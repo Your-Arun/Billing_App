@@ -61,8 +61,13 @@ const LoginScreen = ({ navigation }) => {
           text2: `Welcome back, ${userData.name}`,
         });
 
-       
-        navigation.replace('Dashboard'); 
+       if (userData.role === 'Admin') {
+            navigation.replace('Dashboard'); 
+        } else if (userData.role === 'Reading Taker') {
+            navigation.replace('ReadingTakerScreen'); 
+        } else {
+            Alert.alert("Error", "Unauthorized Role Access");
+        }
       }
     } catch (error) {
       console.log("Login Error:", error.response?.data);

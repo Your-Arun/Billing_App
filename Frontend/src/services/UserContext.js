@@ -30,10 +30,18 @@ export const UserProvider = ({ children }) => {
     await AsyncStorage.setItem('userToken', userData.token);
   };
 
-  const logout = async () => {
+ // src/context/UserContext.js में
+
+const logout = async () => {
+  try {
     setUser(null);
-    await AsyncStorage.clear();
-  };
+    await AsyncStorage.removeItem('userData');
+    await AsyncStorage.removeItem('userToken');
+  
+  } catch (error) {
+    console.error("Logout Error:", error);
+  }
+};
 
   return (
     <UserContext.Provider value={{ user, setUser, login, logout, loading }}>
