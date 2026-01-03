@@ -1,73 +1,151 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useContext } from 'react';
+import {
+  View, Text, StyleSheet, TouchableOpacity, ScrollView,
+  Modal, TextInput, Alert
+} from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import UserProfile from './adminPage/UserProfile';
 
 const Dashboard = ({ navigation }) => {
-  // Mock Data (Slide 5 के हिसाब से)
-  const dashboardItems = [
-    { title: 'Sub-meter Readings', status: 'Submitted (9/9)', color: '#4caf50', icon: 'speedometer' },
-    { title: 'Approval', status: 'Pending', color: '#ff9800', icon: 'check-circle-outline' },
-    { title: 'AVVNL Bill', status: 'Not Uploaded', color: '#f44336', icon: 'file-upload-outline' },
-    { title: 'Solar Data', status: 'Not Entered', color: '#f44336', icon: 'solar-power' },
-    { title: 'DG Data (3 sets)', status: 'Not Entered', color: '#f44336', icon: 'engine' },
-    { title: 'Reconciliation', status: 'Waiting', color: '#9e9e9e', icon: 'calculator' },
+  const [profileVisible, setProfileVisible] = useState(false);
+  const [tenantModalVisible, setTenantModalVisible] = useState(false);
+
+  const navIcons = [
+    { name: 'Home', icon: 'home-outline', route: 'Home' },
+    { name: 'Readings', icon: 'speedometer', route: 'Readings' },
+    { name: 'Approval', icon: 'check-decagram-outline', route: 'Approval' },
+    { name: 'AVVNL Bill', icon: 'lightning-bolt-outline', route: 'Bill' },
+    { name: 'Tenants', icon: 'account-group-outline', route: 'Tenants' },
+    { name: 'Statements', icon: 'file-document-outline', route: 'Home' },
   ];
 
+
+  const getFormattedDate = () => {
+    const date = new Date();
+    const day = date.getDate().toString().padStart(2, '0');
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const month = monthNames[date.getMonth()];
+    const year = date.getFullYear();
+
+    return {
+      displayDate: `${day} ${month}`,
+      cycleMonth: `${year}`
+    };
+  };
+  const { displayDate, cycleMonth } = getFormattedDate();
   return (
-    <ScrollView style={styles.container}>
-      {/* Property & Period Header */}
+    <View style={styles.container}>
+     
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Complex A | Jan 2026</Text>
-        <Text style={styles.headerSub}>Control Center</Text>
+        <TouchableOpacity onPress={() => setProfileVisible(true)}>
+          <MaterialCommunityIcons name="account-circle" size={45} color="white" />
+        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <Text style={styles.dateText}>{displayDate}</Text>
+          <Text style={styles.monthText}>{cycleMonth}</Text>
+        </View>
       </View>
 
-      <View style={styles.content}>
-        {dashboardItems.map((item, index) => (
-          <TouchableOpacity key={index} style={styles.card}>
-            <View style={styles.cardInfo}>
-              <View style={[styles.iconBox, { backgroundColor: item.color + '15' }]}>
-                <MaterialCommunityIcons name={item.icon} size={26} color={item.color} />
-              </View>
-              <View style={{ marginLeft: 15 }}>
-                <Text style={styles.itemTitle}>{item.title}</Text>
-                <Text style={[styles.itemStatus, { color: item.color }]}>{item.status}</Text>
-              </View>
-            </View>
-            <MaterialCommunityIcons name="chevron-right" size={24} color="#ccc" />
+      <ScrollView style={styles.content}>
+    
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <View style={styles.iconGrid}>
+          {navIcons.map((item, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.iconCard}
+              onPress={() => navigation.navigate(item.route)}
+            >
+              <MaterialCommunityIcons name={item.icon} size={30} color="#333399" />
+              <Text style={styles.iconLabel}>{item.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={styles.entrySection}>
+          <Text style={styles.sectionTitle}>Tenants & Setup</Text>
+          <TouchableOpacity
+            style={styles.addTenantBtn}
+            onPress={() => setTenantModalVisible(true)}
+          >
+            <MaterialCommunityIcons name="account-plus" size={24} color="white" />
+            <Text style={styles.addTenantBtnText}>Add New Tenant / Shop</Text>
           </TouchableOpacity>
-        ))}
-      </View>
+        </View>
 
-      {/* Slide 5 Bottom Button */}
-      <TouchableOpacity style={styles.nextButton} onPress={() => navigation.navigate('Login')}>
-        <Text style={styles.nextText}>Logout / Go to Next Step</Text>
-      </TouchableOpacity>
-    </ScrollView>
+       
+        <Text style={styles.sectionTitle}>Current Status</Text>
+        <View style={styles.statusList}>
+          <View style={styles.statusItem}>
+            <Text style={styles.statusLabel}>Reading Status</Text>
+            <Text style={{ color: 'green', fontWeight: 'bold' }}>9/9 Done</Text>
+          </View>
+          <View style={styles.statusItem}>
+            <Text style={styles.statusLabel}>Bill Upload</Text>
+            <Text style={{ color: 'red', fontWeight: 'bold' }}>Pending</Text>
+          </View>
+        </View>
+        <View style={{ height: 100 }} />
+      </ScrollView>
+
+
+      {/* --- Tenant Modal --- */}
+      <Modal visible={tenantModalVisible} animationType="slide">
+        <ScrollView style={{ padding: 20, marginTop: 40 }}>
+          <Text style={styles.modalTitle}>Register New Tenant</Text>
+          <TextInput style={styles.input} placeholder="Name / Shop ID" placeholderTextColor="#999" />
+          <TextInput style={styles.input} placeholder="Meter ID" placeholderTextColor="#999" />
+          <TextInput style={styles.input} placeholder="Opening Meter" keyboardType="numeric" placeholderTextColor="#999" />
+          <TextInput style={styles.input} placeholder="Rate (Rs/Unit)" keyboardType="numeric" placeholderTextColor="#999" />
+          <TextInput style={styles.input} placeholder="Fixed Charge" keyboardType="numeric" placeholderTextColor="#999" />
+
+          <TouchableOpacity style={styles.saveBtn} onPress={() => setTenantModalVisible(false)}>
+            <Text style={{ color: 'white', fontWeight: 'bold' }}>Save Tenant</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setTenantModalVisible(false)} style={{ marginTop: 20, alignSelf: 'center' }}>
+            <Text style={{ color: 'red' }}>Cancel</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </Modal>
+
+      <UserProfile 
+        visible={profileVisible} 
+        onClose={() => setProfileVisible(false)} 
+      />
+
+
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f2f5' },
-  header: { backgroundColor: '#333399', padding: 25, paddingTop: 50 },
-  headerTitle: { color: 'white', fontSize: 20, fontWeight: 'bold' },
-  headerSub: { color: '#ccc', fontSize: 14 },
-  content: { padding: 15 },
-  card: { 
-    backgroundColor: 'white', 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between', 
-    padding: 15, 
-    borderRadius: 12, 
-    marginBottom: 12,
-    elevation: 2
+  container: { flex: 1, backgroundColor: '#f5f7fa' },
+  header: {
+    backgroundColor: '#333399', paddingHorizontal: 20, paddingBottom: 30, paddingTop: 50,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    borderBottomLeftRadius: 30, borderBottomRightRadius: 30
   },
-  cardInfo: { flexDirection: 'row', alignItems: 'center' },
-  iconBox: { padding: 10, borderRadius: 10 },
-  itemTitle: { fontSize: 16, fontWeight: 'bold', color: '#333' },
-  itemStatus: { fontSize: 13, fontWeight: '600', marginTop: 2 },
-  nextButton: { backgroundColor: '#333399', margin: 15, padding: 18, borderRadius: 12, alignItems: 'center' },
-  nextText: { color: 'white', fontWeight: 'bold', fontSize: 16 }
+  headerRight: { alignItems: 'flex-end' },
+  dateText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
+  monthText: { color: '#ccc', fontSize: 12 },
+  content: { padding: 20 },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 15, marginTop: 10 },
+  iconGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  iconCard: { backgroundColor: 'white', width: '31%', padding: 15, borderRadius: 15, alignItems: 'center', marginBottom: 15, elevation: 3 },
+  iconLabel: { fontSize: 10, fontWeight: 'bold', marginTop: 8, color: '#555' },
+  addTenantBtn: { backgroundColor: '#333399', flexDirection: 'row', padding: 15, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  addTenantBtnText: { color: 'white', fontWeight: 'bold', marginLeft: 10 },
+  statusList: { backgroundColor: 'white', borderRadius: 15, padding: 15 },
+  statusItem: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 0.5, borderColor: '#eee' },
+  statusLabel: { color: '#333' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
+  profileModal: { backgroundColor: 'white', borderRadius: 25, padding: 25, alignItems: 'center' },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, color: '#333399' },
+  profileDetail: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginBottom: 10 },
+  label: { fontWeight: 'bold', color: '#666' },
+  logoutBtn: { backgroundColor: '#d32f2f', padding: 12, borderRadius: 10, width: '100%', alignItems: 'center', marginTop: 20 },
+  input: { backgroundColor: '#f0f0f0', padding: 12, borderRadius: 10, marginBottom: 15, color: '#000' },
+  saveBtn: { backgroundColor: '#4caf50', padding: 15, borderRadius: 10, alignItems: 'center' }
 });
 
 export default Dashboard;

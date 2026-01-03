@@ -8,6 +8,7 @@ const SignupScreen = ({ navigation }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [role, setRole] = useState('Reading Taker'); 
   const [adminCodeInput, setAdminCodeInput] = useState(''); 
   const [loading, setLoading] = useState(false);
@@ -25,22 +26,22 @@ const SignupScreen = ({ navigation }) => {
     setLoading(true);
     try {
       const response = await axios.post(`${API_URL}/signup`, {
-        name, email, password, role,
+        name, email, password, role,companyName,
         adminCodeInput: role === 'Reading Taker' ? adminCodeInput : null
       });
   
       if (response.status === 201) {
-        // सफलता का मैसेज
+      
         Toast.show({
           type: 'success',
           text1: 'Success! ✅',
           text2: role === 'Admin' 
                   ? `Account created! Code: ${response.data.adminCode}` 
                   : 'Account created successfully!',
-          visibilityTime: 5000, // एडमिन कोड देखने के लिए थोड़ा ज्यादा समय (5 सेकंड)
+          visibilityTime: 5000, 
         });
   
-        // 2 सेकंड बाद लॉगिन स्क्रीन पर भेजें
+       
         setTimeout(() => {
           navigation.navigate('Login');
         }, 2000);
@@ -72,6 +73,10 @@ const SignupScreen = ({ navigation }) => {
 
         <Text style={styles.label}>Password</Text>
         <TextInput style={styles.input} placeholder="Create password" secureTextEntry value={password} onChangeText={setPassword} />
+
+       <Text style={styles.label}>Company Name</Text>
+        <TextInput style={styles.input} placeholder="Company Name"  value={companyName} onChangeText={setCompanyName} />
+
 
         <Text style={styles.label}>Who are you?</Text>
         <View style={styles.roleContainer}>
