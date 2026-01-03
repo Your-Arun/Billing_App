@@ -269,3 +269,4 @@ export default TenantsScreen;
 
 
 //paste krna hai fix krne ko de dia
+//kaam kr rha naa
