@@ -142,3 +142,5 @@ const styles = StyleSheet.create({
 });
 
 export default TenantsScreen;
+
+//compnay wise data store hogaa 
