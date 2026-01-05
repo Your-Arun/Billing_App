@@ -9,8 +9,9 @@ import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
 import SolarScreen from './SolarScreen';
 import DGScreen from './DGScreen';
+import Toast from 'react-native-toast-message'; 
 
-const TenantsScreen = () => {
+const TenantsScreen = ({navigation}) => {
   const { user } = useContext(UserContext);
   const [activeTab, setActiveTab] = useState('Tenants'); 
   const [tenants, setTenants] = useState([]);
@@ -29,20 +30,44 @@ const TenantsScreen = () => {
 
   const companyId = user?.role === 'Admin' ? user?.id : user?.belongsToAdmin;
 
-  const fetchTenants = useCallback(async () => {
+
+   const fetchTenants = useCallback(async () => {
     if (!companyId || activeTab !== 'Tenants') return;
     setLoading(true);
     try {
       const res = await axios.get(`${API_URL}/tenants/${companyId}`);
       setTenants(res.data);
-    } catch (e) { console.log("Fetch Error:", e.message); }
-    finally { setLoading(false); setRefreshing(false); }
-  }, [companyId, activeTab]);
+     
+      if (selectedTenant) {
+        const updated = res.data.find(t => t._id === selectedTenant._id);
+        if (updated) setSelectedTenant(updated);
+      }
+    } catch (e) { 
+      console.log("Fetch Error:", e.message); 
+    } finally { 
+      setLoading(false); 
+      setRefreshing(false); 
+    }
+  }, [companyId, activeTab, selectedTenant]);
 
-  useEffect(() => { fetchTenants(); }, [fetchTenants]);
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchTenants();
+    });
+    return unsubscribe;
+  }, [navigation, fetchTenants]);
 
-  const onRefresh = useCallback(() => { setRefreshing(true); fetchTenants(); }, [fetchTenants]);
+ useEffect(() => { 
+    fetchTenants(); 
+  }, [activeTab]);
 
+  const onRefresh = useCallback(() => { 
+    setRefreshing(true); 
+    fetchTenants(); 
+  }, [fetchTenants]);
+
+
+  
   const handleEditInitiate = (tenant) => {
     setForm({
       name: tenant.name, meterId: tenant.meterId,
@@ -76,19 +101,17 @@ const TenantsScreen = () => {
       };
 
       if (isEditing) {
-        console.log("Updating Tenant ID:", editId);
         await axios.put(`${API_URL}/tenants/${editId}`, tenantData);
-        Alert.alert("Success", "Tenant Updated ✅");
+       Toast.show({ type: 'success', text1: 'Updated ✅', text2: 'Tenant profile saved' });
       } else {
         await axios.post(`${API_URL}/tenants/add`, tenantData);
-        Alert.alert("Success", "Tenant Registered ✅");
+       Toast.show({ type: 'success', text1: 'Success ✅', text2: 'New tenant registered' });
       }
       
       closeFormModal();
       fetchTenants();
     } catch (e) { 
-      console.log("Error Detail:", e.response?.data || e.message);
-      Alert.alert("Error", "Action failed. Please try again."); 
+      Toast.show({ type: 'error', text1: 'Action Failed', text2: e.response?.data?.msg || 'Try again' });
     }
   };
 
@@ -107,7 +130,8 @@ const TenantsScreen = () => {
             await axios.delete(`${API_URL}/tenants/${id}`);
             setDetailModalVisible(false);
             fetchTenants();
-          } catch (e) { Alert.alert("Error", "Delete failed"); }
+             Toast.show({ type: 'success', text1: 'Deleted 🗑️', text2: 'Tenant removed' });
+          } catch (e) {  Toast.show({ type: 'error', text1: 'Error', text2: 'Delete failed' }); }
       }}
     ]);
   };
@@ -121,6 +145,12 @@ const TenantsScreen = () => {
         <View style={styles.cardTextContainer}>
           <Text style={styles.cardTitle}>{item.name}</Text>
           <Text style={styles.cardSubTitle}>Meter ID: {item.meterId}</Text>
+          <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 4}}>
+           <MaterialCommunityIcons name="engine" size={12} color={item.connectedDG ? "#4caf50" : "#999"} />
+           <Text style={[styles.cardSubTitle, {marginLeft: 5, color: item.connectedDG ? "#4caf50" : "#888"}]}>
+             {item.connectedDG || "No DG Connected"}
+           </Text>
+        </View>
         </View>
       </View>
       <View style={styles.cardRight}>
@@ -198,6 +228,12 @@ const TenantsScreen = () => {
                   </View>
                   <Text style={styles.heroName}>{selectedTenant.name}</Text>
                   <Text style={styles.heroId}>Meter: {selectedTenant.meterId}</Text>
+                </View>
+
+                <View style={styles.dgStatusCard}>
+                  <MaterialCommunityIcons name="engine" size={20} color="#333399" />
+                  <Text style={styles.dgStatusLabel}>CONNECTED TO:</Text>
+                  <Text style={styles.dgStatusValue}>{selectedTenant.connectedDG || "No DG Connected"}</Text>
                 </View>
 
                 <View style={styles.actionGrid}>
@@ -392,6 +428,29 @@ const styles = StyleSheet.create({
   submitBtn: { backgroundColor: '#333399', flexDirection: 'row', padding: 22, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginTop: 10, elevation: 5, shadowColor: '#333399', shadowOpacity: 0.3, shadowRadius: 10 },
   submitBtnText: { color: 'white', fontWeight: 'bold', fontSize: 16, marginLeft: 12, letterSpacing: 1 },
   emptyText: { textAlign: 'center', marginTop: 100, color: '#AAA', fontSize: 16 },
+  dgStatusCard: {
+    backgroundColor: '#F0F2FF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    borderRadius: 15,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#D0D7FF'
+  },
+  dgStatusLabel: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#666',
+    marginLeft: 10,
+    marginRight: 5
+  },
+  dgStatusValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333399',
+    textTransform: 'uppercase'
+  },
 });
 
 export default TenantsScreen;

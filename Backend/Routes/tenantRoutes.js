@@ -9,21 +9,29 @@ router.post('/solar/add', async (req, res) => {
     const data = new Solar(req.body);
     await data.save();
     res.status(201).json(data);
-  } catch (err) { 
-    res.status(400).json({ msg: "Solar save failed: " + err.message }); 
+  } catch (err) {
+    res.status(400).json({ msg: "Solar save failed: " + err.message });
   }
 });
 
 router.post('/dg/add', async (req, res) => {
   try {
-    const data = new DG(req.body);
-    await data.save();
-    res.status(201).json(data);
+    const { adminId, dgName, connectedTenants, unitsProduced, fuelCost, date, month } = req.body;
+
+    const dgEntry = new DG(req.body);
+    await dgEntry.save();
+
+    
+    await Tenant.updateMany(
+      { _id: { $in: connectedTenants } }, 
+      { $set: { connectedDG: dgName } }
+    );
+
+    res.status(201).json({ msg: "DG Data and Tenant Mapping Updated Successfully" });
   } catch (err) { 
-    res.status(400).json({ msg: "DG save failed: " + err.message }); 
+    res.status(400).json({ msg: "Error: " + err.message }); 
   }
 });
-
 router.post('/add', async (req, res) => {
   try {
     const tenant = new Tenant(req.body);
@@ -36,15 +44,15 @@ router.post('/add', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   try {
-    const { 
-      name, meterId, openingMeter, ratePerUnit, 
-      multiplierCT, transformerLoss, fixedCharge 
+    const {
+      name, meterId, openingMeter, ratePerUnit,
+      multiplierCT, transformerLoss, fixedCharge
     } = req.body;
 
     const updatedData = {
       name,
       meterId,
-      openingMeter: Number(openingMeter), 
+      openingMeter: Number(openingMeter),
       ratePerUnit: Number(ratePerUnit),
       multiplierCT: Number(multiplierCT) || 1,
       transformerLoss: Number(transformerLoss) || 0,
@@ -52,8 +60,8 @@ router.put('/:id', async (req, res) => {
     };
 
     const updatedTenant = await Tenant.findByIdAndUpdate(
-      req.params.id, 
-      updatedData, 
+      req.params.id,
+      updatedData,
       { new: true, runValidators: true }
     );
 
@@ -70,8 +78,8 @@ router.delete('/:id', async (req, res) => {
     const deleted = await Tenant.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ msg: "Tenant not found" });
     res.json({ msg: "Tenant Deleted Successfully" });
-  } catch (err) { 
-    res.status(500).json({ msg: "Delete failed: " + err.message }); 
+  } catch (err) {
+    res.status(500).json({ msg: "Delete failed: " + err.message });
   }
 });
 
