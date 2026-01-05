@@ -32,6 +32,8 @@ router.post('/dg/add', async (req, res) => {
     res.status(400).json({ msg: "Error: " + err.message }); 
   }
 });
+
+
 router.post('/add', async (req, res) => {
   try {
     const tenant = new Tenant(req.body);
