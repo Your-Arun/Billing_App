@@ -395,3 +395,5 @@ const styles = StyleSheet.create({
 });
 
 export default TenantsScreen;
+
+// kaam kr diya
