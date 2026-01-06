@@ -5,6 +5,7 @@ require('dotenv').config();
 
 const authRoutes = require('./Routes/auth'); 
 const tenantRoutes = require('./Routes/tenantRoutes'); 
+const dgroutes = require('./Routes/dgroutes'); 
 
 const app = express();
 
@@ -17,6 +18,7 @@ mongoose.connect(process.env.MONGO_URI)
 
 app.use('', authRoutes); 
 app.use('/tenants', tenantRoutes); 
+app.use('/dg', dgroutes); 
 
 
 

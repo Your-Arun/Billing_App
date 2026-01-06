@@ -31,16 +31,16 @@ const TenantsScreen = ({navigation}) => {
   const companyId = user?.role === 'Admin' ? user?.id : user?.belongsToAdmin;
 
 
- const fetchTenants = useCallback(async () => {
+const fetchTenants = useCallback(async () => {
     if (!companyId || activeTab !== 'Tenants') return;
     setLoading(true);
     try {
       const res = await axios.get(`${API_URL}/tenants/${companyId}`);
       setTenants(res.data);
-      
+     
       if (selectedTenant) {
-        const updated = res.data.find(t => t._id === selectedTenant._id);
-        if (updated) setSelectedTenant(updated);
+        const freshData = res.data.find(t => t._id === selectedTenant._id);
+        if (freshData) setSelectedTenant(freshData); 
       }
     } catch (e) { 
       console.log("Fetch Error"); 
@@ -48,15 +48,12 @@ const TenantsScreen = ({navigation}) => {
       setLoading(false); 
       setRefreshing(false); 
     }
-  }, [companyId, activeTab, selectedTenant]);
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      fetchTenants();
-    });
-    return unsubscribe;
-  }, [navigation, fetchTenants]);
+}, [companyId, activeTab, selectedTenant]);
 
-  useEffect(() => { fetchTenants(); }, [activeTab]);
+
+useEffect(() => {
+    fetchTenants();
+}, [activeTab, fetchTenants]);
 
   const onRefresh = useCallback(() => { 
     setRefreshing(true); 
@@ -71,6 +68,7 @@ const TenantsScreen = ({navigation}) => {
       openingMeter: tenant.openingMeter.toString(),
       multiplierCT: tenant.multiplierCT.toString(),
       ratePerUnit: tenant.ratePerUnit.toString(),
+      connectedDG: tenant.ratePerUnit.toString(),
       transformerLoss: tenant.transformerLoss.toString(),
       fixedCharge: tenant.fixedCharge.toString()
     });
@@ -94,6 +92,7 @@ const TenantsScreen = ({navigation}) => {
         ratePerUnit: Number(form.ratePerUnit),
         multiplierCT: Number(form.multiplierCT) || 1,
         transformerLoss: Number(form.transformerLoss) || 0,
+        connectedDG: Number(form.transformerLoss) || 0,
         fixedCharge: Number(form.fixedCharge) || 0
       };
 
@@ -116,7 +115,7 @@ const TenantsScreen = ({navigation}) => {
     setTenantModalVisible(false);
     setIsEditing(false);
     setEditId(null);
-    setForm({ name: '', meterId: '', openingMeter: '', multiplierCT: '', ratePerUnit: '', transformerLoss: '0', fixedCharge: '0' });
+    setForm({ name: '', meterId: '', openingMeter: '', multiplierCT: '', ratePerUnit: '', transformerLoss: '0',connectedDG, fixedCharge: '0' });
   };
 
   const handleDelete = (id, name) => {
@@ -142,11 +141,11 @@ const TenantsScreen = ({navigation}) => {
         <View style={styles.cardTextContainer}>
           <Text style={styles.cardTitle}>{item.name}</Text>
           <Text style={styles.cardSubTitle}>Meter ID: {item.meterId}</Text>
-         <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 4}}>
-            <MaterialCommunityIcons name="engine" size={12} color={item.connectedDG !== "None" ? "#4caf50" : "#999"} />
-            <Text style={{fontSize: 10, marginLeft: 5, color: item.connectedDG !== "None" ? "#4caf50" : "#999", fontWeight:'bold'}}>
-               {item.connectedDG || "No DG"}
-            </Text>
+         <View style={styles.cardPill}>
+             <MaterialCommunityIcons name="engine" size={10} color={item.connectedDG !== "None" ? "#4caf50" : "#999"} />
+             <Text style={[styles.cardPillText, {color: item.connectedDG !== "None" ? "#4caf50" : "#999"}]}>
+               {item.connectedDG || "None"}
+             </Text>
           </View>
         </View>
       </View>
@@ -451,5 +450,3 @@ const styles = StyleSheet.create({
 });
 
 export default TenantsScreen;
-
-// kaam kr diya
