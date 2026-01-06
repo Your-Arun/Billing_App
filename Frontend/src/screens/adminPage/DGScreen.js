@@ -8,129 +8,236 @@ import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
 
 const DGScreen = () => {
-    const { user } = useContext(UserContext);
-    const companyId = user?.id;
+  const { user } = useContext(UserContext);
+  const companyId = user?._id || user?.id;
 
-    const [loading, setLoading] = useState(false);
-    const [date, setDate] = useState(new Date());
-    const [showDatePicker, setShowDatePicker] = useState(false);
-    const [selectedDG, setSelectedDG] = useState('DG Set 1');
-    const [units, setUnits] = useState('');
-    const [cost, setCost] = useState('');
-    const [totals, setTotals] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [loadingReport, setLoadingReport] = useState(false);
 
-    // महीना हमेशा English फॉर्मेट में निकालें ताकि Backend समझ सके
-    const monthName = date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  const [date, setDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
-    const fetchMonthlySummary = useCallback(async () => {
-        if (!companyId) return; // 🟢 सुरक्षा: अगर ID नहीं है तो कॉल न करें
-        try {
-            // URL चेक करें: /dg/ या /api/dg/ (जो भी आपके server.js में है)
-            const res = await axios.get(`${API_URL}/dg/monthly-summary/${companyId}?month=${monthName}`);
-            setTotals(res.data || []);
-        } catch (e) {
-            console.log("Summary Fetch Error:", e.message);
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+
+  const [selectedDG, setSelectedDG] = useState('DG Set 1');
+  const [units, setUnits] = useState('');
+  const [cost, setCost] = useState('');
+
+  const [totals, setTotals] = useState([]);
+  const [reportStart, setReportStart] = useState(new Date());
+  const [reportEnd, setReportEnd] = useState(new Date());
+  const [reportData, setReportData] = useState([]);
+
+  // ✅ monthKey for backend
+  const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  const monthName = date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+  /* ======================
+     MONTHLY SUMMARY
+  ====================== */
+  const fetchMonthlySummary = useCallback(async () => {
+    if (!companyId) return;
+    try {
+      const res = await axios.get(
+        `${API_URL}/dg/monthly-summary/${companyId}?monthKey=${monthKey}`
+      );
+      setTotals(res.data || []);
+    } catch (e) {
+      Toast.show({ type: 'error', text1: 'Monthly fetch failed' });
+    }
+  }, [companyId, monthKey]);
+
+  useEffect(() => {
+    fetchMonthlySummary();
+  }, [fetchMonthlySummary]);
+
+  /* ======================
+     SAVE DAILY LOG
+  ====================== */
+  const handleSave = async () => {
+    if (!units || !cost) {
+      Toast.show({ type: 'error', text1: 'Required fields missing' });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await axios.post(`${API_URL}/dg/add-log`, {
+        adminId: companyId,
+        dgName: selectedDG,
+        date: date.toISOString(),
+        unitsProduced: Number(units),
+        fuelCost: Number(cost)
+      });
+
+      Toast.show({ type: 'success', text1: 'Saved successfully' });
+      setUnits('');
+      setCost('');
+      fetchMonthlySummary();
+    } catch (e) {
+      Toast.show({ type: 'error', text1: 'Save failed' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /* ======================
+     DATE RANGE REPORT
+  ====================== */
+  const fetchRangeReport = async () => {
+    setLoadingReport(true);
+    try {
+      const res = await axios.get(`${API_URL}/dg/report`, {
+        params: {
+          adminId: companyId,
+          startDate: reportStart.toISOString(),
+          endDate: reportEnd.toISOString()
         }
-    }, [companyId, monthName]);
+      });
+      setReportData(res.data || []);
+    } catch (e) {
+      Toast.show({ type: 'error', text1: 'Report failed' });
+    } finally {
+      setLoadingReport(false);
+    }
+  };
 
-    useEffect(() => {
-        fetchMonthlySummary();
-    }, [fetchMonthlySummary]);
+  return (
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 50 }}>
 
-    const handleSave = async () => {
-        if (!units || !cost) {
-            Toast.show({ type: 'error', text1: 'Required', text2: 'Please fill all fields' });
-            return;
-        }
-        setLoading(true);
-        try {
-            await axios.post(`${API_URL}/dg/add-log`, {
-                adminId: companyId,
-                dgName: selectedDG,
-                date: date.toISOString(),
-                unitsProduced: Number(units),
-                fuelCost: Number(cost)
-            });
-            Toast.show({ type: 'success', text1: 'Saved Successfully ✅' });
-            setUnits(''); setCost('');
-            fetchMonthlySummary();
-        } catch (e) {
-            Toast.show({ type: 'error', text1: 'Error', text2: 'Save failed' });
-        } finally {
-            setLoading(false);
-        }
-    };
+        {/* DATE PICKER */}
+        <TouchableOpacity style={styles.datePickerBtn} onPress={() => setShowDatePicker(true)}>
+          <MaterialCommunityIcons name="calendar" size={22} color="#fff" />
+          <Text style={styles.dateText}>{date.toDateString()}</Text>
+        </TouchableOpacity>
 
-    // 🔴 "Text strings" एरर हटाने के लिए JSX को बिल्कुल टाइट (Tight) रखा गया है
-    return (
-        <View style={styles.container}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-                <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDatePicker(true)}>
-                    <MaterialCommunityIcons name="calendar" size={24} color="white" />
-                    <Text style={styles.dateBtnText}>{date.toDateString()}</Text>
-                </TouchableOpacity>
-                {showDatePicker && (<DateTimePicker value={date} mode="date" onChange={(e, d) => { setShowDatePicker(false); if (d) setDate(d); }} />)}
-                <View style={styles.dgPickerRow}>
-                    {['DG Set 1', 'DG Set 2', 'DG Set 3'].map((item) => (
-                        <TouchableOpacity key={item} style={[styles.dgOption, selectedDG === item && styles.dgActive]} onPress={() => setSelectedDG(item)}>
-                            <Text style={[styles.dgOptionText, selectedDG === item && { color: 'white' }]}>{item}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-                <View style={styles.inputCard}>
-                    <Text style={styles.cardInfo}>Entry for {selectedDG}</Text>
-                    <TextInput style={styles.input} placeholder="Units Produced (kWh)" keyboardType="numeric" value={units} onChangeText={setUnits} />
-                    <TextInput style={styles.input} placeholder="Fuel Cost (₹)" keyboardType="numeric" value={cost} onChangeText={setCost} />
-                    <TouchableOpacity style={styles.submitBtn} onPress={handleSave} disabled={loading}>
-                        {loading ? <ActivityIndicator color="white" /> : <Text style={styles.submitBtnText}>SUBMIT LOG</Text>}
-                    </TouchableOpacity>
-                </View>
-                <Text style={styles.sectionTitle}>Monthly Totals ({monthName})</Text>
-                {totals.length === 0 ? (
-                    <Text style={styles.emptyText}>No data for this month</Text>
-                ) : (
-                    totals.map((item, index) => (
-                        <View key={index} style={styles.summaryCard}>
-                            <Text style={styles.summaryDGName}>{item._id}</Text>
-                            <View style={styles.summaryRow}>
-                                <View>
-                                    <Text style={styles.summaryLabel}>Total Units</Text>
-                                    <Text style={styles.summaryValue}>{item.totalUnits} kWh</Text>
-                                </View>
-                                <View style={{ alignItems: 'flex-end' }}>
-                                    <Text style={styles.summaryLabel}>Total Cost</Text>
-                                    <Text style={[styles.summaryValue, { color: '#4caf50' }]}>₹{item.totalCost}</Text>
-                                </View>
-                            </View>
-                        </View>
-                    ))
-                )}
-                <View style={{ height: 100 }} />
-            </ScrollView>
+        {showDatePicker && (
+          <DateTimePicker
+            value={date}
+            mode="date"
+            onChange={(e, d) => {
+              setShowDatePicker(false);
+              if (d) setDate(d);
+            }}
+          />
+        )}
+
+        {/* DG SELECT */}
+        <View style={styles.dgSelector}>
+          {['DG Set 1', 'DG Set 2', 'DG Set 3'].map(dg => (
+            <TouchableOpacity
+              key={dg}
+              style={[styles.dgButton, selectedDG === dg && styles.dgButtonActive]}
+              onPress={() => setSelectedDG(dg)}
+            >
+              <Text style={[styles.dgButtonText, selectedDG === dg && { color: '#fff' }]}>{dg}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
-    );
+
+        {/* INPUT CARD */}
+        <View style={styles.inputCard}>
+          <Text style={styles.cardTitle}>{selectedDG} Daily Entry</Text>
+          <TextInput style={styles.input} placeholder="Units (kWh)" keyboardType="numeric" value={units} onChangeText={setUnits} />
+          <TextInput style={styles.input} placeholder="Fuel Cost ₹" keyboardType="numeric" value={cost} onChangeText={setCost} />
+
+          <TouchableOpacity style={styles.submitBtn} onPress={handleSave}>
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>SAVE</Text>}
+          </TouchableOpacity>
+        </View>
+
+        {/* DATE RANGE REPORT */}
+        <Text style={styles.sectionTitle}>Date Range Report</Text>
+
+        <View style={styles.row}>
+          <TouchableOpacity style={styles.rangeBtn} onPress={() => setShowStartPicker(true)}>
+            <Text>From: {reportStart.toLocaleDateString()}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.rangeBtn} onPress={() => setShowEndPicker(true)}>
+            <Text>To: {reportEnd.toLocaleDateString()}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {showStartPicker && (
+          <DateTimePicker
+            value={reportStart}
+            mode="date"
+            onChange={(e, d) => {
+              setShowStartPicker(false);
+              if (d) setReportStart(d);
+            }}
+          />
+        )}
+
+        {showEndPicker && (
+          <DateTimePicker
+            value={reportEnd}
+            mode="date"
+            onChange={(e, d) => {
+              setShowEndPicker(false);
+              if (d) setReportEnd(d);
+            }}
+          />
+        )}
+
+        <TouchableOpacity style={styles.calcBtn} onPress={fetchRangeReport}>
+          {loadingReport ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: 'bold' }}>CALCULATE</Text>}
+        </TouchableOpacity>
+
+        {reportData.map((r, i) => (
+          <View key={i} style={styles.resultCard}>
+            <Text style={styles.resultName}>{r._id}</Text>
+            <Text>Units: {r.totalUnits}</Text>
+            <Text>Fuel: ₹{r.totalCost}</Text>
+            <Text style={{ fontSize: 10 }}>Days: {r.daysRecorded}</Text>
+          </View>
+        ))}
+
+        {/* MONTHLY SUMMARY */}
+        <Text style={styles.sectionTitle}>Monthly Totals ({monthName})</Text>
+        <ScrollView horizontal>
+          {totals.map((t, i) => (
+            <View key={i} style={styles.summaryCard}>
+              <Text style={styles.summaryDGName}>{t._id}</Text>
+              <Text style={styles.summaryValue}>{t.totalUnits} kWh</Text>
+              <Text style={styles.summaryValueCost}>₹{t.totalCost}</Text>
+            </View>
+          ))}
+        </ScrollView>
+
+      </ScrollView>
+    </View>
+  );
 };
+
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f5f7fa', padding: 20 },
-    dateBtn: { backgroundColor: '#333399', flexDirection: 'row', padding: 15, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 30 },
-    dateBtnText: { color: 'white', fontWeight: 'bold', marginLeft: 10 },
-    dgPickerRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
-    dgOption: { flex: 1, backgroundColor: 'white', padding: 12, borderRadius: 10, alignItems: 'center', marginHorizontal: 4, elevation: 2 },
-    dgActive: { backgroundColor: '#333399' },
-    dgOptionText: { fontWeight: 'bold', color: '#666', fontSize: 11 },
-    inputCard: { backgroundColor: 'white', padding: 20, borderRadius: 20, marginTop: 20, elevation: 3 },
-    cardInfo: { fontSize: 12, color: '#888', marginBottom: 15, fontWeight: 'bold', textAlign: 'center' },
-    input: { backgroundColor: '#f8f9fd', padding: 15, borderRadius: 10, marginBottom: 12, fontSize: 16, borderBottomWidth: 1, borderColor: '#eee', color: '#000' },
-    submitBtn: { backgroundColor: '#333399', padding: 18, borderRadius: 12, alignItems: 'center', marginTop: 10 },
-    submitBtnText: { color: 'white', fontWeight: 'bold' },
+    datePickerBtn: { backgroundColor: '#333399', flexDirection: 'row', padding: 15, borderRadius: 10, alignItems: 'center', marginTop: 30 },
+    dateText: { color: '#fff', fontWeight: 'bold', marginLeft: 10 },
+    dgSelector: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 20 },
+    dgButton: { flex: 1, padding: 12, borderRadius: 10, backgroundColor: '#fff', marginHorizontal: 4, alignItems: 'center', elevation: 2 },
+    dgButtonActive: { backgroundColor: '#333399' },
+    dgButtonText: { color: '#666', fontWeight: 'bold', fontSize: 12 },
+    inputCard: { backgroundColor: '#fff', padding: 20, borderRadius: 15, elevation: 3 },
+    cardTitle: { fontSize: 14, fontWeight: 'bold', color: '#888', marginBottom: 15, textAlign: 'center' },
+    input: { height: 50, backgroundColor: '#f9f9f9', borderRadius: 10, paddingHorizontal: 15, marginBottom: 15, borderBottomWidth: 1, borderColor: '#eee' },
+    submitBtn: { backgroundColor: '#333399', borderRadius: 10, alignItems: 'center', padding: 15 },
+    submitBtnText: { color: '#fff', fontWeight: 'bold' },
     sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#333399', marginTop: 30, marginBottom: 15 },
-    summaryCard: { backgroundColor: 'white', padding: 15, borderRadius: 15, marginBottom: 10, elevation: 2 },
-    summaryDGName: { fontWeight: 'bold', color: '#333399', fontSize: 16, borderBottomWidth: 1, borderColor: '#eee', paddingBottom: 5, marginBottom: 10 },
-    summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
-    summaryLabel: { fontSize: 10, color: '#999', fontWeight: 'bold' },
-    summaryValue: { fontSize: 17, fontWeight: 'bold', marginTop: 2 },
-    emptyText: { textAlign: 'center', color: '#999', marginTop: 20 }
+    summaryCard: { backgroundColor: '#fff', padding: 20, borderRadius: 15, marginRight: 12, elevation: 2, alignItems: 'center', minWidth: 120 },
+    summaryDGName: { fontWeight: 'bold', color: '#333', marginBottom: 5 },
+    summaryValue: { fontSize: 16, fontWeight: 'bold', color: '#333399' },
+    summaryValueCost: { fontSize: 13, color: '#4caf50', marginTop: 2 },
+    noDataCard: { backgroundColor: '#fff', padding: 20, borderRadius: 10, width: 200, alignItems: 'center' },
+    row: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 10 },
+rangeBtn: { flex: 1, padding: 12, backgroundColor: '#fff', borderRadius: 10, marginHorizontal: 5, alignItems: 'center' },
+calcBtn: { backgroundColor: '#333399', padding: 15, borderRadius: 10, alignItems: 'center', marginBottom: 10 },
+resultCard: { backgroundColor: '#fff', padding: 15, borderRadius: 10, marginBottom: 10 },
+resultName: { fontWeight: 'bold', color: '#333399' },
+
 });
 
 export default DGScreen;

@@ -3,68 +3,130 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const DGLog = require('../Modals/DG');
 
-// 1. डेली लॉग सेव या अपडेट करना (POST: /dg/add-log)
+/* ===============================
+   1. DAILY ADD / UPDATE DG LOG
+================================ */
 router.post('/add-log', async (req, res) => {
   try {
-    const { adminId, dgName, date, unitsProduced, fuelCost } = req.body;
+    let { adminId, dgName, date, unitsProduced, fuelCost } = req.body;
 
-    // तारीख को शुद्ध करें (Time हटाकर 00:00:00 करें)
+    // 🔴 adminId fix
+    adminId = new mongoose.Types.ObjectId(adminId);
+
+    // 🔴 date fix (LOCAL midnight – safest)
     const logDate = new Date(date);
     logDate.setHours(0, 0, 0, 0);
 
-    // महीना निकालें (e.g., "January 2026")
-    const monthStr = logDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    // 🔴 month values
+    const month = logDate.toLocaleString('en-US', {
+      month: 'long',
+      year: 'numeric'
+    });
 
-    // Upsert Logic: अगर इस तारीख का डेटा पहले से है तो अपडेट करें, वरना नया बनाएँ
+    const monthKey = `${logDate.getFullYear()}-${String(
+      logDate.getMonth() + 1
+    ).padStart(2, '0')}`;
+
     const log = await DGLog.findOneAndUpdate(
       { adminId, dgName, date: logDate },
-      { 
-        adminId, 
-        dgName, 
-        date: logDate, 
-        unitsProduced: Number(unitsProduced), 
-        fuelCost: Number(fuelCost), 
-        month: monthStr 
+      {
+        $set: {
+          unitsProduced: Number(unitsProduced),
+          fuelCost: Number(fuelCost),
+          month,
+          monthKey
+        }
       },
-      { upsert: true, new: true }
+      {
+        upsert: true,
+        new: true,
+        runValidators: true
+      }
     );
 
-    res.status(201).json(log);
+    res.status(200).json({
+      success: true,
+      data: log
+    });
+
   } catch (err) {
-    res.status(400).json({ msg: err.message });
+    console.error("DG SAVE ERROR:", err);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
   }
 });
 
-// 2. महीने का टोटल (Total) हिसाब निकालना (GET: /dg/monthly-summary/:adminId)
+/* ===============================
+   2. MONTHLY SUMMARY (MONTH END)
+   /dg/monthly-summary/:adminId
+================================ */
 router.get('/monthly-summary/:adminId', async (req, res) => {
-    try {
-        const { month } = req.query; 
-        const adminId = req.params.adminId;
+  try {
+    const { adminId } = req.params;
+    const { monthKey } = req.query;
 
-        if (!mongoose.Types.ObjectId.isValid(adminId)) {
-            return res.status(400).json({ msg: "Invalid Admin ID" });
+    const data = await DGLog.aggregate([
+      {
+        $match: {
+          adminId: new mongoose.Types.ObjectId(adminId),
+          monthKey
         }
+      },
+      {
+        $group: {
+          _id: '$dgName',
+          totalUnits: { $sum: '$unitsProduced' },
+          totalCost: { $sum: '$fuelCost' },
+          daysRecorded: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
 
-        const summary = await DGLog.aggregate([
-            { 
-                $match: { 
-                    adminId: new mongoose.Types.ObjectId(adminId), 
-                    month: month 
-                } 
-            },
-            { 
-                $group: { 
-                    _id: "$dgName", 
-                    totalUnits: { $sum: "$unitsProduced" }, 
-                    totalCost: { $sum: "$fuelCost" }
-                } 
-            },
-            { $sort: { _id: 1 } }
-        ]);
-        res.json(summary);
-    } catch (err) {
-        res.status(500).json({ msg: err.message });
-    }
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+});
+
+/* ===============================
+   3. DATE RANGE REPORT
+   /dg/report?adminId=&startDate=&endDate=
+================================ */
+router.get('/report', async (req, res) => {
+  try {
+    const { adminId, startDate, endDate } = req.query;
+
+    const start = new Date(startDate);
+    start.setUTCHours(0, 0, 0, 0);
+
+    const end = new Date(endDate);
+    end.setUTCHours(23, 59, 59, 999);
+
+    const data = await DGLog.aggregate([
+      {
+        $match: {
+          adminId: new mongoose.Types.ObjectId(adminId),
+          date: { $gte: start, $lte: end }
+        }
+      },
+      {
+        $group: {
+          _id: '$dgName',
+          totalUnits: { $sum: '$unitsProduced' },
+          totalCost: { $sum: '$fuelCost' },
+          daysRecorded: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
 });
 
 module.exports = router;
