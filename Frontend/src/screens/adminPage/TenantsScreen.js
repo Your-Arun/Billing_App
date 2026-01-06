@@ -24,25 +24,9 @@ const TenantsScreen = ({ navigation }) => {
 
   const [form, setForm] = useState({
     name: '', meterId: '', openingMeter: '', multiplierCT: '1',
-    ratePerUnit: '', transformerLoss: '0', fixedCharge: '0',connectedDG: 'None'
+    ratePerUnit: '', transformerLoss: '0', fixedCharge: '0'
   });
-
-  const [dgList, setDgList] = useState([]);
-
-  const fetchDGs = async () => {
-  try {
-    const res = await axios.get(`${API_URL}/dg/list/${companyId}`)
-
-    setDgList(res.data); 
-  } catch (e) {
-    console.log("DG fetch error");
-  }
-};
-
-useEffect(() => {
-  if (modalVisible) fetchDGs();
-}, [modalVisible]);
-
+  
 
   const companyId = user?.role === 'Admin' ? user?.id : user?.belongsToAdmin;
 
@@ -88,9 +72,7 @@ useEffect(() => {
       multiplierCT: tenant.multiplierCT.toString(),
       ratePerUnit: tenant.ratePerUnit.toString(),
       transformerLoss: tenant.transformerLoss.toString(),
-      fixedCharge: tenant.fixedCharge.toString(),
-     connectedDG: tenant.connectedDG || "None"
-
+      fixedCharge: tenant.fixedCharge.toString()
     });
     setEditId(tenant._id);
     setIsEditing(true);
@@ -111,8 +93,7 @@ useEffect(() => {
         ratePerUnit: Number(form.ratePerUnit),
         multiplierCT: Number(form.multiplierCT) || 1,
         transformerLoss: Number(form.transformerLoss) || 0,
-        fixedCharge: Number(form.fixedCharge) || 0,
-        connectedDG: form.connectedDG
+        fixedCharge: Number(form.fixedCharge) || 0
       };
 
       if (isEditing) {
@@ -308,39 +289,6 @@ useEffect(() => {
                 <View style={{flex: 1}}><PremiumInput label="Fixed Charge" value={form.fixedCharge} onChange={(t)=>setForm({...form, fixedCharge:t})} keyboardType="numeric" /></View>
               </View>
             </FormSection>
-            <FormSection title="DG Connection" icon="engine-outline">
-  <View style={styles.dgSelectWrap}>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-      <TouchableOpacity
-        style={[
-          styles.dgChip,
-          form.connectedDG === "None" && styles.dgChipActive
-        ]}
-        onPress={() => setForm({ ...form, connectedDG: "None" })}
-      >
-        <Text style={form.connectedDG === "None" ? styles.dgChipTextActive : styles.dgChipText}>
-          No DG
-        </Text>
-      </TouchableOpacity>
-
-      {dgList.map(dg => (
-        <TouchableOpacity
-          key={dg}
-          style={[
-            styles.dgChip,
-            form.connectedDG === dg && styles.dgChipActive
-          ]}
-          onPress={() => setForm({ ...form, connectedDG: dg })}
-        >
-          <Text style={form.connectedDG === dg ? styles.dgChipTextActive : styles.dgChipText}>
-            {dg}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  </View>
-</FormSection>
-
             <TouchableOpacity style={styles.submitBtn} onPress={handleSaveOrUpdate}><Text style={styles.submitBtnText}>{isEditing ? "UPDATE PROPERTY" : "CREATE PROPERTY"}</Text></TouchableOpacity>
             <View style={{height: 50}} />
           </ScrollView>
@@ -432,30 +380,6 @@ const styles = StyleSheet.create({
   submitBtn: { backgroundColor: '#333399', padding: 22, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginTop: 10, elevation: 5 },
   submitBtnText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
   emptyText: { textAlign: 'center', marginTop: 100, color: '#AAA', fontSize: 16 },
-  dgSelectWrap: { marginTop: 10 },
-dgChip: {
-  backgroundColor: '#F0F2FF',
-  paddingHorizontal: 18,
-  paddingVertical: 10,
-  borderRadius: 20,
-  marginRight: 10,
-  borderWidth: 1,
-  borderColor: '#D0D7FF'
-},
-dgChipActive: {
-  backgroundColor: '#333399'
-},
-dgChipText: {
-  color: '#333399',
-  fontWeight: 'bold',
-  fontSize: 13
-},
-dgChipTextActive: {
-  color: 'white',
-  fontWeight: 'bold',
-  fontSize: 13
-}
-
 });
 
 export default TenantsScreen;
