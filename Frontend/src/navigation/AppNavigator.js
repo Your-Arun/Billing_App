@@ -57,7 +57,7 @@ const AppNavigator = () => {
               <Stack.Screen 
                 name="DG" 
                 component={DGScreen} 
-                options={{ title: 'DG Log History', headerShown: true }} 
+                options={{ title: 'DG Log', headerShown: true }} 
               />
             </>
           ) : (

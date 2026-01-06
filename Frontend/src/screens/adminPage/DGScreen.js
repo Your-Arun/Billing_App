@@ -195,17 +195,7 @@ const DGScreen = () => {
           </View>
         ))}
 
-        {/* MONTHLY SUMMARY */}
-        <Text style={styles.sectionTitle}>Monthly Totals ({monthName})</Text>
-        <ScrollView horizontal>
-          {totals.map((t, i) => (
-            <View key={i} style={styles.summaryCard}>
-              <Text style={styles.summaryDGName}>{t._id}</Text>
-              <Text style={styles.summaryValue}>{t.totalUnits} kWh</Text>
-              <Text style={styles.summaryValueCost}>₹{t.totalCost}</Text>
-            </View>
-          ))}
-        </ScrollView>
+       
 
       </ScrollView>
     </View>
