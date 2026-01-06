@@ -79,7 +79,7 @@ const HomeTab = ({ navigation }) => {
             <Text style={styles.modalTitle}>User Profile</Text>
             <View style={styles.profileDetail}>
               <Text style={styles.detailLabel}>Name:</Text>
-              <Text style={styles.detailValue}>{user?.name || 'Mukund Sanghi'}</Text>
+              <Text style={styles.detailValue}>{user?.name || ''}</Text>
             </View>
             <View style={styles.profileDetail}>
               <Text style={styles.detailLabel}>Company Name:</Text>

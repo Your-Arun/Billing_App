@@ -7,6 +7,8 @@ import SignupScreen from '../screens/SignupScreen';
 import ReadingTakerScreen from '../screens/ReadingTakerScreen';
 import { UserContext } from '../services/UserContext';
 import TabNavigator from './TabNavigator';
+import DGScreen from '../screens/adminPage/DGScreen';
+import SolarScreen from '../screens/adminPage/SolarScreen';
 
 const Stack = createStackNavigator();
 
@@ -38,11 +40,26 @@ const AppNavigator = () => {
       ) : (
         <>
           {user.role === 'Admin' ? (
-            <Stack.Screen 
-              name="MainTabs"
-              component={TabNavigator} 
-              options={{ headerShown: false }} 
-            />
+            <>
+              {/* 🟢 मुख्य टैब नेविगेटर */}
+              <Stack.Screen 
+                name="MainTabs"
+                component={TabNavigator} 
+                options={{ headerShown: false }} 
+              />
+              
+            
+              <Stack.Screen 
+                name="Solar" 
+                component={SolarScreen} 
+                options={{ title: 'Solar Entry', headerShown: true }} 
+              />
+              <Stack.Screen 
+                name="DG" 
+                component={DGScreen} 
+                options={{ title: 'DG Log History', headerShown: true }} 
+              />
+            </>
           ) : (
             <Stack.Screen 
               name="ReadingTakerScreen" 

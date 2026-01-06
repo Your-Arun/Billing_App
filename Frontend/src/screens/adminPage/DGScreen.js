@@ -1,8 +1,5 @@
 import React, { useState, useEffect, useContext, useCallback } from 'react';
-import { 
-    View, Text, TextInput, StyleSheet, ScrollView, 
-    TouchableOpacity, ActivityIndicator, Modal, Alert 
-} from 'react-native';
+import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
@@ -12,219 +9,128 @@ import API_URL from '../../services/apiconfig';
 
 const DGScreen = () => {
     const { user } = useContext(UserContext);
-    const companyId = user?.role === 'Admin' ? user?.id : user?.belongsToAdmin;
+    const companyId = user?.id;
 
     const [loading, setLoading] = useState(false);
     const [date, setDate] = useState(new Date());
     const [showDatePicker, setShowDatePicker] = useState(false);
-    
-    const [dgList, setDgList] = useState(['DG Set 1', 'DG Set 2', 'DG Set 3']);
     const [selectedDG, setSelectedDG] = useState('DG Set 1');
     const [units, setUnits] = useState('');
     const [cost, setCost] = useState('');
-    const [isUpdateMode, setIsUpdateMode] = useState(false); // क्या पुराना डेटा मिल गया है?
+    const [totals, setTotals] = useState([]);
 
-    const [addModalVisible, setAddModalVisible] = useState(false);
-    const [newDgName, setNewDgName] = useState('');
+    // महीना हमेशा English फॉर्मेट में निकालें ताकि Backend समझ सके
+    const monthName = date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
-    // --- 🟢 लॉजिक: तारीख या DG बदलते ही पुराना डेटा फेच करें ---
-    const checkExistingData = useCallback(async () => {
-        setLoading(true);
+    const fetchMonthlySummary = useCallback(async () => {
+        if (!companyId) return; // 🟢 सुरक्षा: अगर ID नहीं है तो कॉल न करें
         try {
-            const res = await axios.get(`${API_URL}/tenants/dg/fetch-data`, {
-                params: {
-                    adminId: companyId,
-                    dgName: selectedDG,
-                    date: date.toISOString()
-                }
-            });
-
-            if (res.data) {
-                setUnits(res.data.unitsProduced.toString());
-                setCost(res.data.fuelCost.toString());
-                setIsUpdateMode(true);
-                Toast.show({ type: 'info', text1: 'Existing Data Loaded', text2: 'You can now update this entry' });
-            } else {
-                setUnits('');
-                setCost('');
-                setIsUpdateMode(false);
-            }
+            // URL चेक करें: /dg/ या /api/dg/ (जो भी आपके server.js में है)
+            const res = await axios.get(`${API_URL}/dg/monthly-summary/${companyId}?month=${monthName}`);
+            setTotals(res.data || []);
         } catch (e) {
-            console.log("Fetch Error");
-        } finally {
-            setLoading(false);
+            console.log("Summary Fetch Error:", e.message);
         }
-    }, [companyId, selectedDG, date]);
+    }, [companyId, monthName]);
 
     useEffect(() => {
-        checkExistingData();
-    }, [checkExistingData]);
+        fetchMonthlySummary();
+    }, [fetchMonthlySummary]);
 
-    const handleAddDG = () => {
-        if (!newDgName) return Alert.alert("Error", "Enter Name");
-        setDgList([...dgList, newDgName]);
-        setSelectedDG(newDgName);
-        setNewDgName('');
-        setAddModalVisible(false);
-    };
-
-    const deleteDGSet = (name) => {
-        Alert.alert("Delete DG Set", `Do you want to remove ${name} from the list?`, [
-            { text: "Cancel" },
-            { text: "Remove", style: "destructive", onPress: () => {
-                const newList = dgList.filter(i => i !== name);
-                setDgList(newList);
-                if (selectedDG === name) setSelectedDG(newList[0]);
-            }}
-        ]);
-    };
-
-    const handleSaveDGEntry = async () => {
-        if (!units || !cost) return Toast.show({ type: 'error', text1: 'Fill all fields' });
-
+    const handleSave = async () => {
+        if (!units || !cost) {
+            Toast.show({ type: 'error', text1: 'Required', text2: 'Please fill all fields' });
+            return;
+        }
         setLoading(true);
         try {
-            const payload = {
+            await axios.post(`${API_URL}/dg/add-log`, {
                 adminId: companyId,
                 dgName: selectedDG,
                 date: date.toISOString(),
-                month: date.toLocaleString('en-US', { month: 'long' }),
                 unitsProduced: Number(units),
-                fuelCost: Number(cost),
-                connectedTenants: [] 
-            };
-
-            await axios.post(`${API_URL}/tenants/dg/add`, payload);
-            Toast.show({ type: 'success', text1: isUpdateMode ? 'Updated ✅' : 'Saved ✅' });
-            setIsUpdateMode(true);
+                fuelCost: Number(cost)
+            });
+            Toast.show({ type: 'success', text1: 'Saved Successfully ✅' });
+            setUnits(''); setCost('');
+            fetchMonthlySummary();
         } catch (e) {
-            Toast.show({ type: 'error', text1: 'Failed to save' });
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Save failed' });
         } finally {
             setLoading(false);
         }
     };
 
+    // 🔴 "Text strings" एरर हटाने के लिए JSX को बिल्कुल टाइट (Tight) रखा गया है
     return (
-        <View style={{flex: 1, backgroundColor: '#f8f9fd'}}>
-            <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-                
-                {/* Date Selection */}
+        <View style={styles.container}>
+            <ScrollView showsVerticalScrollIndicator={false}>
                 <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDatePicker(true)}>
-                    <MaterialCommunityIcons name="calendar-search" size={22} color="white" />
+                    <MaterialCommunityIcons name="calendar" size={24} color="white" />
                     <Text style={styles.dateBtnText}>{date.toDateString()}</Text>
                 </TouchableOpacity>
-
-                {showDatePicker && (
-                    <DateTimePicker value={date} mode="date" onChange={(e, d) => { setShowDatePicker(false); if(d) setDate(d); }} />
-                )}
-
-                <View style={styles.headerRow}>
-                    <Text style={styles.sectionTitle}>DG Sets Inventory</Text>
-                    <TouchableOpacity style={styles.addSmallBtn} onPress={() => setAddModalVisible(true)}>
-                        <Text style={styles.addSmallText}>+ New Set</Text>
+                {showDatePicker && (<DateTimePicker value={date} mode="date" onChange={(e, d) => { setShowDatePicker(false); if (d) setDate(d); }} />)}
+                <View style={styles.dgPickerRow}>
+                    {['DG Set 1', 'DG Set 2', 'DG Set 3'].map((item) => (
+                        <TouchableOpacity key={item} style={[styles.dgOption, selectedDG === item && styles.dgActive]} onPress={() => setSelectedDG(item)}>
+                            <Text style={[styles.dgOptionText, selectedDG === item && { color: 'white' }]}>{item}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+                <View style={styles.inputCard}>
+                    <Text style={styles.cardInfo}>Entry for {selectedDG}</Text>
+                    <TextInput style={styles.input} placeholder="Units Produced (kWh)" keyboardType="numeric" value={units} onChangeText={setUnits} />
+                    <TextInput style={styles.input} placeholder="Fuel Cost (₹)" keyboardType="numeric" value={cost} onChangeText={setCost} />
+                    <TouchableOpacity style={styles.submitBtn} onPress={handleSave} disabled={loading}>
+                        {loading ? <ActivityIndicator color="white" /> : <Text style={styles.submitBtnText}>SUBMIT LOG</Text>}
                     </TouchableOpacity>
                 </View>
-
-                {/* Horizontal DG Selector with Delete Icon */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dgPickerRow}>
-                    {dgList.map(item => (
-                        <View key={item} style={styles.pillContainer}>
-                            <TouchableOpacity 
-                                style={[styles.dgOption, selectedDG === item && styles.dgActive]} 
-                                onPress={() => setSelectedDG(item)}
-                            >
-                                <Text style={[styles.dgOptionText, selectedDG === item && { color: 'white' }]}>{item}</Text>
-                            </TouchableOpacity>
-                            {/* Delete Button on each DG Set */}
-                            <TouchableOpacity 
-                                style={styles.miniDelete} 
-                                onPress={() => deleteDGSet(item)}
-                            >
-                                <MaterialCommunityIcons name="close-circle" size={18} color="#f44336" />
-                            </TouchableOpacity>
+                <Text style={styles.sectionTitle}>Monthly Totals ({monthName})</Text>
+                {totals.length === 0 ? (
+                    <Text style={styles.emptyText}>No data for this month</Text>
+                ) : (
+                    totals.map((item, index) => (
+                        <View key={index} style={styles.summaryCard}>
+                            <Text style={styles.summaryDGName}>{item._id}</Text>
+                            <View style={styles.summaryRow}>
+                                <View>
+                                    <Text style={styles.summaryLabel}>Total Units</Text>
+                                    <Text style={styles.summaryValue}>{item.totalUnits} kWh</Text>
+                                </View>
+                                <View style={{ alignItems: 'flex-end' }}>
+                                    <Text style={styles.summaryLabel}>Total Cost</Text>
+                                    <Text style={[styles.summaryValue, { color: '#4caf50' }]}>₹{item.totalCost}</Text>
+                                </View>
+                            </View>
                         </View>
-                    ))}
-                </ScrollView>
-
-                {/* Input Card */}
-                <View style={[styles.card, isUpdateMode && styles.updateCard]}>
-                    <View style={styles.modeBadge}>
-                        <Text style={styles.modeText}>{isUpdateMode ? "EDITING EXISTING ENTRY" : "NEW ENTRY"}</Text>
-                    </View>
-                    
-                    <View style={styles.inputWrapper}>
-                        <MaterialCommunityIcons name="flash" size={20} color="#333399" />
-                        <TextInput 
-                            style={styles.input} 
-                            placeholder="Units Produced" 
-                            keyboardType="numeric" 
-                            value={units} 
-                            onChangeText={setUnits} 
-                        />
-                    </View>
-                    <View style={styles.inputWrapper}>
-                        <MaterialCommunityIcons name="currency-inr" size={20} color="#4caf50" />
-                        <TextInput 
-                            style={styles.input} 
-                            placeholder="Diesel Cost" 
-                            keyboardType="numeric" 
-                            value={cost} 
-                            onChangeText={setCost} 
-                        />
-                    </View>
-                </View>
-
-                <TouchableOpacity style={styles.submitBtn} onPress={handleSaveDGEntry} disabled={loading}>
-                    {loading ? <ActivityIndicator color="white" /> : (
-                        <Text style={styles.submitBtnText}>{isUpdateMode ? "UPDATE DATA" : "SAVE DATA"}</Text>
-                    )}
-                </TouchableOpacity>
-
+                    ))
+                )}
                 <View style={{ height: 100 }} />
             </ScrollView>
-
-            {/* Add Modal */}
-            <Modal visible={addModalVisible} animationType="slide" transparent={true}>
-                <View style={styles.modalOverlay}>
-                    <View style={styles.addModalContent}>
-                        <Text style={styles.modalTitle}>New DG Set Name</Text>
-                        <TextInput style={styles.modalInput} value={newDgName} onChangeText={setNewDgName} placeholder="e.g. DG 04" autoFocus />
-                        <TouchableOpacity style={styles.confirmBtn} onPress={handleAddDG}><Text style={{color:'white', fontWeight:'bold'}}>Add DG Set</Text></TouchableOpacity>
-                        <TouchableOpacity style={{marginTop:15}} onPress={()=>setAddModalVisible(false)}><Text style={{color:'red'}}>Cancel</Text></TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
         </View>
     );
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, padding: 20 },
-    dateBtn: { backgroundColor: '#333399', flexDirection: 'row', padding: 15, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginTop: 30, elevation: 5 },
+    container: { flex: 1, backgroundColor: '#f5f7fa', padding: 20 },
+    dateBtn: { backgroundColor: '#333399', flexDirection: 'row', padding: 15, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 30 },
     dateBtnText: { color: 'white', fontWeight: 'bold', marginLeft: 10 },
-    headerRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 25, marginBottom: 15 },
-    sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#333' },
-    addSmallBtn: { backgroundColor: '#333399', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-    addSmallText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
-    dgPickerRow: { flexDirection: 'row', marginBottom: 20 },
-    pillContainer: { marginRight: 15, position: 'relative', paddingRight: 8 },
-    dgOption: { minWidth: 100, backgroundColor: 'white', padding: 12, borderRadius: 12, alignItems: 'center', elevation: 2, borderWidth: 1, borderColor: '#eee' },
-    dgActive: { backgroundColor: '#333399', borderColor: '#333399' },
-    dgOptionText: { fontWeight: 'bold', color: '#666', fontSize: 12 },
-    miniDelete: { position: 'absolute', top: -8, right: 0 },
-    card: { backgroundColor: 'white', padding: 25, borderRadius: 24, elevation: 3 },
-    updateCard: { borderLeftWidth: 5, borderLeftColor: '#4caf50' },
-    modeBadge: { alignSelf: 'center', backgroundColor: '#f0f0f0', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginBottom: 20 },
-    modeText: { fontSize: 9, fontWeight: 'bold', color: '#999', letterSpacing: 1 },
-    inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9faff', paddingHorizontal: 15, borderRadius: 15, marginBottom: 15, height: 55, borderWidth: 1, borderColor: '#edf1ff' },
-    input: { flex: 1, marginLeft: 10, fontSize: 16, color: '#333' },
-    submitBtn: { backgroundColor: '#333399', padding: 20, borderRadius: 18, alignItems: 'center', marginTop: 30, elevation: 5 },
-    submitBtnText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
-    addModalContent: { backgroundColor: 'white', borderRadius: 25, padding: 25, alignItems: 'center' },
-    modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 20 },
-    modalInput: { backgroundColor: '#f5f7fa', width: '100%', padding: 15, borderRadius: 12, fontSize: 16, marginBottom: 20 },
-    confirmBtn: { backgroundColor: '#333399', width: '100%', padding: 15, borderRadius: 12, alignItems: 'center' }
+    dgPickerRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
+    dgOption: { flex: 1, backgroundColor: 'white', padding: 12, borderRadius: 10, alignItems: 'center', marginHorizontal: 4, elevation: 2 },
+    dgActive: { backgroundColor: '#333399' },
+    dgOptionText: { fontWeight: 'bold', color: '#666', fontSize: 11 },
+    inputCard: { backgroundColor: 'white', padding: 20, borderRadius: 20, marginTop: 20, elevation: 3 },
+    cardInfo: { fontSize: 12, color: '#888', marginBottom: 15, fontWeight: 'bold', textAlign: 'center' },
+    input: { backgroundColor: '#f8f9fd', padding: 15, borderRadius: 10, marginBottom: 12, fontSize: 16, borderBottomWidth: 1, borderColor: '#eee', color: '#000' },
+    submitBtn: { backgroundColor: '#333399', padding: 18, borderRadius: 12, alignItems: 'center', marginTop: 10 },
+    submitBtnText: { color: 'white', fontWeight: 'bold' },
+    sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#333399', marginTop: 30, marginBottom: 15 },
+    summaryCard: { backgroundColor: 'white', padding: 15, borderRadius: 15, marginBottom: 10, elevation: 2 },
+    summaryDGName: { fontWeight: 'bold', color: '#333399', fontSize: 16, borderBottomWidth: 1, borderColor: '#eee', paddingBottom: 5, marginBottom: 10 },
+    summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
+    summaryLabel: { fontSize: 10, color: '#999', fontWeight: 'bold' },
+    summaryValue: { fontSize: 17, fontWeight: 'bold', marginTop: 2 },
+    emptyText: { textAlign: 'center', color: '#999', marginTop: 20 }
 });
 
 export default DGScreen;
