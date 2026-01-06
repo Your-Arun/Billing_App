@@ -85,25 +85,24 @@ const DGScreen = () => {
             </View>
 
             <Text style={styles.sectionTitle}>Map Connected Tenants</Text>
-
-            <View style={styles.mappingList}>
-                {tenants.map(item => (
-                    <TouchableOpacity
-                        key={item._id}
-                        style={[styles.mappingItem, mappedTenants.includes(item._id) && styles.mappingActive]}
-                        onPress={() => toggleMapping(item._id)}
-                    >
-                        <MaterialCommunityIcons
-                            name={mappedTenants.includes(item._id) ? "check-circle" : "circle-outline"}
-                            size={22}
-                            color={mappedTenants.includes(item._id) ? "white" : "#333399"}
-                        />
-                        <Text style={[styles.mappingText, mappedTenants.includes(item._id) && { color: 'white' }]}>
-                            {item.name}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
+<View style={styles.mappingList}>
+    {tenants.map((item) => (
+        <TouchableOpacity
+            key={item._id}
+            style={[styles.mappingItem, mappedTenants.includes(item._id) && styles.mappingActive]}
+            onPress={() => toggleMapping(item._id)}
+        >
+            <MaterialCommunityIcons
+                name={mappedTenants.includes(item._id) ? "check-circle" : "circle-outline"}
+                size={22}
+                color={mappedTenants.includes(item._id) ? "white" : "#333399"}
+            />
+            <Text style={[styles.mappingText, mappedTenants.includes(item._id) && { color: 'white' }]}>
+                {item.name}
+            </Text>
+        </TouchableOpacity>
+    ))}
+</View>
 
             <TouchableOpacity style={styles.submitBtn} onPress={handleSaveDGEntry} disabled={loading}>
                 {loading ? <ActivityIndicator color="white" /> : <Text style={styles.submitBtnText}>SAVE ENTRY</Text>}

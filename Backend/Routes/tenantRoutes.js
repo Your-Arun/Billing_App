@@ -16,18 +16,16 @@ router.post('/solar/add', async (req, res) => {
 
 router.post('/dg/add', async (req, res) => {
   try {
-    const { adminId, dgName, connectedTenants, unitsProduced, fuelCost, date, month } = req.body;
-
+    const { adminId, dgName, connectedTenants } = req.body;
     const dgEntry = new DG(req.body);
     await dgEntry.save();
 
-    
     await Tenant.updateMany(
       { _id: { $in: connectedTenants } }, 
       { $set: { connectedDG: dgName } }
     );
 
-    res.status(201).json({ msg: "DG Data and Tenant Mapping Updated Successfully" });
+    res.status(201).json({ msg: "DG Data Updated" });
   } catch (err) { 
     res.status(400).json({ msg: "Error: " + err.message }); 
   }
@@ -39,9 +37,7 @@ router.post('/add', async (req, res) => {
     const tenant = new Tenant(req.body);
     await tenant.save();
     res.status(201).json(tenant);
-  } catch (err) {
-    res.status(400).json({ msg: "Tenant save failed: " + err.message });
-  }
+  } catch (err) { res.status(400).json({ msg: err.message }); }
 });
 
 router.put('/:id', async (req, res) => {
@@ -87,11 +83,9 @@ router.delete('/:id', async (req, res) => {
 
 router.get('/:adminId', async (req, res) => {
   try {
-    const tenants = await Tenant.find({ adminId: req.params.adminId }).sort({ lastUpdated: -1 });
+    const tenants = await Tenant.find({ adminId: req.params.adminId }).sort({ updatedAt: -1 });
     res.json(tenants);
-  } catch (err) {
-    res.status(500).json({ msg: "Fetch failed: " + err.message });
-  }
+  } catch (err) { res.status(500).json({ msg: err.message }); }
 });
 
 module.exports = router;

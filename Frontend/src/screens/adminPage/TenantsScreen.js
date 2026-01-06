@@ -31,25 +31,24 @@ const TenantsScreen = ({navigation}) => {
   const companyId = user?.role === 'Admin' ? user?.id : user?.belongsToAdmin;
 
 
-   const fetchTenants = useCallback(async () => {
+ const fetchTenants = useCallback(async () => {
     if (!companyId || activeTab !== 'Tenants') return;
     setLoading(true);
     try {
       const res = await axios.get(`${API_URL}/tenants/${companyId}`);
       setTenants(res.data);
-     
+      
       if (selectedTenant) {
         const updated = res.data.find(t => t._id === selectedTenant._id);
         if (updated) setSelectedTenant(updated);
       }
     } catch (e) { 
-      console.log("Fetch Error:", e.message); 
+      console.log("Fetch Error"); 
     } finally { 
       setLoading(false); 
       setRefreshing(false); 
     }
   }, [companyId, activeTab, selectedTenant]);
-
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       fetchTenants();
@@ -57,9 +56,7 @@ const TenantsScreen = ({navigation}) => {
     return unsubscribe;
   }, [navigation, fetchTenants]);
 
- useEffect(() => { 
-    fetchTenants(); 
-  }, [activeTab]);
+  useEffect(() => { fetchTenants(); }, [activeTab]);
 
   const onRefresh = useCallback(() => { 
     setRefreshing(true); 
@@ -145,12 +142,12 @@ const TenantsScreen = ({navigation}) => {
         <View style={styles.cardTextContainer}>
           <Text style={styles.cardTitle}>{item.name}</Text>
           <Text style={styles.cardSubTitle}>Meter ID: {item.meterId}</Text>
-          <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 4}}>
-           <MaterialCommunityIcons name="engine" size={12} color={item.connectedDG ? "#4caf50" : "#999"} />
-           <Text style={[styles.cardSubTitle, {marginLeft: 5, color: item.connectedDG ? "#4caf50" : "#888"}]}>
-             {item.connectedDG || "No DG Connected"}
-           </Text>
-        </View>
+         <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 4}}>
+            <MaterialCommunityIcons name="engine" size={12} color={item.connectedDG !== "None" ? "#4caf50" : "#999"} />
+            <Text style={{fontSize: 10, marginLeft: 5, color: item.connectedDG !== "None" ? "#4caf50" : "#999", fontWeight:'bold'}}>
+               {item.connectedDG || "No DG"}
+            </Text>
+          </View>
         </View>
       </View>
       <View style={styles.cardRight}>
