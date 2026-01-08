@@ -8,6 +8,7 @@ const tenantRoutes = require('./Routes/tenantRoutes');
 const dgroutes = require('./Routes/dgroutes'); 
 const solarroutes = require('./Routes/solarroutes'); 
 const readingroutes = require('./Routes/readingRoutes'); 
+const billroutes = require('./Routes/billRoutes'); 
 
 const app = express();
 
@@ -23,6 +24,7 @@ app.use('/tenants', tenantRoutes);
 app.use('/dg', dgroutes); 
 app.use('/solar', solarroutes); 
 app.use('/readings', readingroutes); 
+app.use('/bill', billroutes); 
 
 
 

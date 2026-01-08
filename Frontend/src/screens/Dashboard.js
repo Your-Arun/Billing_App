@@ -8,7 +8,6 @@ import UserProfile from './adminPage/UserProfile';
 
 const Dashboard = ({ navigation }) => {
   const [profileVisible, setProfileVisible] = useState(false);
-  const [tenantModalVisible, setTenantModalVisible] = useState(false);
 
   const navIcons = [
     { name: 'Home', icon: 'home-outline', route: 'Home' },
@@ -62,51 +61,9 @@ const Dashboard = ({ navigation }) => {
           ))}
         </View>
 
-        <View style={styles.entrySection}>
-          <Text style={styles.sectionTitle}>Tenants & Setup</Text>
-          <TouchableOpacity
-            style={styles.addTenantBtn}
-            onPress={() => setTenantModalVisible(true)}
-          >
-            <MaterialCommunityIcons name="account-plus" size={24} color="white" />
-            <Text style={styles.addTenantBtnText}>Add New Tenant / Shop</Text>
-          </TouchableOpacity>
-        </View>
 
-       
-        <Text style={styles.sectionTitle}>Current Status</Text>
-        <View style={styles.statusList}>
-          <View style={styles.statusItem}>
-            <Text style={styles.statusLabel}>Reading Status</Text>
-            <Text style={{ color: 'green', fontWeight: 'bold' }}>9/9 Done</Text>
-          </View>
-          <View style={styles.statusItem}>
-            <Text style={styles.statusLabel}>Bill Upload</Text>
-            <Text style={{ color: 'red', fontWeight: 'bold' }}>Pending</Text>
-          </View>
-        </View>
         <View style={{ height: 100 }} />
       </ScrollView>
-
-
-      {/* --- Tenant Modal --- */}
-      <Modal visible={tenantModalVisible} animationType="slide">
-        <ScrollView style={{ padding: 20, marginTop: 40 }}>
-          <Text style={styles.modalTitle}>Register New Tenant</Text>
-          <TextInput style={styles.input} placeholder="Name / Shop ID" placeholderTextColor="#999" />
-          <TextInput style={styles.input} placeholder="Meter ID" placeholderTextColor="#999" />
-          <TextInput style={styles.input} placeholder="Opening Meter" keyboardType="numeric" placeholderTextColor="#999" />
-          <TextInput style={styles.input} placeholder="Rate (Rs/Unit)" keyboardType="numeric" placeholderTextColor="#999" />
-          <TextInput style={styles.input} placeholder="Fixed Charge" keyboardType="numeric" placeholderTextColor="#999" />
-
-          <TouchableOpacity style={styles.saveBtn} onPress={() => setTenantModalVisible(false)}>
-            <Text style={{ color: 'white', fontWeight: 'bold' }}>Save Tenant</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setTenantModalVisible(false)} style={{ marginTop: 20, alignSelf: 'center' }}>
-            <Text style={{ color: 'red' }}>Cancel</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </Modal>
 
       <UserProfile 
         visible={profileVisible} 

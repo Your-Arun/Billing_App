@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const ReadingSchema = new mongoose.Schema({
   tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', required: true },
   adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  staffId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  staffId: { type:String, required: true },
 
   openingReading: { type: Number, required: true }, 
   closingReading: { type: Number, required: true },
@@ -16,5 +16,3 @@ const ReadingSchema = new mongoose.Schema({
 
 module.exports = mongoose.model('Reading', ReadingSchema);
 
-
-module.exports = mongoose.model('Reading', ReadingSchema);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useCallback } from 'react';
-import { 
-  View, Text, StyleSheet, TouchableOpacity, FlatList, 
-  Modal, TextInput, Image, ActivityIndicator, Alert, ScrollView, RefreshControl, Dimensions 
+import {
+  View, Text, StyleSheet, TouchableOpacity, FlatList,
+  Modal, TextInput, Image, ActivityIndicator, Alert, ScrollView, RefreshControl, Dimensions
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -9,17 +9,17 @@ import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { UserContext } from '../services/UserContext';
 import API_URL from '../services/apiconfig';
-import UserProfile from '../screens/adminPage/UserProfile'; 
+import UserProfile from '../screens/adminPage/UserProfile';
 
 const { width } = Dimensions.get('window');
 
 const ReadingTakerScreen = ({ navigation }) => {
-  const { user, logout } = useContext(UserContext);
+  const { user } = useContext(UserContext);
   const [profileVisible, setProfileVisible] = useState(false);
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  
+
   const [entryModalVisible, setEntryModalVisible] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState(null);
   const [readingValue, setReadingValue] = useState('');
@@ -74,7 +74,7 @@ const ReadingTakerScreen = ({ navigation }) => {
       const formData = new FormData();
       formData.append('tenantId', selectedTenant._id);
       formData.append('adminId', companyId);
-      formData.append('staffId', user.id);
+      formData.append('staffId', user.name);
       formData.append('closingReading', readingValue);
       formData.append('photo', {
         uri: image.uri,
@@ -83,7 +83,7 @@ const ReadingTakerScreen = ({ navigation }) => {
       });
 
       await axios.post(`${API_URL}/readings/add`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }, 
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
 
       Toast.show({ type: 'success', text1: 'Reading Added ✅' });
@@ -103,42 +103,42 @@ const ReadingTakerScreen = ({ navigation }) => {
     const progress = tenants.length > 0 ? (tenants.filter(t => t.updatedAt && new Date(t.updatedAt).toDateString() === new Date().toDateString()).length / tenants.length) * 100 : 0;
 
     return (
-      <TouchableOpacity 
-        style={[styles.tenantCard, isDoneToday && styles.doneCard]} 
-        onPress={() => { 
-          if(isDoneToday) return Alert.alert("Already Done", "Job for this shop is completed for today.");
-          setSelectedTenant(item); 
-          setEntryModalVisible(true); 
+      <TouchableOpacity
+        style={[styles.tenantCard, isDoneToday && styles.doneCard]}
+        onPress={() => {
+        
+          setSelectedTenant(item);
+          setEntryModalVisible(true);
         }}
         activeOpacity={0.7}
       >
         <View style={styles.cardMainInfo}>
-            <View style={[styles.iconBox, isDoneToday && {backgroundColor: '#E8F5E9'}]}>
-                <MaterialCommunityIcons 
-                    name={isDoneToday ? "check-bold" : "storefront-outline"} 
-                    size={28} 
-                    color={isDoneToday ? "#4CAF50" : "#333399"} 
-                />
+          <View style={[styles.iconBox, isDoneToday && { backgroundColor: '#E8F5E9' }]}>
+            <MaterialCommunityIcons
+              name={isDoneToday ? "check-bold" : "storefront-outline"}
+              size={28}
+              color={isDoneToday ? "#4CAF50" : "#333399"}
+            />
+          </View>
+          <View style={styles.textContainer}>
+            <Text style={styles.tenantName}>{item.name}</Text>
+            <Text style={styles.meterId}>Meter ID: {item.meterId}</Text>
+            <View style={styles.tagRow}>
+              <View style={[styles.statusTag, isDoneToday ? styles.tagSuccess : styles.tagPending]}>
+                <Text style={[styles.tagText, isDoneToday ? styles.textSuccess : styles.textPending]}>
+                  {isDoneToday ? "COMPLETED" : "PENDING"}
+                </Text>
+              </View>
+              <Text style={styles.accumulatedText}>{item.currentClosing || 0} kWh</Text>
             </View>
-            <View style={styles.textContainer}>
-                <Text style={styles.tenantName}>{item.name}</Text>
-                <Text style={styles.meterId}>Meter ID: {item.meterId}</Text>
-                <View style={styles.tagRow}>
-                   <View style={[styles.statusTag, isDoneToday ? styles.tagSuccess : styles.tagPending]}>
-                      <Text style={[styles.tagText, isDoneToday ? styles.textSuccess : styles.textPending]}>
-                        {isDoneToday ? "COMPLETED" : "PENDING"}
-                      </Text>
-                   </View>
-                   <Text style={styles.accumulatedText}>{item.currentClosing || 0} kWh</Text>
-                </View>
-            </View>
+          </View>
         </View>
         <View style={styles.arrowBox}>
-            <MaterialCommunityIcons 
-                name={isDoneToday ? "chevron-right" : "camera-plus"} 
-                size={24} 
-                color={isDoneToday ? "#DDD" : "#333399"} 
-            />
+          <MaterialCommunityIcons
+            name={isDoneToday ? "chevron-right" : "camera-plus"}
+            size={24}
+            color={isDoneToday ? "#DDD" : "#333399"}
+          />
         </View>
       </TouchableOpacity>
     );
@@ -150,49 +150,49 @@ const ReadingTakerScreen = ({ navigation }) => {
       <View style={styles.header}>
         <View style={styles.topRow}>
           <TouchableOpacity onPress={() => setProfileVisible(true)}>
-             <Image 
-                source={{uri: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png'}} 
-                style={styles.avatar} 
-             />
+            <Image
+              source={{ uri: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png' }}
+              style={styles.avatar}
+            />
           </TouchableOpacity>
           <View style={styles.welcomeBox}>
-             <Text style={styles.helloText}>Techcian</Text>
-             <Text style={styles.staffName}>{user?.name}</Text>
+            <Text style={styles.helloText}>Techcian</Text>
+            <Text style={styles.staffName}>{user?.name}</Text>
           </View>
         </View>
 
         {/* PROGRESS CARD */}
         <View style={styles.progressCard}>
-            <View style={styles.progressTextRow}>
-                <Text style={styles.progressLabel}>Daily Progress</Text>
-                <Text style={styles.progressPercent}>
-                    {tenants.filter(t => t.updatedAt && new Date(t.updatedAt).toDateString() === new Date().toDateString()).length} / {tenants.length}
-                </Text>
-            </View>
-            <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, {
-                    width: `${tenants.length > 0 ? (tenants.filter(t => t.updatedAt && new Date(t.updatedAt).toDateString() === new Date().toDateString()).length / tenants.length) * 100 : 0}%`
-                }]} />
-            </View>
+          <View style={styles.progressTextRow}>
+            <Text style={styles.progressLabel}>Daily Progress</Text>
+            <Text style={styles.progressPercent}>
+              {tenants.filter(t => t.updatedAt && new Date(t.updatedAt).toDateString() === new Date().toDateString()).length} / {tenants.length}
+            </Text>
+          </View>
+          <View style={styles.progressBarBg}>
+            <View style={[styles.progressBarFill, {
+              width: `${tenants.length > 0 ? (tenants.filter(t => t.updatedAt && new Date(t.updatedAt).toDateString() === new Date().toDateString()).length / tenants.length) * 100 : 0}%`
+            }]} />
+          </View>
         </View>
       </View>
 
       {/* --- LIST SECTION --- */}
       <View style={styles.body}>
         <View style={styles.bodyHeader}>
-            <Text style={styles.bodyTitle}>Assigned Shops</Text>
-            <MaterialCommunityIcons name="filter-variant" size={20} color="#666" />
+          <Text style={styles.bodyTitle}>TENANTS (KIRAYEDAAR)</Text>
+          <MaterialCommunityIcons name="filter-variant" size={20} color="#666" />
         </View>
 
         {loading && !refreshing ? (
-          <ActivityIndicator size="large" color="#333399" style={{marginTop: 50}} />
+          <ActivityIndicator size="large" color="#333399" style={{ marginTop: 50 }} />
         ) : (
           <FlatList
             data={tenants}
             keyExtractor={item => item._id}
             renderItem={renderTenantItem}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {setRefreshing(true); fetchTenants();}} />}
-            contentContainerStyle={{paddingBottom: 150}}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchTenants(); }} />}
+            contentContainerStyle={{ paddingBottom: 150 }}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={<Text style={styles.emptyText}>No tenants found.</Text>}
           />
@@ -205,36 +205,32 @@ const ReadingTakerScreen = ({ navigation }) => {
       <Modal visible={entryModalVisible} animationType="slide">
         <View style={styles.modalContent}>
           <View style={styles.modalNav}>
-             <TouchableOpacity onPress={() => setEntryModalVisible(false)}>
-                <MaterialCommunityIcons name="chevron-down" size={30} color="#333" />
-             </TouchableOpacity>
-             <Text style={styles.modalTitle}>New Reading</Text>
-             <View style={{width: 30}} />
+            <TouchableOpacity onPress={() => setEntryModalVisible(false)}>
+              <MaterialCommunityIcons name="chevron-down" size={30} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>New Reading</Text>
+            <View style={{ width: 30 }} />
           </View>
 
           <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
             <View style={styles.tenantHeaderBox}>
-               <Text style={styles.tenantLabel}>SHOP NAME</Text>
-               <Text style={styles.tenantMainName}>{selectedTenant?.name}</Text>
-               <View style={styles.divider} />
-               <View style={styles.readingInfoRow}>
-                  <View>
-                      <Text style={styles.infoSmallLabel}>Month Opening</Text>
-                      <Text style={styles.infoSmallVal}>{selectedTenant?.openingMeter} kWh</Text>
-                  </View>
-                  <View style={{alignItems: 'flex-end'}}>
-                      <Text style={styles.infoSmallLabel}>Last Recorded</Text>
-                      <Text style={styles.infoSmallVal}>{selectedTenant?.currentClosing} kWh</Text>
-                  </View>
-               </View>
+              <Text style={styles.tenantLabel}>TENANT NAME</Text>
+              <Text style={styles.tenantMainName}>{selectedTenant?.name}</Text>
+              <View style={styles.divider} />
+              <View style={styles.readingInfoRow}>
+                <View style={styles.infoSmallLabel}>
+                  <Text style={styles.infoSmallLabel}>Last Recorded</Text>
+                  <Text style={styles.infoSmallVal}>{selectedTenant?.currentClosing} kWh</Text>
+                </View>
+              </View>
             </View>
 
             <Text style={styles.sectionLabel}>1. TAKE METER PHOTO</Text>
             <TouchableOpacity style={styles.cameraBox} onPress={takePhoto}>
               {image ? (
-                <Image source={{uri: image.uri}} style={styles.fullImg} />
+                <Image source={{ uri: image.uri }} style={styles.fullImg} />
               ) : (
-                <View style={{alignItems: 'center'}}>
+                <View style={{ alignItems: 'center' }}>
                   <MaterialCommunityIcons name="camera-plus-outline" size={50} color="#333399" />
                   <Text style={styles.cameraHint}>Tap to capture meter screen</Text>
                 </View>
@@ -243,10 +239,10 @@ const ReadingTakerScreen = ({ navigation }) => {
 
             <Text style={styles.sectionLabel}>2. ENTER CURRENT READING</Text>
             <View style={styles.inputCard}>
-               <MaterialCommunityIcons name="numeric" size={24} color="#333399" />
-               <TextInput 
-                style={styles.mainInput} 
-                placeholder="0.00" 
+              <MaterialCommunityIcons name="numeric" size={24} color="#333399" />
+              <TextInput
+                style={styles.mainInput}
+                placeholder="0.00"
                 keyboardType="numeric"
                 value={readingValue}
                 onChangeText={setReadingValue}
@@ -255,15 +251,15 @@ const ReadingTakerScreen = ({ navigation }) => {
               <Text style={styles.unitText}>kWh</Text>
             </View>
 
-            <TouchableOpacity 
-              style={[styles.submitActionBtn, submitting && {opacity: 0.7}]} 
+            <TouchableOpacity
+              style={[styles.submitActionBtn, submitting && { opacity: 0.7 }]}
               onPress={handleSubmitReading}
               disabled={submitting}
             >
               {submitting ? <ActivityIndicator color="white" /> : <Text style={styles.submitActionText}>SUBMIT TO MANAGER</Text>}
             </TouchableOpacity>
-            
-            <View style={{height: 100}} />
+
+            <View style={{ height: 100 }} />
           </ScrollView>
         </View>
       </Modal>
@@ -272,10 +268,10 @@ const ReadingTakerScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FE' },
+  container: { flex: 1, backgroundColor: '#F8F9FE' ,marginTop:-50},
   // Header Styles
-  header: { 
-    backgroundColor: '#333399', paddingHorizontal: 25, paddingTop: 60, paddingBottom: 40,
+  header: {
+    backgroundColor: '#333399', paddingHorizontal: 25, paddingTop: 60, paddingBottom: 20,
     borderBottomLeftRadius: 40, borderBottomRightRadius: 40, elevation: 15
   },
   topRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
@@ -285,7 +281,7 @@ const styles = StyleSheet.create({
   staffName: { color: 'white', fontSize: 15, fontWeight: 'bold', paddingTop: 2 },
   logoutIcon: { backgroundColor: 'rgba(255,255,255,0.1)', padding: 15, borderRadius: 12 },
 
-  progressCard: { backgroundColor: 'rgba(255,255,255,0.1)', padding: 15, borderRadius: 20,  },
+  progressCard: { backgroundColor: 'rgba(236, 189, 189, 0.1)', padding: 20, borderRadius: 20, },
   progressTextRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
   progressLabel: { color: 'white', fontSize: 10, fontWeight: '600' },
   progressPercent: { color: 'white', fontSize: 10, fontWeight: 'bold' },
@@ -296,8 +292,8 @@ const styles = StyleSheet.create({
   body: { flex: 1, paddingHorizontal: 20, marginTop: 20 },
   bodyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingHorizontal: 5 },
   bodyTitle: { fontSize: 18, fontWeight: 'bold', color: '#1A1C3D' },
-  
-  tenantCard: { 
+
+  tenantCard: {
     backgroundColor: 'white', borderRadius: 24, padding: 18, marginBottom: 16,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     elevation: 3, shadowColor: '#333399', shadowOpacity: 0.08, shadowRadius: 10
@@ -316,7 +312,7 @@ const styles = StyleSheet.create({
   textPending: { color: '#0288D1' },
   textSuccess: { color: '#4CAF50' },
   accumulatedText: { fontSize: 11, fontWeight: 'bold', color: '#333399' },
-  
+
   arrowBox: { backgroundColor: '#F8F9FD', padding: 8, borderRadius: 12 },
   emptyText: { textAlign: 'center', marginTop: 80, color: '#AAA' },
 
@@ -330,27 +326,27 @@ const styles = StyleSheet.create({
   tenantMainName: { fontSize: 24, fontWeight: 'bold', color: '#333399', marginTop: 5 },
   divider: { height: 1, backgroundColor: '#F5F5F5', marginVertical: 15 },
   readingInfoRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  infoSmallLabel: { fontSize: 10, color: '#AAA', fontWeight: '600' },
+  infoSmallLabel: { fontSize: 10, color: '#AAA', fontWeight: '600' , alignContent: 'center', display: 'flex'},
   infoSmallVal: { fontSize: 15, fontWeight: 'bold', color: '#333', marginTop: 3 },
 
   sectionLabel: { fontSize: 12, fontWeight: 'bold', color: '#666', marginBottom: 15, marginLeft: 5 },
-  cameraBox: { 
-    width: '100%', height: 240, backgroundColor: 'white', borderRadius: 30, 
-    borderWidth: 2, borderColor: '#333399', borderStyle: 'dashed', 
+  cameraBox: {
+    width: '100%', height: 240, backgroundColor: 'white', borderRadius: 30,
+    borderWidth: 2, borderColor: '#333399', borderStyle: 'dashed',
     justifyContent: 'center', alignItems: 'center', marginBottom: 25, overflow: 'hidden'
   },
   fullImg: { width: '100%', height: '100%' },
   cameraHint: { color: '#AAA', fontSize: 12, marginTop: 10, fontWeight: '600' },
 
-  inputCard: { 
-    backgroundColor: 'white', borderRadius: 25, paddingHorizontal: 20, 
-    height: 75, flexDirection: 'row', alignItems: 'center', elevation: 3, marginBottom: 30 
+  inputCard: {
+    backgroundColor: 'white', borderRadius: 25, paddingHorizontal: 20,
+    height: 75, flexDirection: 'row', alignItems: 'center', elevation: 3, marginBottom: 30
   },
   mainInput: { flex: 1, marginLeft: 15, fontSize: 26, fontWeight: 'bold', color: '#333399' },
   unitText: { fontSize: 14, fontWeight: 'bold', color: '#AAA' },
 
-  submitActionBtn: { 
-    backgroundColor: '#333399', padding: 22, borderRadius: 25, 
+  submitActionBtn: {
+    backgroundColor: '#333399', padding: 22, borderRadius: 25,
     alignItems: 'center', elevation: 8, shadowColor: '#333399', shadowOpacity: 0.3
   },
   submitActionText: { color: 'white', fontWeight: 'bold', fontSize: 16, letterSpacing: 1 }
