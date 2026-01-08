@@ -7,9 +7,9 @@ const Bill = require('../Modals/Bill');
 const mongoose = require('mongoose'); 
 
 cloudinary.config({
-  cloud_name: 'dvgzuzzsn',
-  api_key: '294445521664239',
-  api_secret: 'uwOnDRFxsFQKDJK-2g3yNBVTPkQ'
+  cloud_name: process.env.cloud_name,
+  api_key: process.env.api_key,
+  api_secret: process.env.api_secret
 });
 
 
