@@ -29,6 +29,8 @@ const DGScreen = () => {
   const [reportEnd, setReportEnd] = useState(new Date());
   const [reportData, setReportData] = useState([]);
 
+
+
   // ✅ monthKey for backend
   const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
   const monthName = date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
@@ -198,6 +200,9 @@ const DGScreen = () => {
        
 
       </ScrollView>
+
+     
+
     </View>
   );
 };
