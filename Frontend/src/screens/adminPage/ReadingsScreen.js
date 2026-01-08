@@ -15,6 +15,9 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+
 
 const ReadingsScreen = () => {
   const { user } = useContext(UserContext);
@@ -50,20 +53,24 @@ const ReadingsScreen = () => {
     fetchLogs();
   }, [fetchLogs]);
 
-  const exportExcel = async () => {
-    setShowModal(false);
+ const exportExcel = async () => {
+  try {
+    const fileUri =
+      FileSystem.documentDirectory +
+      `Readings_${Date.now()}.xlsx`;
 
-    try {
-      await axios.get(`${API_URL}/readings/export/${adminId}`, {
-        params: {
-          from: fromDate.toISOString(),
-          to: toDate.toISOString(),
-        },
-      });
-    } catch (e) {
-      console.log('Export error', e.message);
+    const res = await FileSystem.downloadAsync(
+      `${API_URL}/readings/export/${adminId}?from=${fromDate.toISOString()}&to=${toDate.toISOString()}`,
+      fileUri
+    );
+
+    if (res.status === 200) {
+      await Sharing.shareAsync(res.uri);
     }
-  };
+  } catch (err) {
+    console.log('Excel download error', err.message);
+  }
+};
 
   const renderRow = ({ item }) => {
     const d = new Date(item.createdAt);
