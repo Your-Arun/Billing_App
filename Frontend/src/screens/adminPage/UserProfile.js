@@ -27,10 +27,6 @@ const UserProfile = ({ visible, onClose }) => {
               <Text style={styles.value}>{user?.companyName || "N/A"}</Text>
             </View>
 
-            <View style={styles.detailRow}>
-              <Text style={styles.label}>Mail:</Text>
-              <Text style={styles.value}>{user?.email || "N/A"}</Text>
-            </View>
 
             <View style={styles.detailRow}>
               <Text style={styles.label}>Role:</Text>

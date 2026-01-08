@@ -5,6 +5,7 @@ const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const Reading = require('../Modals/Reading');
 const Tenant = require('../Modals/Tenant');
+const ExcelJS = require('exceljs');
 
 cloudinary.config({
   cloud_name: 'dvgzuzzsn',
@@ -41,8 +42,8 @@ router.post('/add', upload.single('photo'), async (req, res) => {
     await newReading.save();
 
     
-    await Tenant.findByIdAndUpdate(tenantId, {
-      currentClosing: Number(closingReading),
+   await Tenant.findByIdAndUpdate(tenantId, {
+      $inc: { currentClosing: Number(closingReading) },
       lastUpdated: now
     });
 
@@ -66,5 +67,61 @@ router.get('/history/:tenantId', async (req, res) => {
   }
 });
 
+router.get('/all/:adminId', async (req, res) => {
+  try {
+    const data = await Reading.find({ adminId: req.params.adminId })
+      .populate('tenantId', 'name meterId openingMeter') // नाम, मीटर और ओपनिंग मंगवाई
+      .populate('staffId', 'name')
+      .sort({ createdAt: -1 }); // नई रीडिंग सबसे ऊपर
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+});
+
+router.get('/export/:adminId', async (req, res) => {
+  try {
+    const { adminId } = req.params;
+    const readings = await Reading.find({ adminId })
+      .populate('tenantId') 
+      .populate('staffId', 'name')
+      .sort({ createdAt: -1 });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Daily Electricity Log');
+
+    worksheet.columns = [
+      { header: 'Date & Time', key: 'timestamp', width: 25 },
+      { header: 'Staff Name', key: 'staff', width: 20 },
+      { header: 'Shop Name', key: 'tenant', width: 20 },
+      { header: 'Meter ID', key: 'meter', width: 15 },
+      { header: 'Base Opening (kWh)', key: 'opening', width: 20 },
+      { header: 'Added Reading (Today)', key: 'added', width: 20 },
+      { header: 'New Total (Closing)', key: 'total', width: 20 },
+    ];
+
+    readings.forEach((r) => {
+      const baseOpening = r.tenantId ? r.tenantId.openingMeter : 0;
+      // नोट: चूंकि आप $inc (plus) कर रहे हैं, तो 'closingReading' यहाँ वो 'Daily Addon' है
+      worksheet.addRow({
+        timestamp: new Date(r.createdAt).toLocaleString('en-IN'),
+        staff: r.staffId?.name || 'N/A',
+        tenant: r.tenantId?.name || 'N/A',
+        meter: r.tenantId?.meterId || 'N/A',
+        opening: baseOpening,
+        added: r.closingReading,
+        total: baseOpening + r.closingReading // या जो भी आपका कैलकुलेशन लॉजिक है
+      });
+    });
+
+    worksheet.getRow(1).font = { bold: true };
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=Readings_Report.xlsx');
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+});
 
 module.exports = router;

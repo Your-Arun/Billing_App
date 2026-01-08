@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, TouchableOpacity, FlatList, 
-  Modal, TextInput, Image, ActivityIndicator, Alert, ScrollView 
+  Modal, TextInput, Image, ActivityIndicator, Alert, ScrollView, RefreshControl, Dimensions 
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -11,23 +11,23 @@ import { UserContext } from '../services/UserContext';
 import API_URL from '../services/apiconfig';
 import UserProfile from '../screens/adminPage/UserProfile'; 
 
-const ReadingTakerScreen = () => {
+const { width } = Dimensions.get('window');
+
+const ReadingTakerScreen = ({ navigation }) => {
   const { user, logout } = useContext(UserContext);
   const [profileVisible, setProfileVisible] = useState(false);
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   
-  // Reading Entry Modal States
   const [entryModalVisible, setEntryModalVisible] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState(null);
   const [readingValue, setReadingValue] = useState('');
   const [image, setImage] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const companyId = user?.belongsToAdmin;
+  const companyId = user?.belongsToAdmin || user?.id;
 
-
-  
   const fetchTenants = useCallback(async () => {
     if (!companyId) return;
     setLoading(true);
@@ -38,12 +38,15 @@ const ReadingTakerScreen = () => {
       console.log("Fetch Error Staff:", e.message);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [companyId]);
 
   useEffect(() => {
     fetchTenants();
-  }, [fetchTenants]);
+    const unsubscribe = navigation.addListener('focus', () => { fetchTenants(); });
+    return unsubscribe;
+  }, [navigation, fetchTenants]);
 
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -51,14 +54,11 @@ const ReadingTakerScreen = () => {
       alert('Camera permission is required!');
       return;
     }
-
     let result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.5,
-      base64: true, 
     });
-
     if (!result.canceled) {
       setImage(result.assets[0]);
     }
@@ -66,10 +66,9 @@ const ReadingTakerScreen = () => {
 
   const handleSubmitReading = async () => {
     if (!readingValue || !image) {
-      Toast.show({ type: 'error', text1: 'Missing Info', text2: 'Please take photo & enter reading' });
+      Toast.show({ type: 'error', text1: 'Required', text2: 'Take photo & enter reading' });
       return;
     }
-
     setSubmitting(true);
     try {
       const formData = new FormData();
@@ -77,127 +76,194 @@ const ReadingTakerScreen = () => {
       formData.append('adminId', companyId);
       formData.append('staffId', user.id);
       formData.append('closingReading', readingValue);
-      
-    
       formData.append('photo', {
         uri: image.uri,
         name: `meter_${selectedTenant._id}.jpg`,
         type: 'image/jpeg',
       });
 
-      const res = await axios.post(`${API_URL}/readings/add`, formData, {
+      await axios.post(`${API_URL}/readings/add`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }, 
       });
 
-      Toast.show({ type: 'success', text1: 'Success ✅', text2: 'Reading uploaded to Cloudinary' });
+      Toast.show({ type: 'success', text1: 'Reading Added ✅' });
       setEntryModalVisible(false);
       setImage(null);
       setReadingValue('');
       fetchTenants();
     } catch (e) {
-      console.log(e);
-      Alert.alert("Error", "Upload failed. Try again.");
+      Alert.alert("Error", "Submission failed.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const renderTenantItem = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.tenantCard} 
-      onPress={() => { setSelectedTenant(item); setEntryModalVisible(true); }}
-    >
-      <View style={styles.cardLeft}>
-        <View style={styles.iconCircle}>
-          <MaterialCommunityIcons name="storefront" size={24} color="#333399" />
+  const renderTenantItem = ({ item }) => {
+    const isDoneToday = item.updatedAt && new Date(item.updatedAt).toDateString() === new Date().toDateString();
+    const progress = tenants.length > 0 ? (tenants.filter(t => t.updatedAt && new Date(t.updatedAt).toDateString() === new Date().toDateString()).length / tenants.length) * 100 : 0;
+
+    return (
+      <TouchableOpacity 
+        style={[styles.tenantCard, isDoneToday && styles.doneCard]} 
+        onPress={() => { 
+          if(isDoneToday) return Alert.alert("Already Done", "Job for this shop is completed for today.");
+          setSelectedTenant(item); 
+          setEntryModalVisible(true); 
+        }}
+        activeOpacity={0.7}
+      >
+        <View style={styles.cardMainInfo}>
+            <View style={[styles.iconBox, isDoneToday && {backgroundColor: '#E8F5E9'}]}>
+                <MaterialCommunityIcons 
+                    name={isDoneToday ? "check-bold" : "storefront-outline"} 
+                    size={28} 
+                    color={isDoneToday ? "#4CAF50" : "#333399"} 
+                />
+            </View>
+            <View style={styles.textContainer}>
+                <Text style={styles.tenantName}>{item.name}</Text>
+                <Text style={styles.meterId}>Meter ID: {item.meterId}</Text>
+                <View style={styles.tagRow}>
+                   <View style={[styles.statusTag, isDoneToday ? styles.tagSuccess : styles.tagPending]}>
+                      <Text style={[styles.tagText, isDoneToday ? styles.textSuccess : styles.textPending]}>
+                        {isDoneToday ? "COMPLETED" : "PENDING"}
+                      </Text>
+                   </View>
+                   <Text style={styles.accumulatedText}>{item.currentClosing || 0} kWh</Text>
+                </View>
+            </View>
         </View>
-        <View>
-          <Text style={styles.tenantName}>{item.name}</Text>
-          <Text style={styles.meterId}>Meter ID: {item.meterId}</Text>
+        <View style={styles.arrowBox}>
+            <MaterialCommunityIcons 
+                name={isDoneToday ? "chevron-right" : "camera-plus"} 
+                size={24} 
+                color={isDoneToday ? "#DDD" : "#333399"} 
+            />
         </View>
-      </View>
-      <MaterialCommunityIcons name="camera-plus" size={28} color="#333399" />
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
-      {/* --- HEADER --- */}
+      {/* --- NEW MODERN HEADER --- */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => setProfileVisible(true)}>
-          <MaterialCommunityIcons name="account-circle" size={45} color="white" />
-        </TouchableOpacity>
-        <View style={styles.headerText}>
-          <Text style={styles.welcomeText}>Welcome, {user?.name}</Text>
-          <Text style={styles.subHeaderText}>Tenant Reading Entry</Text>
+        <View style={styles.topRow}>
+          <TouchableOpacity onPress={() => setProfileVisible(true)}>
+             <Image 
+                source={{uri: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png'}} 
+                style={styles.avatar} 
+             />
+          </TouchableOpacity>
+          <View style={styles.welcomeBox}>
+             <Text style={styles.helloText}>Techcian</Text>
+             <Text style={styles.staffName}>{user?.name}</Text>
+          </View>
+        </View>
+
+        {/* PROGRESS CARD */}
+        <View style={styles.progressCard}>
+            <View style={styles.progressTextRow}>
+                <Text style={styles.progressLabel}>Daily Progress</Text>
+                <Text style={styles.progressPercent}>
+                    {tenants.filter(t => t.updatedAt && new Date(t.updatedAt).toDateString() === new Date().toDateString()).length} / {tenants.length}
+                </Text>
+            </View>
+            <View style={styles.progressBarBg}>
+                <View style={[styles.progressBarFill, {
+                    width: `${tenants.length > 0 ? (tenants.filter(t => t.updatedAt && new Date(t.updatedAt).toDateString() === new Date().toDateString()).length / tenants.length) * 100 : 0}%`
+                }]} />
+            </View>
         </View>
       </View>
 
-      {/* --- TENANTS LIST --- */}
-      <View style={styles.listContainer}>
-        <Text style={styles.sectionTitle}>Select Shop / Tenant</Text>
-        {loading ? (
+      {/* --- LIST SECTION --- */}
+      <View style={styles.body}>
+        <View style={styles.bodyHeader}>
+            <Text style={styles.bodyTitle}>Assigned Shops</Text>
+            <MaterialCommunityIcons name="filter-variant" size={20} color="#666" />
+        </View>
+
+        {loading && !refreshing ? (
           <ActivityIndicator size="large" color="#333399" style={{marginTop: 50}} />
         ) : (
           <FlatList
             data={tenants}
             keyExtractor={item => item._id}
             renderItem={renderTenantItem}
-            contentContainerStyle={{paddingBottom: 50}}
-            ListEmptyComponent={<Text style={styles.emptyText}>No tenants assigned to you.</Text>}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {setRefreshing(true); fetchTenants();}} />}
+            contentContainerStyle={{paddingBottom: 150}}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={<Text style={styles.emptyText}>No tenants found.</Text>}
           />
         )}
       </View>
 
-      {/* --- MODAL 1: PROFILE --- */}
       <UserProfile visible={profileVisible} onClose={() => setProfileVisible(false)} />
 
-      {/* --- MODAL 2: READING ENTRY --- */}
+      {/* --- PREMIUM INPUT MODAL --- */}
       <Modal visible={entryModalVisible} animationType="slide">
-        <View style={styles.entryModal}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Capture Reading</Text>
-            <TouchableOpacity onPress={() => setEntryModalVisible(false)}>
-              <MaterialCommunityIcons name="close" size={28} color="#333" />
-            </TouchableOpacity>
+        <View style={styles.modalContent}>
+          <View style={styles.modalNav}>
+             <TouchableOpacity onPress={() => setEntryModalVisible(false)}>
+                <MaterialCommunityIcons name="chevron-down" size={30} color="#333" />
+             </TouchableOpacity>
+             <Text style={styles.modalTitle}>New Reading</Text>
+             <View style={{width: 30}} />
           </View>
 
-          <ScrollView contentContainerStyle={styles.modalBody}>
-            <Text style={styles.targetTenant}>{selectedTenant?.name}</Text>
-            <Text style={styles.openingInfo}>Prev. Opening: {selectedTenant?.openingMeter}</Text>
-             <Text style={styles.openingInfo}>Prev. Closing: {selectedTenant?.currentClosing}</Text>
+          <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+            <View style={styles.tenantHeaderBox}>
+               <Text style={styles.tenantLabel}>SHOP NAME</Text>
+               <Text style={styles.tenantMainName}>{selectedTenant?.name}</Text>
+               <View style={styles.divider} />
+               <View style={styles.readingInfoRow}>
+                  <View>
+                      <Text style={styles.infoSmallLabel}>Month Opening</Text>
+                      <Text style={styles.infoSmallVal}>{selectedTenant?.openingMeter} kWh</Text>
+                  </View>
+                  <View style={{alignItems: 'flex-end'}}>
+                      <Text style={styles.infoSmallLabel}>Last Recorded</Text>
+                      <Text style={styles.infoSmallVal}>{selectedTenant?.currentClosing} kWh</Text>
+                  </View>
+               </View>
+            </View>
 
-            {/* Photo Capture Section */}
-            <TouchableOpacity style={styles.photoBox} onPress={takePhoto}>
+            <Text style={styles.sectionLabel}>1. TAKE METER PHOTO</Text>
+            <TouchableOpacity style={styles.cameraBox} onPress={takePhoto}>
               {image ? (
-                <Image source={{uri: image.uri}} style={styles.capturedImage} />
+                <Image source={{uri: image.uri}} style={styles.fullImg} />
               ) : (
                 <View style={{alignItems: 'center'}}>
-                  <MaterialCommunityIcons name="camera" size={50} color="#999" />
-                  <Text style={styles.photoLabel}>Take Meter Photo</Text>
+                  <MaterialCommunityIcons name="camera-plus-outline" size={50} color="#333399" />
+                  <Text style={styles.cameraHint}>Tap to capture meter screen</Text>
                 </View>
               )}
             </TouchableOpacity>
 
-            {/* Manual Input */}
-            <View style={styles.inputWrapper}>
-              <Text style={styles.label}>Enter Closing Reading (kWh)</Text>
-              <TextInput 
-                style={styles.input} 
-                placeholder="e.g. 12450.5" 
+            <Text style={styles.sectionLabel}>2. ENTER CURRENT READING</Text>
+            <View style={styles.inputCard}>
+               <MaterialCommunityIcons name="numeric" size={24} color="#333399" />
+               <TextInput 
+                style={styles.mainInput} 
+                placeholder="0.00" 
                 keyboardType="numeric"
                 value={readingValue}
                 onChangeText={setReadingValue}
+                autoFocus
               />
+              <Text style={styles.unitText}>kWh</Text>
             </View>
 
             <TouchableOpacity 
-              style={[styles.submitBtn, submitting && {opacity: 0.7}]} 
+              style={[styles.submitActionBtn, submitting && {opacity: 0.7}]} 
               onPress={handleSubmitReading}
               disabled={submitting}
             >
-              {submitting ? <ActivityIndicator color="white" /> : <Text style={styles.submitText}>SUBMIT TO ADMIN</Text>}
+              {submitting ? <ActivityIndicator color="white" /> : <Text style={styles.submitActionText}>SUBMIT TO MANAGER</Text>}
             </TouchableOpacity>
+            
+            <View style={{height: 100}} />
           </ScrollView>
         </View>
       </Modal>
@@ -206,53 +272,88 @@ const ReadingTakerScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fd' },
+  container: { flex: 1, backgroundColor: '#F8F9FE' },
+  // Header Styles
   header: { 
-    backgroundColor: '#333399', paddingHorizontal: 20, paddingBottom: 30, paddingTop: 60,
-    flexDirection: 'row', alignItems: 'center', borderBottomLeftRadius: 30, borderBottomRightRadius: 30
+    backgroundColor: '#333399', paddingHorizontal: 25, paddingTop: 60, paddingBottom: 40,
+    borderBottomLeftRadius: 40, borderBottomRightRadius: 40, elevation: 15
   },
-  headerText: { marginLeft: 15 },
-  welcomeText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
-  subHeaderText: { color: '#ccc', fontSize: 13 },
-  listContainer: { flex: 1, padding: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 15 },
+  topRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  avatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#f0f0ff' },
+  welcomeBox: { marginLeft: 15, flex: 1 },
+  helloText: { color: 'rgba(255,255,255,0.6)', fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1 },
+  staffName: { color: 'white', fontSize: 15, fontWeight: 'bold', paddingTop: 2 },
+  logoutIcon: { backgroundColor: 'rgba(255,255,255,0.1)', padding: 15, borderRadius: 12 },
+
+  progressCard: { backgroundColor: 'rgba(255,255,255,0.1)', padding: 15, borderRadius: 20,  },
+  progressTextRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
+  progressLabel: { color: 'white', fontSize: 10, fontWeight: '600' },
+  progressPercent: { color: 'white', fontSize: 10, fontWeight: 'bold' },
+  progressBarBg: { height: 8, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 10 },
+  progressBarFill: { height: '100%', backgroundColor: '#4CAF50', borderRadius: 10 },
+
+  // Body Styles
+  body: { flex: 1, paddingHorizontal: 20, marginTop: 20 },
+  bodyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingHorizontal: 5 },
+  bodyTitle: { fontSize: 18, fontWeight: 'bold', color: '#1A1C3D' },
+  
   tenantCard: { 
-    backgroundColor: 'white', padding: 15, borderRadius: 15, marginBottom: 12, 
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', elevation: 3
+    backgroundColor: 'white', borderRadius: 24, padding: 18, marginBottom: 16,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    elevation: 3, shadowColor: '#333399', shadowOpacity: 0.08, shadowRadius: 10
   },
-  cardLeft: { flexDirection: 'row', alignItems: 'center' },
-  iconCircle: { backgroundColor: '#f0f0ff', padding: 10, borderRadius: 12, marginRight: 15 },
-  tenantName: { fontSize: 16, fontWeight: 'bold', color: '#333' },
-  meterId: { fontSize: 12, color: '#888' },
-  emptyText: { textAlign: 'center', marginTop: 50, color: '#999' },
+  doneCard: { backgroundColor: '#F0FFF4', borderLeftWidth: 5, borderLeftColor: '#4CAF50' },
+  cardMainInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  iconBox: { backgroundColor: '#F0F2FF', padding: 12, borderRadius: 18 },
+  textContainer: { marginLeft: 15 },
+  tenantName: { fontSize: 16, fontWeight: 'bold', color: '#1A1C3D' },
+  meterId: { fontSize: 11, color: '#888', marginTop: 2 },
+  tagRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+  statusTag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginRight: 10 },
+  tagPending: { backgroundColor: '#E1F5FE' },
+  tagSuccess: { backgroundColor: '#E8F5E9' },
+  tagText: { fontSize: 8, fontWeight: 'bold' },
+  textPending: { color: '#0288D1' },
+  textSuccess: { color: '#4CAF50' },
+  accumulatedText: { fontSize: 11, fontWeight: 'bold', color: '#333399' },
+  
+  arrowBox: { backgroundColor: '#F8F9FD', padding: 8, borderRadius: 12 },
+  emptyText: { textAlign: 'center', marginTop: 80, color: '#AAA' },
 
   // Modal Styles
-  entryModal: { flex: 1, backgroundColor: '#fff' },
-  modalHeader: { 
-    flexDirection: 'row', justifyContent: 'space-between', 
-    padding: 20, paddingTop: 50, borderBottomWidth: 1, borderBottomColor: '#eee' 
+  modalContent: { flex: 1, backgroundColor: '#F8F9FE' },
+  modalNav: { flexDirection: 'row', justifyContent: 'space-between', padding: 25, paddingTop: 50, alignItems: 'center' },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+  modalBody: { paddingHorizontal: 25 },
+  tenantHeaderBox: { backgroundColor: 'white', borderRadius: 25, padding: 25, marginBottom: 25, elevation: 2 },
+  tenantLabel: { fontSize: 10, fontWeight: 'bold', color: '#AAA', letterSpacing: 1 },
+  tenantMainName: { fontSize: 24, fontWeight: 'bold', color: '#333399', marginTop: 5 },
+  divider: { height: 1, backgroundColor: '#F5F5F5', marginVertical: 15 },
+  readingInfoRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  infoSmallLabel: { fontSize: 10, color: '#AAA', fontWeight: '600' },
+  infoSmallVal: { fontSize: 15, fontWeight: 'bold', color: '#333', marginTop: 3 },
+
+  sectionLabel: { fontSize: 12, fontWeight: 'bold', color: '#666', marginBottom: 15, marginLeft: 5 },
+  cameraBox: { 
+    width: '100%', height: 240, backgroundColor: 'white', borderRadius: 30, 
+    borderWidth: 2, borderColor: '#333399', borderStyle: 'dashed', 
+    justifyContent: 'center', alignItems: 'center', marginBottom: 25, overflow: 'hidden'
   },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#333399' },
-  modalBody: { padding: 20, alignItems: 'center' },
-  targetTenant: { fontSize: 24, fontWeight: 'bold', color: '#333', marginBottom: 5 },
-  openingInfo: { fontSize: 14, color: '#666', marginBottom: 25 },
-  photoBox: { 
-    width: '100%', height: 250, backgroundColor: '#f5f5f5', borderRadius: 20, 
-    justifyContent: 'center', alignItems: 'center', borderWidth: 2, 
-    borderColor: '#eee', borderStyle: 'dashed', marginBottom: 25, overflow: 'hidden'
+  fullImg: { width: '100%', height: '100%' },
+  cameraHint: { color: '#AAA', fontSize: 12, marginTop: 10, fontWeight: '600' },
+
+  inputCard: { 
+    backgroundColor: 'white', borderRadius: 25, paddingHorizontal: 20, 
+    height: 75, flexDirection: 'row', alignItems: 'center', elevation: 3, marginBottom: 30 
   },
-  capturedImage: { width: '100%', height: '100%' },
-  inputWrapper: { width: '100%', marginBottom: 30 },
-  label: { fontSize: 14, fontWeight: 'bold', color: '#555', marginBottom: 10 },
-  input: { 
-    backgroundColor: '#f9f9f9', padding: 18, borderRadius: 15, 
-    fontSize: 20, fontWeight: 'bold', color: '#333399', borderWidth: 1, borderColor: '#ddd'
+  mainInput: { flex: 1, marginLeft: 15, fontSize: 26, fontWeight: 'bold', color: '#333399' },
+  unitText: { fontSize: 14, fontWeight: 'bold', color: '#AAA' },
+
+  submitActionBtn: { 
+    backgroundColor: '#333399', padding: 22, borderRadius: 25, 
+    alignItems: 'center', elevation: 8, shadowColor: '#333399', shadowOpacity: 0.3
   },
-  submitBtn: { 
-    backgroundColor: '#333399', padding: 20, borderRadius: 15, 
-    width: '100%', alignItems: 'center', elevation: 5 
-  },
-  submitText: { color: 'white', fontWeight: 'bold', fontSize: 16 }
+  submitActionText: { color: 'white', fontWeight: 'bold', fontSize: 16, letterSpacing: 1 }
 });
 
 export default ReadingTakerScreen;
