@@ -10,6 +10,7 @@ const ReadingSchema = new mongoose.Schema({
 
   photo: { type: String, required: true },
   status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
+rejectionReason: { type: String, default: "" },
   month: { type: String, required: true }
 
 }, { timestamps: true });

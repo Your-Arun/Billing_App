@@ -10,6 +10,7 @@ import Toast from 'react-native-toast-message';
 import { UserContext } from '../services/UserContext';
 import API_URL from '../services/apiconfig';
 import UserProfile from '../screens/adminPage/UserProfile';
+import { useMemo } from 'react';
 
 const { width } = Dimensions.get('window');
 
@@ -28,6 +29,8 @@ const ReadingTakerScreen = ({ navigation }) => {
 
   const companyId = user?.belongsToAdmin || user?.id;
 
+
+
   const fetchTenants = useCallback(async () => {
     if (!companyId) return;
     setLoading(true);
@@ -41,6 +44,8 @@ const ReadingTakerScreen = ({ navigation }) => {
       setRefreshing(false);
     }
   }, [companyId]);
+
+  
 
   useEffect(() => {
     fetchTenants();
@@ -99,50 +104,64 @@ const ReadingTakerScreen = ({ navigation }) => {
   };
 
   const renderTenantItem = ({ item }) => {
-    const isDoneToday = item.updatedAt && new Date(item.updatedAt).toDateString() === new Date().toDateString();
-    const progress = tenants.length > 0 ? (tenants.filter(t => t.updatedAt && new Date(t.updatedAt).toDateString() === new Date().toDateString()).length / tenants.length) * 100 : 0;
+    const status = item.todayStatus; // 'Approved', 'Pending', 'Rejected', 'Ready'
+    
+    // स्टेटस के हिसाब से रंग और आइकॉन तय करना
+    const getUIConfig = () => {
+        switch(status) {
+            case 'Pending': 
+                return { color: '#FF9800', icon: 'clock-outline', label: 'PENDING APPROVAL', isLocked: true };
+            case 'Approved': 
+                return { color: '#4CAF50', icon: 'check-decagram', label: 'APPROVED', isLocked: true };
+            case 'Rejected': 
+                return { color: '#F44336', icon: 'alert-circle', label: 'REJECTED (RE-ENTER)', isLocked: false };
+            default: 
+                return { color: '#333399', icon: 'camera-plus', label: 'READY FOR ENTRY', isLocked: false };
+        }
+    };
+
+    const config = getUIConfig();
 
     return (
-      <TouchableOpacity
-        style={[styles.tenantCard, isDoneToday && styles.doneCard]}
+      <TouchableOpacity 
+        style={[
+            styles.tenantCard, 
+            status === 'Approved' && styles.doneCard,
+            status === 'Pending' && { borderColor: '#FF9800', borderWidth: 1 },
+            status === 'Rejected' && { borderColor: '#F44336', borderWidth: 1 }
+        ]} 
         onPress={() => {
-        
-          setSelectedTenant(item);
-          setEntryModalVisible(true);
+          if (config.isLocked) {
+             return Alert.alert("Wait!", `This reading is ${status}. You cannot edit it now.`);
+          }
+          setSelectedTenant(item); 
+          setEntryModalVisible(true); 
         }}
-        activeOpacity={0.7}
+        activeOpacity={config.isLocked ? 1 : 0.7}
       >
         <View style={styles.cardMainInfo}>
-          <View style={[styles.iconBox, isDoneToday && { backgroundColor: '#E8F5E9' }]}>
-            <MaterialCommunityIcons
-              name={isDoneToday ? "check-bold" : "storefront-outline"}
-              size={28}
-              color={isDoneToday ? "#4CAF50" : "#333399"}
-            />
+          <View style={[styles.iconBox, {backgroundColor: config.color + '15'}]}>
+            <MaterialCommunityIcons name={config.icon} size={24} color={config.color} />
           </View>
           <View style={styles.textContainer}>
             <Text style={styles.tenantName}>{item.name}</Text>
-            <Text style={styles.meterId}>Meter ID: {item.meterId}</Text>
             <View style={styles.tagRow}>
-              <View style={[styles.statusTag, isDoneToday ? styles.tagSuccess : styles.tagPending]}>
-                <Text style={[styles.tagText, isDoneToday ? styles.textSuccess : styles.textPending]}>
-                  {isDoneToday ? "COMPLETED" : "PENDING"}
-                </Text>
+              <View style={[styles.statusTag, {backgroundColor: config.color}]}>
+                <Text style={styles.tagText}>{config.label}</Text>
               </View>
               <Text style={styles.accumulatedText}>{item.currentClosing || 0} kWh</Text>
             </View>
+            {/* रिजेक्शन की वजह दिखाएं */}
+            {status === 'Rejected' && (
+               <Text style={styles.rejectText}>Reason: {item.rejectionReason || "Check again"}</Text>
+            )}
           </View>
         </View>
-        <View style={styles.arrowBox}>
-          <MaterialCommunityIcons
-            name={isDoneToday ? "chevron-right" : "camera-plus"}
-            size={24}
-            color={isDoneToday ? "#DDD" : "#333399"}
-          />
-        </View>
+        {!config.isLocked && <MaterialCommunityIcons name="chevron-right" size={20} color="#CCC" />}
       </TouchableOpacity>
     );
-  };
+};
+
 
   return (
     <View style={styles.container}>
@@ -161,20 +180,6 @@ const ReadingTakerScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* PROGRESS CARD */}
-        <View style={styles.progressCard}>
-          <View style={styles.progressTextRow}>
-            <Text style={styles.progressLabel}>Daily Progress</Text>
-            <Text style={styles.progressPercent}>
-              {tenants.filter(t => t.updatedAt && new Date(t.updatedAt).toDateString() === new Date().toDateString()).length} / {tenants.length}
-            </Text>
-          </View>
-          <View style={styles.progressBarBg}>
-            <View style={[styles.progressBarFill, {
-              width: `${tenants.length > 0 ? (tenants.filter(t => t.updatedAt && new Date(t.updatedAt).toDateString() === new Date().toDateString()).length / tenants.length) * 100 : 0}%`
-            }]} />
-          </View>
-        </View>
       </View>
 
       {/* --- LIST SECTION --- */}
@@ -349,7 +354,30 @@ const styles = StyleSheet.create({
     backgroundColor: '#333399', padding: 22, borderRadius: 25,
     alignItems: 'center', elevation: 8, shadowColor: '#333399', shadowOpacity: 0.3
   },
-  submitActionText: { color: 'white', fontWeight: 'bold', fontSize: 16, letterSpacing: 1 }
+  submitActionText: { color: 'white', fontWeight: 'bold', fontSize: 16, letterSpacing: 1 },
+  errorCard: { borderColor: '#F44336', borderWidth: 1 },
+  tagRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  rejectedHint: { color: '#F44336', fontSize: 10, fontWeight: 'bold', marginLeft: 10 },
+  infoContainer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
+  infoSmallLabel: { fontSize: 10, color: '#AAA', fontWeight: '600' },
+  infoSmallVal: { fontSize: 15, fontWeight: 'bold', color: '#333' },
+  statusTag: { 
+    paddingHorizontal: 8, 
+    paddingVertical: 3, 
+    borderRadius: 6, 
+    marginRight: 10 
+  },
+  tagText: { 
+    fontSize: 8, 
+    fontWeight: 'bold', 
+    color: 'white' 
+  },
+  rejectText: { 
+    color: '#F44336', 
+    fontSize: 10, 
+    fontWeight: 'bold', 
+    marginTop: 5 
+  }
 });
 
 export default ReadingTakerScreen;

@@ -8,12 +8,15 @@ import { UserProvider } from './src/services/UserContext';
 
 function App() {
   return (
-    <> <UserProvider>
+    <> 
+   
+    <UserProvider>
       <NavigationContainer>
         <AppNavigator />
       </NavigationContainer>
       <Toast />
       </UserProvider>
+   
     </>
   );
 }

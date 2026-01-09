@@ -4,29 +4,29 @@ const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const Bill = require('../Modals/Bill');
-const mongoose = require('mongoose'); 
+const mongoose = require('mongoose');
 
+// Cloudinary Config (Check .env)
 cloudinary.config({
   cloud_name: process.env.cloud_name,
   api_key: process.env.api_key,
   api_secret: process.env.api_secret
 });
 
-
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: { 
     folder: 'official_bills', 
-    allowed_formats: ['jpg', 'png', 'pdf', 'jpeg'] 
+    resource_type: 'raw', 
+    format: 'pdf',
   },
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({ storage: storage , limits: { fileSize: 10 * 1024 * 1024 } }); 
 
 router.post('/add', upload.single('billFile'), async (req, res) => {
   try {
     const { adminId, month, totalUnits, energyCharges, fixedCharges, taxes } = req.body;
-
     const total = Number(energyCharges) + Number(fixedCharges) + Number(taxes);
 
     const newBill = new Bill({
@@ -43,7 +43,7 @@ router.post('/add', upload.single('billFile'), async (req, res) => {
     await newBill.save();
     res.status(201).json(newBill);
   } catch (err) {
-    console.error("Bill Save Error:", err.message);
+    console.error("Save Error:", err.message);
     res.status(400).json({ msg: err.message });
   }
 });
@@ -56,7 +56,5 @@ router.get('/history/:adminId', async (req, res) => {
     res.status(500).json({ msg: err.message });
   }
 });
-
-
 
 module.exports = router;

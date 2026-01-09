@@ -14,7 +14,6 @@ cloudinary.config({
   api_key: process.env.api_key,
   api_secret: process.env.api_secret
 });
-
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
@@ -23,88 +22,23 @@ const storage = new CloudinaryStorage({
   },
 });
 const upload = multer({ storage: storage });
-
 router.post('/add', upload.single('photo'), async (req, res) => {
   try {
     const { tenantId, adminId, staffId, closingReading } = req.body;
-
-    if (!tenantId || !adminId || !staffId || !closingReading) {
-      return res.status(400).json({ msg: "All fields are required" });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({ msg: "Photo is required" });
-    }
-
-    const tenant = await Tenant.findById(tenantId);
-    if (!tenant) {
-      return res.status(404).json({ msg: "Tenant not found" });
-    }
-
-    const closing = Number(closingReading);
-    if (isNaN(closing)) {
-      return res.status(400).json({ msg: "Invalid reading value" });
-    }
-
-    // 🔒 Prevent duplicate reading (per tenant per staff per day)
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-
-    const end = new Date();
-    end.setHours(23, 59, 59, 999);
-
-    const alreadyDone = await Reading.findOne({
-      tenantId,
-      staffId,
-      createdAt: { $gte: start, $lte: end }
-    });
-
-    if (alreadyDone) {
-      return res.status(400).json({
-        msg: "Reading already submitted today"
-      });
-    }
-
-    const now = new Date();
-    const monthStr = now.toLocaleString('en-US', {
-      month: 'long',
-      year: 'numeric'
-    });
-
+    
     const newReading = new Reading({
-      tenantId,
-      adminId,
-      staffId,
-      openingReading: tenant.currentClosing || 0,
-      closingReading: closing,
+      tenantId, adminId, staffId,
+      openingReading: 0,
+      closingReading: Number(closingReading),
       photo: req.file.path,
-      month: monthStr
+      month: new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+      status: 'Pending' 
     });
-
     await newReading.save();
 
-    // 🔄 Update tenant
-    tenant.currentClosing = closing;
-    tenant.lastUpdated = now;
-    await tenant.save();
-
-    // ✅ populate for frontend instant display
-    const populatedReading = await Reading.findById(newReading._id)
-      .populate('tenantId', 'name')
-      .populate('staffId', 'name');
-
-    res.status(201).json({
-      msg: "Reading Added Successfully ✅",
-      data: populatedReading
-    });
-
-  } catch (err) {
-    console.error("ADD READING ERROR:", err);
-    res.status(500).json({ msg: err.message });
-  }
+    res.status(201).json({ msg: "Sent for Approval" });
+  } catch (err) { res.status(500).json({ msg: err.message }); }
 });
-
-//readingscreen pe
 //fecth krne ke lie
 router.get('/all/:adminId', async (req, res) => {
   try {
@@ -120,9 +54,6 @@ router.get('/all/:adminId', async (req, res) => {
     res.status(500).json({ msg: err.message });
   }
 });
-
-
-
 //excelsheet download wali
 router.get('/export/:adminId', async (req, res) => {
   try {
@@ -171,7 +102,7 @@ router.get('/export/:adminId', async (req, res) => {
         tenant: r.tenantId?.name || '',
         meter: r.tenantId?.meterId || '',
         reading: r.closingReading,
-        staff: r.staffId?.name || 'User',
+        staff: r.staffId || 'User Deleted',
       });
     });
 
@@ -194,7 +125,70 @@ router.get('/export/:adminId', async (req, res) => {
     res.status(500).json({ msg: 'Excel export failed' });
   }
 });
+//iske upar reading screen ke hai ......
 
+
+
+
+
+//abhi likha hai bss
+
+// GET: /api/tenants/:adminId (स्टाफ के लिए अपडेटेड)
+router.get('/:adminId', async (req, res) => {
+  try {
+    const tenants = await Tenant.find({ adminId: req.params.adminId });
+
+    // आज की तारीख की शुरुआत और अंत
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const end = new Date(); end.setHours(23, 59, 59, 999);
+
+    const tenantsWithStatus = await Promise.all(tenants.map(async (t) => {
+      // आज की रीडिंग ढूंढें
+      const todayReading = await Reading.findOne({
+        tenantId: t._id,
+        createdAt: { $gte: start, $lte: end }
+      });
+
+      return {
+        ...t._doc,
+        todayStatus: todayReading ? todayReading.status : 'Ready', 
+        rejectionReason: todayReading ? todayReading.rejectionReason : ""
+      };
+    }));
+
+    res.json(tenantsWithStatus);
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+});
+
+router.get('/pending/:adminId', async (req, res) => {
+  const data = await Reading.find({ adminId: req.params.adminId, status: 'Pending' })
+    .populate('tenantId', 'name meterId')
+    .populate('staffId', 'name');
+  res.json(data);
+});
+
+// 3. 🟢 APPROVE: यहाँ मास्टर डेटा अपडेट होगा
+router.put('/approve/:id', async (req, res) => {
+  try {
+    const reading = await Reading.findByIdAndUpdate(req.params.id, { status: 'Approved' }, { new: true });
+    
+    // अब मास्टर टेनेंट टेबल में डेटा प्लस करो
+    await Tenant.findByIdAndUpdate(reading.tenantId, {
+      $inc: { currentClosing: reading.closingReading },
+      lastUpdated: new Date()
+    });
+    res.json({ msg: "Approved & Data Locked" });
+  } catch (err) { res.status(500).send(err.message); }
+});
+
+// 4. 🔴 REJECT: स्टाफ को दोबारा भरने के लिए भेजें
+router.put('/reject/:id', async (req, res) => {
+  const { reason } = req.body;
+  await Reading.findByIdAndUpdate(req.params.id, { status: 'Rejected', rejectionReason: reason });
+  res.json({ msg: "Rejected" });
+});
 
 
 module.exports = router;
