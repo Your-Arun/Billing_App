@@ -41,9 +41,9 @@ const AppNavigator = () => {
         <>
           {user.role === 'Admin' ? (
             <>
-              {/* 🟢 मुख्य टैब नेविगेटर */}
+            
               <Stack.Screen 
-                name="MainTabs"
+                name="Dashboard"
                 component={TabNavigator} 
                 options={{ headerShown: false }} 
               />

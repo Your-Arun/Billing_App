@@ -132,14 +132,30 @@ router.get('/report', async (req, res) => {
 // routes/dg.js
 router.get('/list/:adminId', async (req, res) => {
   try {
-    const dgs = await DGLog.distinct('dgName', {
-      adminId: new mongoose.Types.ObjectId(req.params.adminId)
-    });
+    const { adminId } = req.params;
+    const dgs = await DGLog.distinct('dgName', { adminId });
     res.json(dgs);
+    console.log(`DG LIST FETCHED`, dgs);
   } catch (err) {
     res.status(500).json({ msg: err.message });
   }
 });
 
+
+router.put('/tenants/:id', async (req, res) => {
+  try {
+    const updated = await Tenant.findByIdAndUpdate(
+      req.params.id,
+      {
+        ...req.body,
+        lastUpdated: new Date()
+      },
+      { new: true }
+    );
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+});
 
 module.exports = router;
