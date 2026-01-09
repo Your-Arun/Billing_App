@@ -20,6 +20,7 @@ const storage = new CloudinaryStorage({
     allowed_formats: ['jpg', 'png', 'pdf', 'jpeg'] 
   },
 });
+
 const upload = multer({ storage: storage });
 
 router.post('/add', upload.single('billFile'), async (req, res) => {

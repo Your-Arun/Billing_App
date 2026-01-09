@@ -7,7 +7,7 @@ const BillSchema = new mongoose.Schema({
   energyCharges: { type: Number, required: true },
   fixedCharges: { type: Number, required: true },
   taxes: { type: Number, default: 0 },
-  billUrl: { type: String }, // Cloudinary PDF/Image link
+  billUrl: { type: String }, 
   totalAmount: { type: Number, required: true }
 }, { timestamps: true });
 

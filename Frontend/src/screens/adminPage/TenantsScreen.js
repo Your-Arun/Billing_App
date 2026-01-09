@@ -21,16 +21,16 @@ const TenantsScreen = ({ navigation }) => {
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [dgList, setDgList] = useState([]);
 
   const [form, setForm] = useState({
     name: '', meterId: '', openingMeter: '', multiplierCT: '1',
-    ratePerUnit: '', transformerLoss: '0', fixedCharge: '0'
+    ratePerUnit: '', transformerLoss: '0', fixedCharge: '0',connectedDG: ''
   });
   
 
   const companyId = user?.role === 'Admin' ? user?.id : user?.belongsToAdmin;
 
-  // 🔄 डेटा फेच करने का फंक्शन
   const fetchTenants = useCallback(async () => {
     if (!companyId) return;
     setLoading(true);
@@ -51,14 +51,29 @@ const TenantsScreen = ({ navigation }) => {
     }
   }, [companyId, selectedTenant]);
 
-  // स्क्रीन फोकस होने पर रिफ्रेश करें
+const fetchDGs = useCallback(async () => {
+  if (!companyId) return;
+  try {
+    const res = await axios.get(`${API_URL}/dg/list/${companyId}`);
+    setDgList(res.data || []);
+    console.log('DG LIST =>', res.data);
+  } catch (e) {
+    console.log('DG fetch error:', e.message);
+  }
+}, [companyId]);
+
+
+
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       fetchTenants();
+      fetchDGs();
     });
     return unsubscribe;
-  }, [navigation, fetchTenants]);
+  }, [navigation, fetchTenants, fetchDGs]);
 
+
+  
   const onRefresh = useCallback(() => { 
     setRefreshing(true); 
     fetchTenants(); 
@@ -72,7 +87,8 @@ const TenantsScreen = ({ navigation }) => {
       multiplierCT: tenant.multiplierCT.toString(),
       ratePerUnit: tenant.ratePerUnit.toString(),
       transformerLoss: tenant.transformerLoss.toString(),
-      fixedCharge: tenant.fixedCharge.toString()
+      fixedCharge: tenant.fixedCharge.toString(),
+      connectedDG: tenant.connectedDG || ''
     });
     setEditId(tenant._id);
     setIsEditing(true);
@@ -93,7 +109,8 @@ const TenantsScreen = ({ navigation }) => {
         ratePerUnit: Number(form.ratePerUnit),
         multiplierCT: Number(form.multiplierCT) || 1,
         transformerLoss: Number(form.transformerLoss) || 0,
-        fixedCharge: Number(form.fixedCharge) || 0
+        fixedCharge: Number(form.fixedCharge) || 0,
+        connectedDG: form.connectedDG || ''
       };
 
       if (isEditing) {
@@ -289,6 +306,63 @@ const TenantsScreen = ({ navigation }) => {
                 <View style={{flex: 1}}><PremiumInput label="Fixed Charge" value={form.fixedCharge} onChange={(t)=>setForm({...form, fixedCharge:t})} keyboardType="numeric" /></View>
               </View>
             </FormSection>
+         <View style={styles.inputWrapper}>
+  <Text style={styles.inputLabel}>Connected DG</Text>
+
+  <View style={styles.inputBox}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+
+      {/* NONE OPTION */}
+      <TouchableOpacity
+        style={[
+          styles.dgChip,
+          form.connectedDG === 'None' && styles.dgChipActive
+        ]}
+        onPress={() => setForm({ ...form, connectedDG: 'None' })}
+      >
+        <Text
+          style={[
+            styles.dgChipText,
+            form.connectedDG === 'None' && { color: '#fff' }
+          ]}
+        >
+          None
+        </Text>
+      </TouchableOpacity>
+
+      {/* DG LIST FROM API */}
+      {dgList && dgList.length > 0 ? (
+        dgList.map((dg) => (
+          <TouchableOpacity
+            key={dg}
+            style={[
+              styles.dgChip,
+              form.connectedDG === dg && styles.dgChipActive
+            ]}
+            onPress={() => setForm({ ...form, connectedDG: dg })}
+          >
+            <Text
+              style={[
+                styles.dgChipText,
+                form.connectedDG === dg && { color: '#fff' }
+              ]}
+            >
+              {dg}
+            </Text>
+          </TouchableOpacity>
+        ))
+      ) : (
+        <Text style={{ color: '#999', marginLeft: 10 }}>
+          No DG Found
+        </Text>
+      )}
+
+    </ScrollView>
+  </View>
+</View>
+
+
+
             <TouchableOpacity style={styles.submitBtn} onPress={handleSaveOrUpdate}><Text style={styles.submitBtnText}>{isEditing ? "UPDATE PROPERTY" : "CREATE PROPERTY"}</Text></TouchableOpacity>
             <View style={{height: 50}} />
           </ScrollView>
@@ -380,6 +454,23 @@ const styles = StyleSheet.create({
   submitBtn: { backgroundColor: '#333399', padding: 22, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginTop: 10, elevation: 5 },
   submitBtnText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
   emptyText: { textAlign: 'center', marginTop: 100, color: '#AAA', fontSize: 16 },
+  dgChip: {
+  backgroundColor: '#F0F2FF',
+  paddingHorizontal: 16,
+  paddingVertical: 10,
+  borderRadius: 20,
+  marginRight: 10,
+  borderWidth: 1,
+  borderColor: '#D0D7FF'
+},
+dgChipActive: {
+  backgroundColor: '#333399'
+},
+dgChipText: {
+  color: '#333',
+  fontWeight: 'bold'
+}
+
 });
 
 export default TenantsScreen;

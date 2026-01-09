@@ -3,7 +3,6 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const DGLog = require('../Modals/DG');
 const Tenant = require('../Modals/Tenant');
-
 /* ===============================
    1. DAILY ADD / UPDATE DG LOG
 ================================ */
@@ -130,6 +129,17 @@ router.get('/report', async (req, res) => {
   }
 });
 
+// routes/dg.js
+router.get('/list/:adminId', async (req, res) => {
+  try {
+    const dgs = await DGLog.distinct('dgName', {
+      adminId: new mongoose.Types.ObjectId(req.params.adminId)
+    });
+    res.json(dgs);
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+});
 
 
 module.exports = router;
