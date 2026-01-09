@@ -18,7 +18,6 @@ import API_URL from '../../services/apiconfig';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
-
 const ReadingsScreen = () => {
   const { user } = useContext(UserContext);
   const adminId = user?._id || user?.id;
@@ -36,41 +35,64 @@ const ReadingsScreen = () => {
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker] = useState(false);
 
-  const fetchLogs = useCallback(async () => {
-    if (!adminId) return;
-    setLoading(true);
-    try {
-      const res = await axios.get(`${API_URL}/readings/all/${adminId}`);
-      setLogs(res.data);
-    } catch (e) {
-      console.log('Fetch error:', e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [adminId]);
 
   useEffect(() => {
     fetchLogs();
   }, [fetchLogs]);
 
- const exportExcel = async () => {
+  useEffect(() => {
+  if (adminId) {
+    fetchLogs();
+  }
+}, [adminId]);
+
+const fetchLogs = async () => {
+  if (!adminId) return;
+
+  setLoading(true);
   try {
-    const fileUri =
-      FileSystem.documentDirectory +
-      `Readings_${Date.now()}.xlsx`;
-
-    const res = await FileSystem.downloadAsync(
-      `${API_URL}/readings/export/${adminId}?from=${fromDate.toISOString()}&to=${toDate.toISOString()}`,
-      fileUri
+    const res = await axios.get(
+      `${API_URL}/readings/all/${adminId}`
     );
-
-    if (res.status === 200) {
-      await Sharing.shareAsync(res.uri);
-    }
-  } catch (err) {
-    console.log('Excel download error', err.message);
+    setLogs(res.data);
+  } catch (e) {
+    console.log('Fetch error:', e.response?.data || e.message);
+  } finally {
+    setLoading(false);
   }
 };
+
+ const exportExcel = async () => {
+  setShowModal(false);
+
+  const url =
+    `${API_URL}/readings/export/${adminId}` +
+    `?from=${fromDate.toISOString()}&to=${toDate.toISOString()}`;
+
+  try {
+    // 🌐 WEB → direct download
+    if (Platform.OS === 'web') {
+      window.open(url, '_blank');
+      return;
+    }
+
+    // 📱 MOBILE → file download + share
+    const fileUri =
+      FileSystem.documentDirectory +
+      `Meter_Readings_${Date.now()}.xlsx`;
+
+    const result = await FileSystem.downloadAsync(url, fileUri);
+
+    if (result.status === 200) {
+      await Sharing.shareAsync(result.uri);
+    } else {
+      console.log('Download failed');
+    }
+  } catch (e) {
+    console.log('Export error:', e);
+  }
+};
+
 
   const renderRow = ({ item }) => {
     const d = new Date(item.createdAt);
@@ -193,6 +215,7 @@ const ReadingsScreen = () => {
     </View>
   );
 };
+
 
 
 const styles = StyleSheet.create({

@@ -47,7 +47,6 @@ router.post('/add', upload.single('billFile'), async (req, res) => {
   }
 });
 
-
 router.get('/history/:adminId', async (req, res) => {
   try {
     const history = await Bill.find({ adminId: req.params.adminId }).sort({ createdAt: -1 });
@@ -56,5 +55,7 @@ router.get('/history/:adminId', async (req, res) => {
     res.status(500).json({ msg: err.message });
   }
 });
+
+
 
 module.exports = router;

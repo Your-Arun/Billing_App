@@ -7,6 +7,7 @@ const Reading = require('../Modals/Reading');
 const Tenant = require('../Modals/Tenant');
 const ExcelJS = require('exceljs');
 require('dotenv').config(); 
+const mongoose = require('mongoose');
 
 cloudinary.config({
   cloud_name: process.env.cloud_name,
@@ -103,93 +104,33 @@ router.post('/add', upload.single('photo'), async (req, res) => {
   }
 });
 
-
 //readingscreen pe
+//fecth krne ke lie
 router.get('/all/:adminId', async (req, res) => {
   try {
-    const data = await Reading.find({ adminId: req.params.adminId })
-      .populate('tenantId', 'name meterId')     
-      .sort({ createdAt: -1 }); 
+    const adminId = new mongoose.Types.ObjectId(req.params.adminId);
+
+    const data = await Reading.find({ adminId })
+      .populate('tenantId', 'name meterId')
+      .sort({ createdAt: -1 });
+
     res.json(data);
   } catch (err) {
+    console.log(err);
     res.status(500).json({ msg: err.message });
   }
 });
 
 
 
-//roughly wale
-router.get('/range', async (req, res) => {
-  try {
-    const { adminId, startDate, endDate } = req.query;
-
-    const data = await Reading.find({
-      adminId,
-      createdAt: {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
-      }
-    })
-    .populate('tenantId', 'name meterId ratePerUnit')
-    .populate('staffId', 'name')
-    .sort({ createdAt: 1 });
-
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ msg: err.message });
-  }
-});
-
-router.get('/export/range', async (req, res) => {
-  const { adminId, startDate, endDate } = req.query;
-
-  const readings = await Reading.find({
-    adminId,
-    createdAt: {
-      $gte: new Date(startDate),
-      $lte: new Date(endDate)
-    }
-  })
-  .populate('tenantId', 'name meterId ratePerUnit')
-  .populate('staffId', 'name');
-
-  const sheet = workbook.addWorksheet('Report');
-
-  sheet.columns = [
-    { header: 'Date', key: 'date' },
-    { header: 'Tenant', key: 'tenant' },
-    { header: 'Meter', key: 'meter' },
-    { header: 'Opening', key: 'opening' },
-    { header: 'Closing', key: 'closing' },
-    { header: 'Units', key: 'units' },
-    { header: 'Rate', key: 'rate' },
-    { header: 'Amount', key: 'amount' },
-    { header: 'Taken By', key: 'staff' }
-  ];
-
-  readings.forEach(r => {
-    const units = r.closingReading - r.openingReading;
-    sheet.addRow({
-      date: r.createdAt.toLocaleDateString('en-IN'),
-      tenant: r.tenantId.name,
-      meter: r.tenantId.meterId,
-      opening: r.openingReading,
-      closing: r.closingReading,
-      units,
-      rate: r.tenantId.ratePerUnit,
-      amount: units * r.tenantId.ratePerUnit,
-      staff: r.staffId.name
-    });
-  });
-
-  await workbook.xlsx.write(res);
-  res.end();
-});
-
-
+//excelsheet download wali
 router.get('/export/:adminId', async (req, res) => {
   try {
     const { from, to } = req.query;
+
+    if (!from || !to) {
+      return res.status(400).json({ msg: 'From & To date required' });
+    }
 
     const start = new Date(from);
     const end = new Date(to);
@@ -200,28 +141,42 @@ router.get('/export/:adminId', async (req, res) => {
       createdAt: { $gte: start, $lte: end },
     })
       .populate('tenantId', 'name meterId')
-      .sort({ createdAt: 1 });
+      .sort({ createdAt: 1 }); 
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Readings');
 
     sheet.columns = [
-      { header: 'Tenant Name', key: 'tenant', width: 20 },
-      { header: 'Meter ID', key: 'meter', width: 15 },
-      { header: 'Reading', key: 'reading', width: 12 },
-      { header: 'Staff', key: 'staff', width: 18 },
-      { header: 'Date & Time', key: 'time', width: 22 },
+      { header: 'S No.', key: 'sno', width: 8 },
+      { header: 'Date', key: 'date', width: 14 },
+      { header: 'Time', key: 'time', width: 14 },
+      { header: 'Tenant Name', key: 'tenant', width: 22 },
+      { header: 'Meter ID', key: 'meter', width: 16 },
+      { header: 'Reading (kWh)', key: 'reading', width: 15 },
+      { header: 'Entered By', key: 'staff', width: 20 },
     ];
 
+    let i = 1;
+
     readings.forEach((r) => {
+      const dt = new Date(r.createdAt);
+
       sheet.addRow({
-        tenant: r.tenantId?.name,
-        meter: r.tenantId?.meterId,
+        sno: i++, // ✅ SERIAL NUMBER
+        date: dt.toLocaleDateString('en-IN'),
+        time: dt.toLocaleTimeString('en-IN', {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        tenant: r.tenantId?.name || '',
+        meter: r.tenantId?.meterId || '',
         reading: r.closingReading,
-        staff: r.staffId,
-        time: new Date(r.createdAt).toLocaleString(),
+        staff: r.staffId?.name || 'User',
       });
     });
+
+    // ✅ HEADER BOLD
+    sheet.getRow(1).font = { bold: true };
 
     res.setHeader(
       'Content-Type',
@@ -229,16 +184,17 @@ router.get('/export/:adminId', async (req, res) => {
     );
     res.setHeader(
       'Content-Disposition',
-      'attachment; filename=Meter_Readings.xlsx'
+      'attachment; filename=Meter_Readings_Daywise.xlsx'
     );
 
     await workbook.xlsx.write(res);
     res.end();
   } catch (err) {
-    console.error(err);
+    console.error('EXPORT ERROR:', err);
     res.status(500).json({ msg: 'Excel export failed' });
   }
 });
+
 
 
 module.exports = router;
