@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const Tenant = require('../Modals/Tenant');
-
+const Reading = require('../Modals/Reading');
+const DGLog = require('../Modals/DG');
 
 
 router.post('/add', async (req, res) => {
@@ -21,9 +22,14 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    await Tenant.findByIdAndDelete(req.params.id);
-    res.json({ msg: "Deleted" });
-  } catch (err) { res.status(500).json({ msg: err.message }); }
+    const tenantId = req.params.id;
+    await Reading.deleteMany({ tenantId });
+    await DGLog.deleteMany({ tenantId });
+    await Tenant.findByIdAndDelete(tenantId);
+    res.json({ msg: "Tenant & related data deleted" });
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
 });
 
 router.get('/:adminId', async (req, res) => {

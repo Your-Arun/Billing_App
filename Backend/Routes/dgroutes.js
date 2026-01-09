@@ -135,7 +135,6 @@ router.get('/list/:adminId', async (req, res) => {
     const { adminId } = req.params;
     const dgs = await DGLog.distinct('dgName', { adminId });
     res.json(dgs);
-    console.log(`DG LIST FETCHED`, dgs);
   } catch (err) {
     res.status(500).json({ msg: err.message });
   }

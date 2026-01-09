@@ -225,10 +225,10 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    paddingTop: 60,
+    paddingTop: 90,
     paddingBottom: 25,
     paddingHorizontal: 20,
-    backgroundColor: '#4F46E5',
+    backgroundColor: '#333399',
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     flexDirection: 'row',

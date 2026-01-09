@@ -56,7 +56,6 @@ const fetchDGs = useCallback(async () => {
   try {
     const res = await axios.get(`${API_URL}/dg/list/${companyId}`);
     setDgList(res.data || []);
-    console.log('DG LIST =>', res.data);
   } catch (e) {
     console.log('DG fetch error:', e.message);
   }
@@ -246,9 +245,9 @@ const fetchDGs = useCallback(async () => {
                 </View>
 
                 <View style={styles.dgStatusCard}>
-                  <MaterialCommunityIcons name="engine" size={20} color="#333399" />
-                  <Text style={styles.dgStatusLabel}>CONNECTED TO:</Text>
-                  <Text style={styles.dgStatusValue}>{selectedTenant.connectedDG || "No DG Connected"}</Text>
+                  <MaterialCommunityIcons name="" size={20} color="#333399" />
+                  <Text style={styles.dgStatusLabel}>CONNECTED TO : </Text>
+                  <Text style={styles.dgStatusValue}>{ selectedTenant.connectedDG || "No DG Connected"}</Text>
                 </View>
 
                 <View style={styles.actionGrid}>
@@ -420,8 +419,8 @@ const styles = StyleSheet.create({
   heroName: { fontSize: 22, fontWeight: 'bold', color: '#333' },
   heroId: { fontSize: 13, color: '#999' },
   dgStatusCard: { backgroundColor: '#F0F2FF', flexDirection: 'row', alignItems: 'center', padding: 18, borderRadius: 20, marginBottom: 20, borderWidth: 1, borderColor: '#D0D7FF' },
-  dgStatusLabel: { fontSize: 9, fontWeight: 'bold', color: '#666' },
-  dgStatusValue: { fontSize: 16, fontWeight: 'bold', color: '#333399', marginTop: 2 },
+  dgStatusLabel: { fontSize: 9, fontWeight: 'bold', color: '#666', marginLeft: 8 },
+  dgStatusValue: { fontSize: 16, fontWeight: 'bold', color: '#333399', marginTop: 1, padding:4 },
   actionGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 25 },
   actionBtn: { flex: 1, flexDirection: 'row', padding: 15, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginHorizontal: 5, elevation: 2 },
   actionBtnText: { color: 'white', fontWeight: 'bold', marginLeft: 8, fontSize: 14 },
