@@ -22,23 +22,40 @@ const storage = new CloudinaryStorage({
   },
 });
 const upload = multer({ storage: storage });
+
 router.post('/add', upload.single('photo'), async (req, res) => {
   try {
     const { tenantId, adminId, staffId, closingReading } = req.body;
     
+    // 🟢 सुधार 1: आज की शुद्ध तारीख (बिना समय के)
+    const now = new Date();
+    const logDate = new Date(now);
+    logDate.setHours(0, 0, 0, 0); 
+
+    const monthStr = now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
     const newReading = new Reading({
-      tenantId, adminId, staffId,
-      openingReading: 0,
+      tenantId,
+      adminId,
+      staffId,
+      openingReading: 0, 
       closingReading: Number(closingReading),
       photo: req.file.path,
-      month: new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' }),
-      status: 'Pending' 
+      month: monthStr,
+      status: 'Pending', 
+      createdAt: now 
     });
+
     await newReading.save();
 
     res.status(201).json({ msg: "Sent for Approval" });
-  } catch (err) { res.status(500).json({ msg: err.message }); }
+  } catch (err) {
+    console.error("Save Error:", err.message);
+    res.status(500).json({ msg: err.message });
+  }
 });
+
+
 //fecth krne ke lie
 router.get('/all/:adminId', async (req, res) => {
   try {
@@ -131,26 +148,78 @@ router.get('/export/:adminId', async (req, res) => {
 
 
 
-//abhi likha hai bss
 
-// GET: /api/tenants/:adminId (स्टाफ के लिए अपडेटेड)
+//sequence of approval and rejection
+
+router.get('/pending/:adminId', async (req, res) => {
+  try {
+    const { adminId } = req.params;
+    const mongoose = require('mongoose'); 
+    
+    const data = await Reading.find({ 
+      adminId: new mongoose.Types.ObjectId(adminId), 
+      status: 'Pending' 
+    })
+    .populate('tenantId', 'name meterId') 
+    .sort({ createdAt: -1 });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+});
+
+
+// GET /tenants/:adminId
+router.put('/approve/:id', async (req, res) => {
+  try {
+    const reading = await Reading.findByIdAndUpdate(req.params.id, { status: 'Approved' }, { new: true });
+    if (!reading) return res.status(404).json({ msg: "Reading not found" });
+
+    // 🟢 सुधार: यहाँ $inc इस्तेमाल करें ताकि रीडिंग प्लस (+) होती रहे
+    await Tenant.findByIdAndUpdate(reading.tenantId, {
+      $inc: { currentClosing: reading.closingReading }, // 👈 पुरानी वैल्यू में नई वैल्यू जुड़ जाएगी
+      lastUpdated: new Date()
+    });
+
+    res.json({ msg: "Approved and Units Added ✅" });
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+});
+
+// 🔴 2. REJECT: रिजेक्शन की वजह के साथ
+router.put('/reject/:id', async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const reading = await Reading.findByIdAndUpdate(req.params.id, { 
+      status: 'Rejected', 
+      rejectionReason: reason || "Photo is not clear / Wrong data" 
+    });
+    if (!reading) return res.status(404).json({ msg: "Reading not found" });
+    
+    res.json({ msg: "Rejected Successfully ❌" });
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+});
+
+
 router.get('/:adminId', async (req, res) => {
   try {
-    const tenants = await Tenant.find({ adminId: req.params.adminId });
+    // lean() बहुत ज़रूरी है ताकि todayStatus जुड़ सके
+    const tenants = await Tenant.find({ adminId: req.params.adminId }).lean();
 
-    // आज की तारीख की शुरुआत और अंत
     const start = new Date(); start.setHours(0, 0, 0, 0);
     const end = new Date(); end.setHours(23, 59, 59, 999);
 
-    const tenantsWithStatus = await Promise.all(tenants.map(async (t) => {
-      // आज की रीडिंग ढूंढें
+    const tenantsWithStatus = await Promise.all(tenants.map(async (tenant) => {
       const todayReading = await Reading.findOne({
-        tenantId: t._id,
+        tenantId: tenant._id,
         createdAt: { $gte: start, $lte: end }
-      });
+      }).sort({ createdAt: -1 });
 
       return {
-        ...t._doc,
+        ...tenant,
         todayStatus: todayReading ? todayReading.status : 'Ready', 
         rejectionReason: todayReading ? todayReading.rejectionReason : ""
       };
@@ -161,34 +230,5 @@ router.get('/:adminId', async (req, res) => {
     res.status(500).json({ msg: err.message });
   }
 });
-
-router.get('/pending/:adminId', async (req, res) => {
-  const data = await Reading.find({ adminId: req.params.adminId, status: 'Pending' })
-    .populate('tenantId', 'name meterId')
-    .populate('staffId', 'name');
-  res.json(data);
-});
-
-// 3. 🟢 APPROVE: यहाँ मास्टर डेटा अपडेट होगा
-router.put('/approve/:id', async (req, res) => {
-  try {
-    const reading = await Reading.findByIdAndUpdate(req.params.id, { status: 'Approved' }, { new: true });
-    
-    // अब मास्टर टेनेंट टेबल में डेटा प्लस करो
-    await Tenant.findByIdAndUpdate(reading.tenantId, {
-      $inc: { currentClosing: reading.closingReading },
-      lastUpdated: new Date()
-    });
-    res.json({ msg: "Approved & Data Locked" });
-  } catch (err) { res.status(500).send(err.message); }
-});
-
-// 4. 🔴 REJECT: स्टाफ को दोबारा भरने के लिए भेजें
-router.put('/reject/:id', async (req, res) => {
-  const { reason } = req.body;
-  await Reading.findByIdAndUpdate(req.params.id, { status: 'Rejected', rejectionReason: reason });
-  res.json({ msg: "Rejected" });
-});
-
 
 module.exports = router;
