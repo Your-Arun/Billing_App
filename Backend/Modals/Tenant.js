@@ -16,8 +16,6 @@ const TenantSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
-
-  openingMeter: { type: Number, required: true, min: 0 },
   multiplierCT: { type: Number, default: 1, min: 1 },
   ratePerUnit: { type: Number, required: true, min: 0 },
   transformerLoss: { type: Number, default: 0, min: 0 },

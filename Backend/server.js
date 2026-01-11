@@ -9,11 +9,13 @@ const dgroutes = require('./Routes/dgroutes');
 const solarroutes = require('./Routes/solarroutes'); 
 const readingroutes = require('./Routes/readingRoutes'); 
 const billroutes = require('./Routes/billRoutes'); 
+const reconcileroutes = require('./Routes/reconcileRoutes'); 
 
 const app = express();
 
 app.use(cors());
 app.use(express.json()); 
+
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB Connected Successfully"))
@@ -25,6 +27,8 @@ app.use('/dg', dgroutes);
 app.use('/solar', solarroutes); 
 app.use('/readings', readingroutes); 
 app.use('/bill', billroutes); 
+app.use('/bill', billroutes); 
+app.use('/reconcile', reconcileroutes); 
 
 
 

@@ -74,7 +74,13 @@ const ReadingTakerScreen = ({ navigation }) => {
       setImage(null);
       setReadingValue('');
       fetchTenants();
-    } catch (e) { Alert.alert("Error", "Failed"); }
+    } catch (e)
+        {if (e.response && e.response.status === 409) {
+          Toast.show({ type: 'error', text1: 'Today reading already submitted' });  
+        } else {
+          console.log("Submit Error:", e.message);
+          Toast.show({ type: 'error', text1: 'Submission Failed', text2: 'Try again later' });
+        } }
     finally { setSubmitting(false); }
   };
 
@@ -139,13 +145,12 @@ const ReadingTakerScreen = ({ navigation }) => {
                 <Text style={styles.badgeText}>{badgeText}</Text>
               </View>
               <Text style={styles.kwhText}>
-                {item.currentClosing || 0} kWh
+                {}
               </Text>
             </View>
 
             {status === 'Rejected' && (
               <Text style={styles.rejectText}>
-                Reason: {item.rejectionReason}
               </Text>
             )}
           </View>
@@ -173,15 +178,14 @@ const ReadingTakerScreen = ({ navigation }) => {
           </TouchableOpacity>
           <View style={styles.welcomeBox}>
             <Text style={styles.technicianText}>TECHNICIAN</Text>
-            <Text style={styles.staffName}>{user?.name || "Rajesh Kumar"}</Text>
+            <Text style={styles.staffName}>{user?.name}</Text>
           </View>
         </View>
       </View>
 
       <View style={styles.body}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.bodyTitle}>TENANTS (KIRAYEDAAR)</Text>
-          <MaterialCommunityIcons name="filter-variant" size={24} color="#666" />
+          <Text style={styles.bodyTitle}>TENANTS ( KIRAYEDAAR )</Text>
         </View>
 
         <FlatList
@@ -241,7 +245,7 @@ const ReadingTakerScreen = ({ navigation }) => {
             </View>
 
             <TouchableOpacity style={styles.submitActionBtn} onPress={handleSubmitReading} disabled={submitting}>
-              {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitActionText}>SUBMIT TO MANAGER</Text>}
+              {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitActionText}>SEND FOR APPROVAL</Text>}
             </TouchableOpacity>
             <View style={{ height: 100 }} />
           </ScrollView>
@@ -252,17 +256,17 @@ const ReadingTakerScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FE' },
+  container: { flex: 1, backgroundColor: '#F8F9FE', paddingTop: 40 },
   // Header Style (Curve Blue)
   blueHeader: {
     backgroundColor: '#333399', height: 100, paddingHorizontal: 30, justifyContent: 'center',
-    borderBottomLeftRadius: 100, borderBottomRightRadius: 100, elevation: 10
+    borderBottomLeftRadius: 10, borderBottomRightRadius: 10, elevation: 122
   },
   headerTopRow: { flexDirection: 'row', alignItems: 'center' },
   avatar: { width: 30, height: 30, borderRadius: 30, borderWidth: 3, borderColor: '#fff' },
   welcomeBox: { marginLeft: 15 },
   technicianText: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: 'bold' },
-  staffName: { color: 'white', fontSize: 24, fontWeight: 'bold' },
+  staffName: { color: 'white', fontSize: 24, fontWeight: 'bold',paddingTop: 2,  fontFamily: 'Helvetica' },
 
   // Body Style
   body: { flex: 1, paddingHorizontal: 25, marginTop: 30 },
@@ -323,7 +327,7 @@ const styles = StyleSheet.create({
   borderRadius: 24,
   marginBottom: 18,
   flexDirection: 'row',
-  elevation: 6,
+  elevation: 1,
   shadowColor: '#000',
   shadowOpacity: 0.08,
   shadowRadius: 10,
@@ -331,8 +335,8 @@ const styles = StyleSheet.create({
 
 leftStrip: {
   width: 6,
-  borderTopLeftRadius: 24,
-  borderBottomLeftRadius: 24,
+  borderTopLeftRadius: 90,
+  borderBottomLeftRadius: 90,
 },
 
 cardContent: {

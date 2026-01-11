@@ -32,17 +32,30 @@ router.post('/add', upload.single('photo'), async (req, res) => {
     const logDate = new Date(now);
     logDate.setHours(0, 0, 0, 0); 
 
+    const dateKey = now.toISOString().split('T')[0]; 
+
     const monthStr = now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    // 🟢 सुधार 2: चेक करें कि आज के लिए पहले से रीडिंग तो नहीं है
+    const alreadyExists = await Reading.findOne({
+      tenantId,
+      dateKey
+    });
+
+    if (alreadyExists) {
+      return res.status(409).json({
+        msg: 'Today reading already submitted for this tenant'
+      });
+    }
 
     const newReading = new Reading({
       tenantId,
       adminId,
       staffId,
-      openingReading: 0, 
       closingReading: Number(closingReading),
       photo: req.file.path,
       month: monthStr,
-      status: 'Pending', 
+      status: 'Pending',
+      dateKey, 
       createdAt: now 
     });
 
@@ -168,7 +181,6 @@ router.get('/pending/:adminId', async (req, res) => {
   }
 });
 
-
 // GET /tenants/:adminId
 router.put('/approve/:id', async (req, res) => {
   try {
@@ -203,7 +215,6 @@ router.put('/reject/:id', async (req, res) => {
   }
 });
 
-
 router.get('/:adminId', async (req, res) => {
   try {
     // lean() बहुत ज़रूरी है ताकि todayStatus जुड़ सके
@@ -230,5 +241,53 @@ router.get('/:adminId', async (req, res) => {
     res.status(500).json({ msg: err.message });
   }
 });
+
+
+// 🟢 पेंडिंग के अलावा बाकी सारी रीडिंग्स (Approved/Rejected)
+router.get('/history-all/:adminId', async (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    const history = await Reading.find({ 
+      adminId: new mongoose.Types.ObjectId(req.params.adminId), 
+      status: { $ne: 'Pending' } 
+    })
+    .populate('tenantId', 'name meterId')
+    .sort({ updatedAt: -1 }); // ताज़ा फैसला सबसे ऊपर
+
+    res.json(history);
+  } catch (err) { res.status(500).json({ msg: err.message }); }
+});
+
+
+
+router.get('/opening/:tenantId', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const firstApproved = await Reading.findOne({
+      tenantId,
+      status: 'Approved',
+      createdAt: { $gte: startOfMonth }
+    }).sort({ createdAt: 1 }); // 👈 first of month
+
+    if (!firstApproved) {
+      return res.json({ openingReading: 0 });
+    }
+
+    res.json({
+      openingReading: firstApproved.closingReading
+    });
+
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+});
+
+
+
 
 module.exports = router;

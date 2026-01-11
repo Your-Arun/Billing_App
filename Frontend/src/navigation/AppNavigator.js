@@ -9,6 +9,7 @@ import { UserContext } from '../services/UserContext';
 import TabNavigator from './TabNavigator';
 import DGScreen from '../screens/adminPage/DGScreen';
 import SolarScreen from '../screens/adminPage/SolarScreen';
+import ReconciliationScreen from '../screens/adminPage/ReconciliationScreen';
 
 const Stack = createStackNavigator();
 
@@ -59,12 +60,18 @@ const AppNavigator = () => {
                 component={DGScreen} 
                 options={{ title: 'DG Log', headerShown: true }} 
               />
+               <Stack.Screen 
+                name="Reconciliation" 
+                component={ReconciliationScreen} 
+                options={{ title: '', headerShown: false }} 
+              />
+              
             </>
           ) : (
             <Stack.Screen 
               name="ReadingTakerScreen" 
               component={ReadingTakerScreen} 
-              options={{ title: 'Staff Portal', headerLeft: () => null }} 
+              options={{ title: '', headerLeft: () => null ,headerShown: false}} 
             />
           )}
         </>

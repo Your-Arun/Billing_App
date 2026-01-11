@@ -16,6 +16,7 @@ const Dashboard = ({ navigation }) => {
     { name: 'AVVNL Bill', icon: 'lightning-bolt-outline', route: 'Bill' },
     { name: 'Tenants', icon: 'account-group-outline', route: 'Tenants' },
     { name: 'Statements', icon: 'file-document-outline', route: 'Home' },
+     { name: 'Reconciliation', icon: 'file-document-outline', route: 'Reconciliation' },
   ];
 
 

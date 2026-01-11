@@ -22,9 +22,10 @@ const TenantsScreen = ({ navigation }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
   const [dgList, setDgList] = useState([]);
+  const [opening, setOpening] = useState(0);
 
   const [form, setForm] = useState({
-    name: '', meterId: '', openingMeter: '', multiplierCT: '1',
+    name: '', meterId: '',  multiplierCT: '1',
     ratePerUnit: '', transformerLoss: '0', fixedCharge: '0',connectedDG: ''
   });
   
@@ -43,7 +44,6 @@ const TenantsScreen = ({ navigation }) => {
         if (freshData) setSelectedTenant(freshData);
       }
     } catch (e) { 
-      console.log("Fetch Error"); 
       Toast.show({ type: 'error', text1: 'Connection Error', text2: 'Could not fetch list' });
     } finally { 
       setLoading(false); 
@@ -60,6 +60,21 @@ const fetchDGs = useCallback(async () => {
     console.log('DG fetch error:', e.message);
   }
 }, [companyId]);
+
+useEffect(() => {
+  if (!selectedTenant?._id) return;
+
+  axios
+    .get(`${API_URL}/readings/opening/${selectedTenant._id}`)
+    .then(res => setOpening(res.data.openingReading))
+    .catch(() => setOpening(0));
+
+}, [selectedTenant?._id]);
+
+
+
+
+
 
 
 
@@ -82,7 +97,6 @@ const fetchDGs = useCallback(async () => {
   const handleEditInitiate = (tenant) => {
     setForm({
       name: tenant.name, meterId: tenant.meterId,
-      openingMeter: tenant.openingMeter.toString(),
       multiplierCT: tenant.multiplierCT.toString(),
       ratePerUnit: tenant.ratePerUnit.toString(),
       transformerLoss: tenant.transformerLoss.toString(),
@@ -96,7 +110,7 @@ const fetchDGs = useCallback(async () => {
   };
 
   const handleSaveOrUpdate = async () => {
-    if (!form.name || !form.meterId || !form.openingMeter || !form.ratePerUnit) {
+    if (!form.name || !form.meterId  || !form.ratePerUnit) {
       return Alert.alert("Error", "Please fill required fields!");
     }
     try {
@@ -104,7 +118,6 @@ const fetchDGs = useCallback(async () => {
         name: form.name,
         meterId: form.meterId,
         adminId: companyId,
-        openingMeter: Number(form.openingMeter),
         ratePerUnit: Number(form.ratePerUnit),
         multiplierCT: Number(form.multiplierCT) || 1,
         transformerLoss: Number(form.transformerLoss) || 0,
@@ -130,7 +143,7 @@ const fetchDGs = useCallback(async () => {
     setTenantModalVisible(false);
     setIsEditing(false);
     setEditId(null);
-    setForm({ name: '', meterId: '', openingMeter: '', multiplierCT: '1', ratePerUnit: '', transformerLoss: '0', fixedCharge: '0' });
+    setForm({ name: '', meterId: '', multiplierCT: '1', ratePerUnit: '', transformerLoss: '0', fixedCharge: '0' });
   };
 
   const handleDelete = (id, name) => {
@@ -260,7 +273,7 @@ const fetchDGs = useCallback(async () => {
                 </View>
 
                 <View style={styles.statsGrid}>
-                  <StatBox label="Opening" value={selectedTenant.openingMeter} icon="arrow-up-circle" color="#333399" />
+                  <StatBox label="Opening" value={opening} icon="arrow-up-circle" color="#333399" />
                   <StatBox label="Rate" value={`₹${selectedTenant.ratePerUnit}`} icon="tag" color="#4caf50" />
                   <StatBox label="Multiplier" value={`${selectedTenant.multiplierCT}x`} icon="layers" color="#ff9800" />
                   <StatBox label="Trans. Loss" value={`${selectedTenant.transformerLoss}%`} icon="percent" color="#d32f2f" />
@@ -294,7 +307,7 @@ const fetchDGs = useCallback(async () => {
             </FormSection>
             <FormSection title="Specs" icon="flash-outline">
               <View style={styles.flexRow}>
-                <View style={{flex: 1, marginRight: 12}}><PremiumInput label="Opening (kWh) *" value={form.openingMeter} onChange={(t)=>setForm({...form, openingMeter:t})} keyboardType="numeric" /></View>
+                
                 <View style={{flex: 1}}><PremiumInput label="Multiplier" value={form.multiplierCT} onChange={(t)=>setForm({...form, multiplierCT:t})} keyboardType="numeric" /></View>
               </View>
               <PremiumInput label="Rate Per Unit (₹) *" value={form.ratePerUnit} onChange={(t)=>setForm({...form, ratePerUnit:t})} keyboardType="numeric" icon="currency-inr" />

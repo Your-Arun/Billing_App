@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Pressable } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { UserContext } from '../../services/UserContext'; 
+import { UserContext } from '../../services/UserContext';
 const UserProfile = ({ visible, onClose }) => {
   const { user, logout } = useContext(UserContext);
 
@@ -9,13 +9,13 @@ const UserProfile = ({ visible, onClose }) => {
     <Modal visible={visible} animationType="fade" transparent={true}>
       <Pressable style={styles.modalOverlay} onPress={onClose}>
         <View style={styles.profileModal}>
-          
+
           <View style={styles.avatarSection}>
             <MaterialCommunityIcons name="account-circle" size={80} color="#333399" />
             <Text style={styles.modalTitle}>User Profile</Text>
           </View>
-          
-         
+
+
           <View style={styles.infoBox}>
             <View style={styles.detailRow}>
               <Text style={styles.label}>Name:</Text>
@@ -33,19 +33,23 @@ const UserProfile = ({ visible, onClose }) => {
               <Text style={styles.value}>{user?.role || "N/A"}</Text>
             </View>
 
-            <View style={styles.detailRow}>
-              <Text style={styles.label}>Reading Taker Code:</Text>
-              <Text style={[styles.value, {color: '#333399', fontWeight: 'bold'}]}>
-                {user?.adminCode || "Linked to Admin"}
-              </Text>
-            </View>
+            {user?.role === 'Admin' && (
+              <View style={styles.detailRow}>
+                <Text style={styles.label}>Reading Taker Code:</Text>
+                <Text style={[styles.value, { color: '#333399', fontWeight: 'bold' }]}>
+                  {user?.adminCode}
+                </Text>
+              </View>
+            )}
+
+
           </View>
 
-          <TouchableOpacity 
-            style={styles.logoutBtn} 
+          <TouchableOpacity
+            style={styles.logoutBtn}
             onPress={() => {
               onClose();
-              logout(); 
+              logout();
             }}
           >
             <MaterialCommunityIcons name="logout" size={20} color="white" />
