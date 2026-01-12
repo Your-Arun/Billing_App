@@ -114,4 +114,130 @@ router.get('/master-report/:adminId', async (req, res) => {
     res.status(500).json({ msg: "Fetch Error: " + err.message });
   }
 });
+
+
+
+router.get('/summary/:adminId', async (req, res) => {
+  try {
+    const { adminId } = req.params;
+    const { from, to } = req.query;
+
+    if (!from || !to) {
+      return res.status(400).json({ msg: 'from & to dates required' });
+    }
+
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    toDate.setHours(23, 59, 59, 999);
+
+    /* ================= MAIN BILL ================= */
+    const latestBill = await Bill.findOne({
+      adminId,
+      createdAt: { $lte: toDate }
+    }).sort({ createdAt: -1 });
+
+    /* ================= SOLAR ================= */
+    const solarLogs = await Solar.find({
+      adminId,
+      date: { $gte: fromDate, $lte: toDate }
+    });
+
+    const totalSolarUnits = solarLogs.reduce(
+      (sum, s) => sum + s.unitsGenerated, 0
+    );
+
+    /* ================= DG ================= */
+    const dgLogs = await DGLog.find({
+      adminId,
+      date: { $gte: fromDate, $lte: toDate }
+    });
+
+    const dgSummary = {};
+    let totalDGUnits = 0;
+    let totalDGCost = 0;
+
+    dgLogs.forEach(dg => {
+      if (!dgSummary[dg.dgName]) {
+        dgSummary[dg.dgName] = {
+          dgName: dg.dgName,
+          units: 0,
+          fuelCost: 0
+        };
+      }
+
+      dgSummary[dg.dgName].units += dg.unitsProduced;
+      dgSummary[dg.dgName].fuelCost += dg.fuelCost;
+
+      totalDGUnits += dg.unitsProduced;
+      totalDGCost += dg.fuelCost;
+    });
+
+    /* ================= TENANTS ================= */
+    const tenants = await Tenant.find({ adminId, isActive: true });
+
+    const tenantData = [];
+
+    for (const tenant of tenants) {
+      const openingReading = await Reading.findOne({
+        tenantId: tenant._id,
+        status: 'Approved',
+        createdAt: { $lt: fromDate }
+      }).sort({ createdAt: -1 });
+
+      const closingReading = await Reading.findOne({
+        tenantId: tenant._id,
+        status: 'Approved',
+        createdAt: { $lte: toDate }
+      }).sort({ createdAt: -1 });
+
+      const opening = openingReading?.closingReading || 0;
+      const closing = closingReading?.closingReading || opening;
+
+      const units =
+        (closing - opening) * tenant.multiplierCT;
+
+      tenantData.push({
+        tenantId: tenant._id,
+        tenantName: tenant.name,
+        meterId: tenant.meterId,
+        opening,
+        closing,
+        units
+      });
+    }
+
+    /* ================= RESPONSE ================= */
+    res.json({
+      range: { from, to },
+
+      bill: latestBill ? {
+        month: latestBill.month,
+        totalUnits: latestBill.totalUnits,
+        energyCharges: latestBill.energyCharges,
+        fixedCharges: latestBill.fixedCharges,
+        taxes: latestBill.taxes,
+        totalAmount: latestBill.totalAmount,
+        billUrl: latestBill.billUrl
+      } : null,
+
+      solar: {
+        totalUnits: totalSolarUnits
+      },
+
+      dg: {
+        totalUnits: totalDGUnits,
+        totalFuelCost: totalDGCost,
+        breakdown: Object.values(dgSummary)
+      },
+
+      tenants: tenantData
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: err.message });
+  }
+});
+
+
 module.exports = router;
