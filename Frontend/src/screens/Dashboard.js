@@ -10,13 +10,13 @@ const Dashboard = ({ navigation }) => {
   const [profileVisible, setProfileVisible] = useState(false);
 
   const navIcons = [
-    { name: 'Home', icon: 'home-outline', route: 'Home' },
     { name: 'Readings', icon: 'speedometer', route: 'Readings' },
     { name: 'Approval', icon: 'check-decagram-outline', route: 'Approval' },
     { name: 'AVVNL Bill', icon: 'lightning-bolt-outline', route: 'Bill' },
     { name: 'Tenants', icon: 'account-group-outline', route: 'Tenants' },
     { name: 'Statements', icon: 'file-document-outline', route: 'Home' },
      { name: 'Reconciliation', icon: 'file-document-outline', route: 'Reconciliation' },
+      { name: 'MonthlyBilling', icon: 'file-document-outline', route: 'MonthlyBilling' },
   ];
 
 

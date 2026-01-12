@@ -71,13 +71,6 @@ useEffect(() => {
 
 }, [selectedTenant?._id]);
 
-
-
-
-
-
-
-
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       fetchTenants();

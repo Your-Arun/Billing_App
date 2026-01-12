@@ -10,6 +10,7 @@ import TabNavigator from './TabNavigator';
 import DGScreen from '../screens/adminPage/DGScreen';
 import SolarScreen from '../screens/adminPage/SolarScreen';
 import ReconciliationScreen from '../screens/adminPage/ReconciliationScreen';
+import ReadingsReviewScreen from '../screens/adminPage/ReadingsReviewScreen';
 
 const Stack = createStackNavigator();
 
@@ -63,6 +64,11 @@ const AppNavigator = () => {
                <Stack.Screen 
                 name="Reconciliation" 
                 component={ReconciliationScreen} 
+                options={{ title: '', headerShown: false }} 
+              />
+        <Stack.Screen 
+                name="MonthlyBilling" 
+                component={ReadingsReviewScreen} 
                 options={{ title: '', headerShown: false }} 
               />
               
