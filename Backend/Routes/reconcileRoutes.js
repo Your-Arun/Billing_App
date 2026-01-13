@@ -126,37 +126,47 @@ router.get('/summary/:adminId', async (req, res) => {
       return res.status(400).json({ msg: 'from & to dates required' });
     }
 
+    /* ================= ObjectId FIX ================= */
+    const adminObjectId = new mongoose.Types.ObjectId(adminId);
+
+    /* ================= Date FIX ================= */
     const fromDate = new Date(from);
     const toDate = new Date(to);
+
+    fromDate.setHours(0, 0, 0, 0);
     toDate.setHours(23, 59, 59, 999);
 
     /* ================= MAIN BILL ================= */
     const latestBill = await Bill.findOne({
-      adminId,
+      adminId: adminObjectId,
       createdAt: { $lte: toDate }
     }).sort({ createdAt: -1 });
 
     /* ================= SOLAR ================= */
     const solarLogs = await Solar.find({
-      adminId,
+      adminId: adminObjectId,
       date: { $gte: fromDate, $lte: toDate }
     });
 
     const totalSolarUnits = solarLogs.reduce(
-      (sum, s) => sum + s.unitsGenerated, 0
+      (sum, s) => sum + (s.unitsGenerated || 0),
+      0
     );
 
     /* ================= DG ================= */
     const dgLogs = await DGLog.find({
-      adminId,
+      adminId: adminObjectId,
       date: { $gte: fromDate, $lte: toDate }
     });
 
-    const dgSummary = {};
     let totalDGUnits = 0;
     let totalDGCost = 0;
+    const dgSummary = {};
 
     dgLogs.forEach(dg => {
+      totalDGUnits += dg.unitsProduced || 0;
+      totalDGCost += dg.fuelCost || 0;
+
       if (!dgSummary[dg.dgName]) {
         dgSummary[dg.dgName] = {
           dgName: dg.dgName,
@@ -165,60 +175,66 @@ router.get('/summary/:adminId', async (req, res) => {
         };
       }
 
-      dgSummary[dg.dgName].units += dg.unitsProduced;
-      dgSummary[dg.dgName].fuelCost += dg.fuelCost;
-
-      totalDGUnits += dg.unitsProduced;
-      totalDGCost += dg.fuelCost;
+      dgSummary[dg.dgName].units += dg.unitsProduced || 0;
+      dgSummary[dg.dgName].fuelCost += dg.fuelCost || 0;
     });
 
     /* ================= TENANTS ================= */
-    const tenants = await Tenant.find({ adminId, isActive: true });
+    const tenants = await Tenant.find({
+      adminId: adminObjectId,
+      isActive: true
+    });
 
-    const tenantData = [];
+    const tenantData = await Promise.all(
+      tenants.map(async (tenant) => {
+        const openingReading = await Reading.findOne({
+          tenantId: tenant._id,
+          adminId: adminObjectId,
+          status: 'Approved',
+          createdAt: { $lt: fromDate }
+        }).sort({ createdAt: -1 });
 
-    for (const tenant of tenants) {
-      const openingReading = await Reading.findOne({
-        tenantId: tenant._id,
-        status: 'Approved',
-        createdAt: { $lt: fromDate }
-      }).sort({ createdAt: -1 });
+        const closingReading = await Reading.findOne({
+          tenantId: tenant._id,
+          adminId: adminObjectId,
+          status: 'Approved',
+          createdAt: { $lte: toDate }
+        }).sort({ createdAt: -1 });
 
-      const closingReading = await Reading.findOne({
-        tenantId: tenant._id,
-        status: 'Approved',
-        createdAt: { $lte: toDate }
-      }).sort({ createdAt: -1 });
+        const opening = openingReading?.closingReading || 0;
+        const closing = closingReading?.closingReading || opening;
 
-      const opening = openingReading?.closingReading || 0;
-      const closing = closingReading?.closingReading || opening;
+        const units =
+          (closing - opening) * (tenant.multiplierCT || 1);
 
-      const units =
-        (closing - opening) * tenant.multiplierCT;
-
-      tenantData.push({
-        tenantId: tenant._id,
-        tenantName: tenant.name,
-        meterId: tenant.meterId,
-        opening,
-        closing,
-        units
-      });
-    }
+        return {
+          tenantId: tenant._id,
+          tenantName: tenant.name,
+          meterId: tenant.meterId,
+          opening,
+          closing,
+          units
+        };
+      })
+    );
 
     /* ================= RESPONSE ================= */
     res.json({
       range: { from, to },
 
-      bill: latestBill ? {
-        month: latestBill.month,
-        totalUnits: latestBill.totalUnits,
-        energyCharges: latestBill.energyCharges,
-        fixedCharges: latestBill.fixedCharges,
-        taxes: latestBill.taxes,
-        totalAmount: latestBill.totalAmount,
-        billUrl: latestBill.billUrl
-      } : null,
+      bill: latestBill
+        ? {
+            month: latestBill.month,
+            totalUnits: latestBill.totalUnits,
+            energyCharges: latestBill.energyCharges,
+            fixedCharges: latestBill.fixedCharges,
+            taxes: latestBill.taxes,
+            totalAmount: latestBill.totalAmount,
+            billUrl: latestBill.billUrl
+          }
+        : {
+            totalUnits: 0
+          },
 
       solar: {
         totalUnits: totalSolarUnits
@@ -234,10 +250,9 @@ router.get('/summary/:adminId', async (req, res) => {
     });
 
   } catch (err) {
-    console.error(err);
+    console.error('SUMMARY API ERROR:', err);
     res.status(500).json({ msg: err.message });
   }
 });
-
 
 module.exports = router;
