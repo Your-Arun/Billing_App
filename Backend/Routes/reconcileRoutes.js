@@ -57,6 +57,10 @@ router.get('/range-summary/:adminId', async (req, res) => {
         tenantName: tenant.name,
         meterId: tenant.meterId,
         connectedDG: tenant.connectedDG,
+        multiplierCT: tenant.multiplierCT,
+        ratePerUnit: tenant.ratePerUnit,
+        transformerLoss: tenant.transformerLoss,
+        fixedCharge: tenant.fixedCharge,
         opening,
         closing,
         spike: closing - opening

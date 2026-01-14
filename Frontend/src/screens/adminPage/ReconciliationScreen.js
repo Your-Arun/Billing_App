@@ -12,7 +12,6 @@ import API_URL from '../../services/apiconfig';
 const ReconciliationScreen = ({ route, navigation }) => {
     const { user } = useContext(UserContext);
     
-    // Dates from Navigation (String to Date object conversion)
     const startDate = useMemo(() => 
         route.params?.startDate ? new Date(route.params.startDate) : new Date(), 
     [route.params?.startDate]);
@@ -23,21 +22,15 @@ const ReconciliationScreen = ({ route, navigation }) => {
 
     const [loading, setLoading] = useState(true);
     const [reconData, setReconData] = useState({
-        gridUnits: 0, 
-        solarUnits: 0, 
-        dgUnits: 0, 
-        dgCost: 0,
-        totalTenantUnits: 0, // Isme 'Spikes' ka sum aayega
-        netToAllocate: 0, 
-        commonLoss: 0, 
-        lossPercent: 0
+        gridUnits: 0, gridAmount: 0, solarUnits: 0, dgUnits: 0, dgCost: 0,
+        totalTenantUnits: 0, netToAllocate: 0, commonLoss: 0, lossPercent: 0
     });
+    const [tenantBreakdown, setTenantBreakdown] = useState([]);
 
     const adminId = user?._id || user?.id;
 
     const calculateReconciliation = useCallback(async () => {
         if (!adminId) return;
-
         setLoading(true);
         try {
             const dateParams = { 
@@ -45,7 +38,6 @@ const ReconciliationScreen = ({ route, navigation }) => {
                 to: endDate.toISOString().split('T')[0] 
             };
 
-            // Calling APIs
             const [billRes, solarRes, dgRes, tenantRes] = await Promise.allSettled([
                 axios.get(`${API_URL}/bill/history/${adminId}`),
                 axios.get(`${API_URL}/solar/history/${adminId}`),
@@ -53,53 +45,67 @@ const ReconciliationScreen = ({ route, navigation }) => {
                 axios.get(`${API_URL}/reconcile/range-summary/${adminId}`, { params: dateParams })
             ]);
 
-            // Data Extraction
+            // Summary Extraction
             const grid = billRes.status === 'fulfilled' ? (billRes.value.data?.[0]?.totalUnits || 0) : 0;
             const gridAmt = billRes.status === 'fulfilled' ? (billRes.value.data?.[0]?.totalAmount || 0) : 0;
             const solar = solarRes.status === 'fulfilled' ? (solarRes.value.data?.[0]?.unitsGenerated || 0) : 0;
-            
-            let dgU = 0, dgC = 0;
-            if (dgRes.status === 'fulfilled' && dgRes.value.data?.dgSummary) {
-                dgU = dgRes.value.data.dgSummary.reduce((sum, d) => sum + (Number(d.totalUnits) || 0), 0);
-                dgC = dgRes.value.data.dgSummary.reduce((sum, d) => sum + (Number(d.totalCost) || 0), 0);
-            }
+            const dgU = dgRes.status === 'fulfilled' && dgRes.value.data?.dgSummary ? dgRes.value.data.dgSummary.reduce((sum, d) => sum + (Number(d.totalUnits) || 0), 0) : 0;
+            const dgC = dgRes.status === 'fulfilled' && dgRes.value.data?.dgSummary ? dgRes.value.data.dgSummary.reduce((sum, d) => sum + (Number(d.totalCost) || 0), 0) : 0;
 
-            // ✅ LOGIC: Backend se aane wale 'spike' ka sum
-            let tenantTotalSpike = 0;
+            // ✅ TENANT WISE CALCULATION (Excel Logic)
+            let totalTenantUnitsSum = 0;
+            let calculatedTenants = [];
+
             if (tenantRes.status === 'fulfilled' && Array.isArray(tenantRes.value.data)) {
-                tenantTotalSpike = tenantRes.value.data.reduce((sum, t) => {
-                    // Backend se 'spike' key aa rahi hai (closing - opening)
-                    return sum + (Number(t.spike) || 0);
-                }, 0);
+                calculatedTenants = tenantRes.value.data.map(t => {
+                    const diff = Number(t.closing) - Number(t.opening);
+                    const ct = Number(t.multiplierCT || 1); // Default CT is 1 if not provided
+                    const units = diff * ct;
+                    const rate = Number(t.ratePerUnit || 10.2); // Default Rate from Excel
+                    const amount = units * rate;
+                    const fixed = Number(t.fixedCharge || 0);
+                    
+                    // Transformer Loss (4% of Amount + Fixed)
+                    const transLoss = (amount + fixed) * Number(t.transformerLoss);
+                    
+                    // DG Charges (Assuming 1 Rs per unit if DG connected)
+                    const dgCharge = t.connectedDG ? (units * 1) : 0; 
+                    
+                    const totalBill = amount + fixed + transLoss + dgCharge;
+
+                    totalTenantUnitsSum += units;
+
+                    return {
+                        ...t,
+                        units,
+                        amount,
+                        fixed,
+                        transLoss,
+                        dgCharge,
+                        totalBill
+                    };
+                });
             }
 
-            // Calculations: Input = Grid + Solar + DG
             const totalInput = Number(grid) + Number(solar) + Number(dgU);
-            const loss = totalInput - tenantTotalSpike;
+            const loss = totalInput - totalTenantUnitsSum;
             const lossP = totalInput > 0 ? ((loss / totalInput) * 100).toFixed(1) : 0;
 
             setReconData({
-                gridUnits: grid, 
-                gridAmount: gridAmt, 
-                solarUnits: solar, 
-                dgUnits: dgU, 
-                dgCost: dgC,
-                totalTenantUnits: tenantTotalSpike,
-                netToAllocate: totalInput,
-                commonLoss: loss, 
-                lossPercent: lossP
+                gridUnits: grid, gridAmount: gridAmt, solarUnits: solar, 
+                dgUnits: dgU, dgCost: dgC, totalTenantUnits: totalTenantUnitsSum,
+                netToAllocate: totalInput, commonLoss: loss, lossPercent: lossP,
             });
+            setTenantBreakdown(calculatedTenants);
 
         } catch (e) { 
-            console.error("DEBUG Error:", e);
+            console.error("Calculation Error:", e);
         } finally { 
             setLoading(false); 
         }
     }, [adminId, startDate, endDate]);
 
-    useEffect(() => {
-        calculateReconciliation();
-    }, [calculateReconciliation]);
+    useEffect(() => { calculateReconciliation(); }, [calculateReconciliation]);
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -110,111 +116,130 @@ const ReconciliationScreen = ({ route, navigation }) => {
                 </TouchableOpacity>
                 <View style={{marginLeft: 15}}>
                     <Text style={styles.headerTitle}>Final Reconciliation</Text>
-                    <Text style={styles.headerSub}>
-                        {startDate.toLocaleDateString()} - {endDate.toLocaleDateString()}
-                    </Text>
+                    <Text style={styles.headerSub}>{startDate.toLocaleDateString()} - {endDate.toLocaleDateString()}</Text>
                 </View>
             </View>
 
             {loading ? (
                 <View style={styles.loaderContainer}>
                     <ActivityIndicator size="large" color="#333399" />
-                    <Text style={{marginTop: 10, color: '#666', fontWeight: 'bold'}}>Calculating Tenant Spikes...</Text>
+                    <Text style={styles.loaderText}>Processing Tenant Bills...</Text>
                 </View>
             ) : (
-                <ScrollView 
-                    contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
-                    refreshControl={<RefreshControl refreshing={loading} onRefresh={calculateReconciliation} />}
-                >
+                <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+                    
+                    {/* TOP SUMMARY CARD */}
                     <View style={styles.mainCard}>
-                        {/* SOURCES */}
-                        <Row label="Grid Units" value={reconData.gridUnits} icon="flash" color="#333399" />
-                        <Row label="Grid Amount" value={reconData.gridAmount} icon="flash" color="#333399" />
-                        <Row label="Solar Gen" value={reconData.solarUnits} icon="solar-power" color="#059669" />
-                        <Row label="DG Backup" value={reconData.dgUnits} icon="engine" color="#DC2626" />
-                        <Row label="DG Backup Cost" value={reconData.dgCost} icon="currency-inr" color="#DC2626" unit="Rs" />
-
+                        <Row label="Total Grid Input" value={reconData.gridUnits} icon="flash" color="#333399" />
+                        <Row label="Tenant Consumption" value={reconData.totalTenantUnits.toFixed(1)} icon="account-group" color="#4F46E5" bold />
                         <View style={styles.darkDivider} />
-                        
-                        {/* TOTALS */}
-                        <Row label="TOTAL ENERGY IN" value={reconData.netToAllocate.toFixed(1)} bold />
-                        
-                        
-                        {/* ✅ TENANT SUM (Saare spikes ka total) */}
-                        <Row 
-                            label="TENANT SUM (TOTAL SPIKES)" 
-                            value={reconData.totalTenantUnits.toFixed(1)} 
-                            bold 
-                            color="#4F46E5" 
-                        />
-                        
-                        <View style={styles.darkDivider} />
-                        
-                        {/* LOSS ANALYSIS */}
                         <View style={styles.lossRow}>
                             <View>
-                                <Text style={styles.lossLabel}>Common Area / Maintenance</Text>
+                                <Text style={styles.lossLabel}>Common Area Loss</Text>
                                 <Text style={styles.lossValue}>{reconData.commonLoss.toFixed(1)} kWh</Text>
                             </View>
-                            <View style={[styles.lossBadge, {backgroundColor: reconData.lossPercent > 12 ? '#FEE2E2' : '#D1FAE5'}]}>
-                                <Text style={[styles.lossPercentText, {color: reconData.lossPercent > 12 ? '#DC2626' : '#059669'}]}>
-                                    {reconData.lossPercent}%
-                                </Text>
-                            </View>
+                            <Text style={[styles.lossPercent, {color: reconData.lossPercent > 12 ? '#DC2626' : '#059669'}]}>
+                                {reconData.lossPercent}%
+                            </Text>
                         </View>
                     </View>
 
-                    <View style={styles.noteBox}>
-                        <MaterialCommunityIcons name="shield-check-outline" size={18} color="#059669" />
-                        <Text style={styles.noteText}>
-                            Tenant sum is calculated based on individual meter spikes verified earlier.
-                        </Text>
-                    </View>
+                    <Text style={styles.sectionTitle}>Tenant-wise Breakdown</Text>
+
+                    {/* TENANT CARDS (Excel View) */}
+                    {tenantBreakdown.map((item, index) => (
+                        <View key={index} style={styles.tenantCard}>
+                            <View style={styles.tenantHeader}>
+                                <Text style={styles.tenantNameText}>{item.tenantName}</Text>
+                                <Text style={styles.totalBadge}>₹ {item.totalBill.toFixed(0)}</Text>
+                            </View>
+                            
+                            <View style={styles.detailGrid}>
+                                <DetailItem label="Opening" value={item.opening} />
+                                <MaterialCommunityIcons name="minus" size={12} color="#AAA" />
+                                <DetailItem label="Closing" value={item.closing} />
+                                <MaterialCommunityIcons name="equal" size={12} color="#AAA" />
+                                <DetailItem label="Units (x{item.meterCT || 1})" value={item.units} bold />
+                            </View>
+
+                            <View style={styles.divider} />
+
+                            <View style={styles.priceRow}>
+                                <PriceItem label="Energy Amt" val={item.amount} />
+                                <PriceItem label="Fixed Chg" val={item.fixed} />
+                                <PriceItem label="Trans. Loss" val={item.transLoss} />
+                                <PriceItem label="DG (1/u)" val={item.dgCharge} color="#DC2626" />
+                            </View>
+                        </View>
+                    ))}
                 </ScrollView>
             )}
 
             <View style={styles.footer}>
-                <TouchableOpacity style={styles.btn} onPress={() => Alert.alert("Success", "Ready for Final Billing")}>
-                    <Text style={styles.btnText}>GENERATE FINAL BILLS</Text>
+                <TouchableOpacity style={styles.btn} onPress={() => Alert.alert("Success", "All bills have been queued for generation.")}>
+                    <Text style={styles.btnText}>CONFIRM & GENERATE INVOICES</Text>
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
     );
 };
 
-const Row = ({ label, value, color = '#111827', icon, bold, unit = "kWh" }) => (
+// Helper Components
+const Row = ({ label, value, color = '#111827', icon, bold }) => (
     <View style={styles.row}>
         <View style={{flexDirection: 'row', alignItems: 'center'}}>
-            {icon && <MaterialCommunityIcons name={icon} size={16} color={color} style={{marginRight: 8}} />}
-            <Text style={[styles.rowLabel, bold && { fontWeight: 'bold', color: '#000' }]}>{label}</Text>
+            <MaterialCommunityIcons name={icon} size={16} color={color} style={{marginRight: 8}} />
+            <Text style={[styles.rowLabel, bold && { fontWeight: 'bold' }]}>{label}</Text>
         </View>
-        <Text style={[styles.rowValue, { color }, bold && { fontSize: 18, fontWeight: 'bold' }]}>
-            {value} <Text style={{fontSize: 10, fontWeight: 'normal'}}>{unit}</Text>
-        </Text>
+        <Text style={[styles.rowValue, { color }, bold && { fontSize: 18, fontWeight: 'bold' }]}>{value} kWh</Text>
+    </View>
+);
+
+const DetailItem = ({ label, value, bold }) => (
+    <View style={{alignItems: 'center'}}>
+        <Text style={styles.detailLabel}>{label}</Text>
+        <Text style={[styles.detailValue, bold && {fontWeight: 'bold', color: '#333399'}]}>{value}</Text>
+    </View>
+);
+
+const PriceItem = ({ label, val, color = '#4B5563' }) => (
+    <View style={{flex: 1, alignItems: 'center'}}>
+        <Text style={styles.priceLabel}>{label}</Text>
+        <Text style={[styles.priceValue, {color}]}>₹{val.toFixed(1)}</Text>
     </View>
 );
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F9FAFB' },
+    container: { flex: 1, backgroundColor: '#F3F4F6' },
     header: { backgroundColor: '#333399', padding: 20, flexDirection: 'row', alignItems: 'center', borderBottomLeftRadius: 20, borderBottomRightRadius: 20 },
     headerTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
     headerSub: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
     loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    mainCard: { backgroundColor: '#FFF', padding: 20, borderRadius: 20, elevation: 5 },
-    row: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 10, alignItems: 'center' },
-    rowLabel: { fontSize: 13, color: '#4B5563', fontWeight: '500' },
+    loaderText: { marginTop: 10, fontWeight: 'bold', color: '#666' },
+    mainCard: { backgroundColor: '#FFF', padding: 20, borderRadius: 20, elevation: 4, marginBottom: 20 },
+    row: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 8, alignItems: 'center' },
+    rowLabel: { fontSize: 13, color: '#4B5563' },
     rowValue: { fontSize: 15, fontWeight: '700' },
     darkDivider: { height: 1, backgroundColor: '#F3F4F6', marginVertical: 12 },
-    lossRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, backgroundColor: '#F8FAFC', padding: 15, borderRadius: 15 },
-    lossLabel: { fontSize: 11, color: '#64748B', fontWeight: 'bold' },
-    lossValue: { fontSize: 20, fontWeight: '900', color: '#1E293B' },
-    lossBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-    lossPercentText: { fontWeight: 'bold', fontSize: 14 },
+    lossRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    lossLabel: { fontSize: 11, color: '#999', fontWeight: 'bold' },
+    lossValue: { fontSize: 18, fontWeight: '900', color: '#333' },
+    lossPercent: { fontSize: 18, fontWeight: 'bold' },
+    sectionTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 15, color: '#111827' },
+    tenantCard: { backgroundColor: '#FFF', padding: 15, borderRadius: 16, marginBottom: 15, elevation: 2 },
+    tenantHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+    tenantNameText: { fontSize: 15, fontWeight: 'bold', color: '#111827' },
+    totalBadge: { backgroundColor: '#EEF2FF', color: '#4F46E5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, fontWeight: 'bold' },
+    detailGrid: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 10 },
+    detailLabel: { fontSize: 9, color: '#999', marginBottom: 2 },
+    detailValue: { fontSize: 13, color: '#333' },
+    divider: { height: 1, backgroundColor: '#F3F4F6', marginVertical: 12 },
+    priceRow: { flexDirection: 'row', justifyContent: 'space-between' },
+    priceLabel: { fontSize: 8, color: '#999', marginBottom: 3, textAlign: 'center' },
+    priceValue: { fontSize: 11, fontWeight: 'bold', textAlign: 'center' },
     footer: { padding: 16, backgroundColor: '#FFF', borderTopWidth: 1, borderColor: '#EEE' },
     btn: { backgroundColor: '#333399', padding: 18, borderRadius: 15, alignItems: 'center' },
-    btnText: { color: '#FFF', fontWeight: 'bold' },
-    noteBox: { flexDirection: 'row', alignItems: 'center', padding: 15, marginTop: 15 },
-    noteText: { fontSize: 12, color: '#6B7280', marginLeft: 8, fontStyle: 'italic' }
+    btnText: { color: '#FFF', fontWeight: 'bold' }
 });
 
 export default ReconciliationScreen;
