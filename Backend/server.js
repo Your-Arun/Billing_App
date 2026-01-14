@@ -27,7 +27,6 @@ app.use('/dg', dgroutes);
 app.use('/solar', solarroutes); 
 app.use('/readings', readingroutes); 
 app.use('/bill', billroutes); 
-app.use('/bill', billroutes); 
 app.use('/reconcile', reconcileroutes); 
 
 

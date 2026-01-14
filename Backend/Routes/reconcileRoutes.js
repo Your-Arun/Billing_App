@@ -3,256 +3,74 @@ const router = express.Router();
 const mongoose = require('mongoose');
 
 // सभी मॉडल्स को इम्पोर्ट करें
-const Tenant = require('../Modals/Tenant');
 const Reading = require('../Modals/Reading');
-const Bill = require('../Modals/Bill');
-const Solar = require('../Modals/Solar');
-const { DGLog } = require('../Modals/DG');
+const Tenant = require('../Modals/Tenant');
 
 
-// 🟢 GET: /api/reconcile/master-report/:adminId?startDate=...&endDate=...
-router.get('/master-report/:adminId', async (req, res) => {
+router.get('/range-summary/:adminId', async (req, res) => {
   try {
-    const { adminId } = req.params;
-    const { startDate, endDate } = req.query;
-
-    if (!startDate || !endDate) {
-      return res.status(400).json({ msg: "Please select date range" });
-    }
-
-    const start = new Date(startDate);
-    start.setUTCHours(0, 0, 0, 0);
-    const end = new Date(endDate);
-    end.setUTCHours(23, 59, 59, 999);
-
-    const objAdminId = new mongoose.Types.ObjectId(adminId);
-
-    // 1. सरकारी बिल - रेंज के बीच की सबसे लेटेस्ट एंट्री उठाओ
-    const mainBill = await Bill.findOne({
-      adminId: objAdminId,
-      createdAt: { $gte: start, $lte: end }
-    }).sort({ createdAt: -1 }).lean();
-
-    // 2. सोलर डेटा - रेंज के बीच की सभी एंट्रीज़ का टोटल
-    const solarTotal = await Solar.aggregate([
-      { $match: { adminId: objAdminId, date: { $gte: start, $lte: end } } },
-      { $group: { _id: null, totalUnits: { $sum: "$unitsGenerated" } } }
-    ]);
-
-    // 3. DG डेटा - रेंज के बीच की सभी एंट्रीज़ का टोटल (Units + Cost)
-    const dgTotal = await DGLog.aggregate([
-      { $match: { adminId: objAdminId, date: { $gte: start, $lte: end } } },
-      { 
-        $group: { 
-          _id: null, 
-          totalUnitsProduced: { $sum: "$unitsProduced" }, 
-          totalFuelCost: { $sum: "$fuelCost" } 
-        } 
-      }
-    ]);
-
-    // 4. किरायेदारों की टेबल के लिए डेटा (Individual Calculation)
-    const tenants = await Tenant.find({ adminId: objAdminId }).lean();
-    
-    const tableData = await Promise.all(tenants.map(async (tenant) => {
-      // रेंज की सबसे पहली APPROVED रीडिंग (Opening)
-      const firstLog = await Reading.findOne({
-        tenantId: tenant._id,
-        status: 'Approved',
-        createdAt: { $gte: start, $lte: end }
-      }).sort({ createdAt: 1 });
-
-      // रेंज की सबसे आखिरी APPROVED रीडिंग (Closing)
-      const lastLog = await Reading.findOne({
-        tenantId: tenant._id,
-        status: 'Approved',
-        createdAt: { $gte: start, $lte: end }
-      }).sort({ createdAt: -1 });
-
-      // अगर रीडिंग नहीं मिली तो 0, वरना वैल्यू
-      const opening = firstLog ? firstLog.closingReading : 0;
-      const closing = lastLog ? lastLog.closingReading : 0;
-      
-      // 🧮 खपत कैलकुलेशन: (Closing - Opening) * CT Multiplier
-      const rawConsumed = closing - opening;
-      const netConsumed = (rawConsumed > 0 ? rawConsumed : 0) * (tenant.multiplierCT || 1);
-      
-      return {
-        tenantId: tenant._id,
-        name: tenant.name,
-        meterSN: tenant.meterId,
-        opening,
-        closing,
-        multiplier: tenant.multiplierCT,
-        unitsConsumed: netConsumed,
-        rate: tenant.ratePerUnit,
-        fixedCharge: tenant.fixedCharge,
-        amount: netConsumed * tenant.ratePerUnit
-      };
-    }));
-
-    // 5. एग्रीगेट समरी
-    const totalTenantsUnits = tableData.reduce((acc, curr) => acc + curr.unitsConsumed, 0);
-    const solarUnits = solarTotal[0]?.totalUnits || 0;
-    const dgUnits = dgTotal[0]?.totalUnitsProduced || 0;
-    const dgCost = dgTotal[0]?.totalFuelCost || 0;
-    const billUnits = mainBill?.totalUnits || 0;
-
-    res.json({
-      summary: {
-        mainMeter: billUnits,
-        solarGen: solarUnits,
-        dgTotalUnits: dgUnits,
-        dgTotalCost: dgCost,
-        aggregateTenantUnits: Number(totalTenantsUnits.toFixed(2))
-      },
-      tableData
-    });
-
-  } catch (err) {
-    console.error("Reconciliation Error:", err);
-    res.status(500).json({ msg: "Fetch Error: " + err.message });
-  }
-});
-
-
-
-router.get('/summary/:adminId', async (req, res) => {
-  try {
-    const { adminId } = req.params;
     const { from, to } = req.query;
+    const adminId = new mongoose.Types.ObjectId(req.params.adminId);
 
     if (!from || !to) {
-      return res.status(400).json({ msg: 'from & to dates required' });
+      return res.status(400).json({ msg: 'From & To date required' });
     }
 
-    /* ================= ObjectId FIX ================= */
-    const adminObjectId = new mongoose.Types.ObjectId(adminId);
-
-    /* ================= Date FIX ================= */
     const fromDate = new Date(from);
-    const toDate = new Date(to);
-
     fromDate.setHours(0, 0, 0, 0);
+
+    const toDate = new Date(to);
     toDate.setHours(23, 59, 59, 999);
 
-    /* ================= MAIN BILL ================= */
-    const latestBill = await Bill.findOne({
-      adminId: adminObjectId,
-      createdAt: { $lte: toDate }
-    }).sort({ createdAt: -1 });
+    // 🔹 All tenants
+    const tenants = await Tenant.find({ adminId }).lean();
 
-    /* ================= SOLAR ================= */
-    const solarLogs = await Solar.find({
-      adminId: adminObjectId,
-      date: { $gte: fromDate, $lte: toDate }
-    });
+    const result = [];
 
-    const totalSolarUnits = solarLogs.reduce(
-      (sum, s) => sum + (s.unitsGenerated || 0),
-      0
-    );
+    for (const tenant of tenants) {
 
-    /* ================= DG ================= */
-    const dgLogs = await DGLog.find({
-      adminId: adminObjectId,
-      date: { $gte: fromDate, $lte: toDate }
-    });
+      // ✅ OPENING = last reading BEFORE fromDate
+      const openingReading = await Reading.findOne({
+        tenantId: tenant._id,
+        adminId,
+        createdAt: { $lt: fromDate }
+      }).sort({ createdAt: -1 });
 
-    let totalDGUnits = 0;
-    let totalDGCost = 0;
-    const dgSummary = {};
+      // ✅ CLOSING = last reading WITHIN range
+      const closingReading = await Reading.findOne({
+        tenantId: tenant._id,
+        adminId,
+        createdAt: { $gte: fromDate, $lte: toDate }
+      }).sort({ createdAt: -1 });
 
-    dgLogs.forEach(dg => {
-      totalDGUnits += dg.unitsProduced || 0;
-      totalDGCost += dg.fuelCost || 0;
+      const opening =
+        openingReading?.closingReading ??
+        tenant.openingMeter ??
+        0;
 
-      if (!dgSummary[dg.dgName]) {
-        dgSummary[dg.dgName] = {
-          dgName: dg.dgName,
-          units: 0,
-          fuelCost: 0
-        };
-      }
+      const closing =
+        closingReading?.closingReading ??
+        opening;
 
-      dgSummary[dg.dgName].units += dg.unitsProduced || 0;
-      dgSummary[dg.dgName].fuelCost += dg.fuelCost || 0;
-    });
+      result.push({
+        tenantId: tenant._id,
+        tenantName: tenant.name,
+        meterId: tenant.meterId,
+        connectedDG: tenant.connectedDG,
+        opening,
+        closing,
+        spike: closing - opening
+      });
+    }
 
-    /* ================= TENANTS ================= */
-    const tenants = await Tenant.find({
-      adminId: adminObjectId,
-      isActive: true
-    });
-
-    const tenantData = await Promise.all(
-      tenants.map(async (tenant) => {
-        const openingReading = await Reading.findOne({
-          tenantId: tenant._id,
-          adminId: adminObjectId,
-          status: 'Approved',
-          createdAt: { $lt: fromDate }
-        }).sort({ createdAt: -1 });
-
-        const closingReading = await Reading.findOne({
-          tenantId: tenant._id,
-          adminId: adminObjectId,
-          status: 'Approved',
-          createdAt: { $lte: toDate }
-        }).sort({ createdAt: -1 });
-
-        const opening = openingReading?.closingReading || 0;
-        const closing = closingReading?.closingReading || opening;
-
-        const units =
-          (closing - opening) * (tenant.multiplierCT || 1);
-
-        return {
-          tenantId: tenant._id,
-          tenantName: tenant.name,
-          meterId: tenant.meterId,
-          opening,
-          closing,
-          units
-        };
-      })
-    );
-
-    /* ================= RESPONSE ================= */
-    res.json({
-      range: { from, to },
-
-      bill: latestBill
-        ? {
-            month: latestBill.month,
-            totalUnits: latestBill.totalUnits,
-            energyCharges: latestBill.energyCharges,
-            fixedCharges: latestBill.fixedCharges,
-            taxes: latestBill.taxes,
-            totalAmount: latestBill.totalAmount,
-            billUrl: latestBill.billUrl
-          }
-        : {
-            totalUnits: 0
-          },
-
-      solar: {
-        totalUnits: totalSolarUnits
-      },
-
-      dg: {
-        totalUnits: totalDGUnits,
-        totalFuelCost: totalDGCost,
-        breakdown: Object.values(dgSummary)
-      },
-
-      tenants: tenantData
-    });
+    res.json(result);
 
   } catch (err) {
-    console.error('SUMMARY API ERROR:', err);
+    console.error(err);
     res.status(500).json({ msg: err.message });
   }
 });
+
+
 
 module.exports = router;

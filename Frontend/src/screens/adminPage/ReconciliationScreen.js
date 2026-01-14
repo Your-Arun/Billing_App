@@ -1,211 +1,220 @@
-import React, { useState, useEffect, useContext, useCallback } from 'react';
+import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, ActivityIndicator, 
-  TouchableOpacity, RefreshControl, Alert 
+  TouchableOpacity, Alert, StatusBar, RefreshControl 
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
 
-const ReconciliationScreen = () => {
-  const { user } = useContext(UserContext);
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [date, setDate] = useState(new Date());
-  const [showPicker, setShowPicker] = useState(false);
+const ReconciliationScreen = ({ route, navigation }) => {
+    const { user } = useContext(UserContext);
+    
+    // Dates from Navigation (String to Date object conversion)
+    const startDate = useMemo(() => 
+        route.params?.startDate ? new Date(route.params.startDate) : new Date(), 
+    [route.params?.startDate]);
 
-  const adminId = user?._id || user?.id;
+    const endDate = useMemo(() => 
+        route.params?.endDate ? new Date(route.params.endDate) : new Date(), 
+    [route.params?.endDate]);
 
-  // 🟢 YYYY-MM फॉर्मेट में monthKey तैयार करें
-  const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-  const monthName = date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    const [loading, setLoading] = useState(true);
+    const [reconData, setReconData] = useState({
+        gridUnits: 0, 
+        solarUnits: 0, 
+        dgUnits: 0, 
+        dgCost: 0,
+        totalTenantUnits: 0, // Isme 'Spikes' ka sum aayega
+        netToAllocate: 0, 
+        commonLoss: 0, 
+        lossPercent: 0
+    });
 
-  const fetchSummary = useCallback(async () => {
-    if (!adminId) return;
-    setLoading(true);
-    try {
-      // 🟢 बैकएंड रूट: /api/reconcile/:adminId?monthKey=2026-01
-      const res = await axios.get(`${API_URL}/reconcile/${adminId}`, {
-        params: { monthKey }
-      });
-      setData(res.data);
-    } catch (e) {
-      console.log("Reconcile Fetch Error:", e.response?.data || e.message);
-      Alert.alert("Error", "Could not fetch reconciliation data for this month.");
-    } finally {
-      setLoading(false);
-    }
-  }, [adminId, monthKey]);
+    const adminId = user?._id || user?.id;
 
-  useEffect(() => {
-    fetchSummary();
-  }, [fetchSummary]);
+    const calculateReconciliation = useCallback(async () => {
+        if (!adminId) return;
 
-  const handleFinalize = () => {
-    Alert.alert(
-      "Finalize Month",
-      `Are you sure you want to finalize ${monthName}? This will lock all readings and prepare final bills.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Yes, Finalize", onPress: () => console.log("Finalizing...") }
-      ]
+        setLoading(true);
+        try {
+            const dateParams = { 
+                from: startDate.toISOString().split('T')[0], 
+                to: endDate.toISOString().split('T')[0] 
+            };
+
+            // Calling APIs
+            const [billRes, solarRes, dgRes, tenantRes] = await Promise.allSettled([
+                axios.get(`${API_URL}/bill/history/${adminId}`),
+                axios.get(`${API_URL}/solar/history/${adminId}`),
+                axios.get(`${API_URL}/dg/dgsummary/${adminId}`, { params: dateParams }),
+                axios.get(`${API_URL}/reconcile/range-summary/${adminId}`, { params: dateParams })
+            ]);
+
+            // Data Extraction
+            const grid = billRes.status === 'fulfilled' ? (billRes.value.data?.[0]?.totalUnits || 0) : 0;
+            const gridAmt = billRes.status === 'fulfilled' ? (billRes.value.data?.[0]?.totalAmount || 0) : 0;
+            const solar = solarRes.status === 'fulfilled' ? (solarRes.value.data?.[0]?.unitsGenerated || 0) : 0;
+            
+            let dgU = 0, dgC = 0;
+            if (dgRes.status === 'fulfilled' && dgRes.value.data?.dgSummary) {
+                dgU = dgRes.value.data.dgSummary.reduce((sum, d) => sum + (Number(d.totalUnits) || 0), 0);
+                dgC = dgRes.value.data.dgSummary.reduce((sum, d) => sum + (Number(d.totalCost) || 0), 0);
+            }
+
+            // ✅ LOGIC: Backend se aane wale 'spike' ka sum
+            let tenantTotalSpike = 0;
+            if (tenantRes.status === 'fulfilled' && Array.isArray(tenantRes.value.data)) {
+                tenantTotalSpike = tenantRes.value.data.reduce((sum, t) => {
+                    // Backend se 'spike' key aa rahi hai (closing - opening)
+                    return sum + (Number(t.spike) || 0);
+                }, 0);
+            }
+
+            // Calculations: Input = Grid + Solar + DG
+            const totalInput = Number(grid) + Number(solar) + Number(dgU);
+            const loss = totalInput - tenantTotalSpike;
+            const lossP = totalInput > 0 ? ((loss / totalInput) * 100).toFixed(1) : 0;
+
+            setReconData({
+                gridUnits: grid, 
+                gridAmount: gridAmt, 
+                solarUnits: solar, 
+                dgUnits: dgU, 
+                dgCost: dgC,
+                totalTenantUnits: tenantTotalSpike,
+                netToAllocate: totalInput,
+                commonLoss: loss, 
+                lossPercent: lossP
+            });
+
+        } catch (e) { 
+            console.error("DEBUG Error:", e);
+        } finally { 
+            setLoading(false); 
+        }
+    }, [adminId, startDate, endDate]);
+
+    useEffect(() => {
+        calculateReconciliation();
+    }, [calculateReconciliation]);
+
+    return (
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <StatusBar barStyle="light-content" />
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => navigation.goBack()}>
+                    <MaterialCommunityIcons name="arrow-left" size={26} color="#FFF" />
+                </TouchableOpacity>
+                <View style={{marginLeft: 15}}>
+                    <Text style={styles.headerTitle}>Final Reconciliation</Text>
+                    <Text style={styles.headerSub}>
+                        {startDate.toLocaleDateString()} - {endDate.toLocaleDateString()}
+                    </Text>
+                </View>
+            </View>
+
+            {loading ? (
+                <View style={styles.loaderContainer}>
+                    <ActivityIndicator size="large" color="#333399" />
+                    <Text style={{marginTop: 10, color: '#666', fontWeight: 'bold'}}>Calculating Tenant Spikes...</Text>
+                </View>
+            ) : (
+                <ScrollView 
+                    contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+                    refreshControl={<RefreshControl refreshing={loading} onRefresh={calculateReconciliation} />}
+                >
+                    <View style={styles.mainCard}>
+                        {/* SOURCES */}
+                        <Row label="Grid Units" value={reconData.gridUnits} icon="flash" color="#333399" />
+                        <Row label="Grid Amount" value={reconData.gridAmount} icon="flash" color="#333399" />
+                        <Row label="Solar Gen" value={reconData.solarUnits} icon="solar-power" color="#059669" />
+                        <Row label="DG Backup" value={reconData.dgUnits} icon="engine" color="#DC2626" />
+                        <Row label="DG Backup Cost" value={reconData.dgCost} icon="currency-inr" color="#DC2626" unit="Rs" />
+
+                        <View style={styles.darkDivider} />
+                        
+                        {/* TOTALS */}
+                        <Row label="TOTAL ENERGY IN" value={reconData.netToAllocate.toFixed(1)} bold />
+                        
+                        
+                        {/* ✅ TENANT SUM (Saare spikes ka total) */}
+                        <Row 
+                            label="TENANT SUM (TOTAL SPIKES)" 
+                            value={reconData.totalTenantUnits.toFixed(1)} 
+                            bold 
+                            color="#4F46E5" 
+                        />
+                        
+                        <View style={styles.darkDivider} />
+                        
+                        {/* LOSS ANALYSIS */}
+                        <View style={styles.lossRow}>
+                            <View>
+                                <Text style={styles.lossLabel}>Common Area / Maintenance</Text>
+                                <Text style={styles.lossValue}>{reconData.commonLoss.toFixed(1)} kWh</Text>
+                            </View>
+                            <View style={[styles.lossBadge, {backgroundColor: reconData.lossPercent > 12 ? '#FEE2E2' : '#D1FAE5'}]}>
+                                <Text style={[styles.lossPercentText, {color: reconData.lossPercent > 12 ? '#DC2626' : '#059669'}]}>
+                                    {reconData.lossPercent}%
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+
+                    <View style={styles.noteBox}>
+                        <MaterialCommunityIcons name="shield-check-outline" size={18} color="#059669" />
+                        <Text style={styles.noteText}>
+                            Tenant sum is calculated based on individual meter spikes verified earlier.
+                        </Text>
+                    </View>
+                </ScrollView>
+            )}
+
+            <View style={styles.footer}>
+                <TouchableOpacity style={styles.btn} onPress={() => Alert.alert("Success", "Ready for Final Billing")}>
+                    <Text style={styles.btnText}>GENERATE FINAL BILLS</Text>
+                </TouchableOpacity>
+            </View>
+        </SafeAreaView>
     );
-  };
-
-  return (
-    <View style={styles.container}>
-      {/* --- SMART HEADER --- */}
-      <View style={styles.blueHeader}>
-        <View>
-          <Text style={styles.headerTitle}>Reconciliation</Text>
-          <TouchableOpacity 
-            style={styles.monthSelector} 
-            onPress={() => setShowPicker(true)}
-          >
-            <Text style={styles.headerSub}>{monthName}</Text>
-            <MaterialCommunityIcons name="calendar-edit" size={16} color="rgba(255,255,255,0.7)" style={{marginLeft: 5}} />
-          </TouchableOpacity>
-        </View>
-        <MaterialCommunityIcons name="calculator-variant" size={40} color="rgba(255,255,255,0.3)" />
-      </View>
-
-      {showPicker && (
-        <DateTimePicker
-          value={date}
-          mode="date"
-          display="default"
-          onChange={(e, d) => {
-            setShowPicker(false);
-            if (d) setDate(d);
-          }}
-        />
-      )}
-
-      {loading ? (
-        <View style={styles.loaderBox}>
-          <ActivityIndicator size="large" color="#333399" />
-          <Text style={styles.loaderText}>Calculating Balance...</Text>
-        </View>
-      ) : (
-        <ScrollView 
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchSummary} />}
-          contentContainerStyle={{paddingBottom: 100}}
-        >
-          {/* --- UNITS CARD --- */}
-          <View style={styles.card}>
-            <Text style={styles.cardHeading}>UNITS CONSUMPTION</Text>
-            
-            <SummaryRow label="Main AVVNL Bill" value={data?.mainBill?.totalUnits || 0} icon="lightning-bolt" color="#333" />
-            <SummaryRow label="Solar Credit" value={`- ${data?.solarCredit || 0}`} icon="solar-power" color="#4caf50" />
-            <SummaryRow label="DG Units Added" value={`+ ${data?.dgUnits || 0}`} icon="engine" color="#FF9800" />
-            
-            <View style={styles.divider} />
-            
-            <View style={styles.netBox}>
-              <Text style={styles.netLabel}>Net Units to Distribute</Text>
-              <Text style={styles.netValue}>{data?.netToAllocate || 0} <Text style={{fontSize:10}}>kWh</Text></Text>
-            </View>
-
-            <SummaryRow label="Approved Sub-meters" value={data?.totalTenantUnits || 0} icon="speedometer" color="#333399" />
-
-            {/* --- LOSS CALCULATION --- */}
-            <View style={[styles.lossBox, data?.lossPercent > 10 ? styles.lossHigh : styles.lossNormal]}>
-              <View style={{flex: 1}}>
-                <Text style={styles.lossLabel}>Common Area / Loss</Text>
-                <Text style={styles.lossValue}>{data?.commonLoss || 0} kWh ({data?.lossPercent || 0}%)</Text>
-              </View>
-              <MaterialCommunityIcons 
-                name={data?.lossPercent > 10 ? "alert-decagram" : "check-decagram"} 
-                size={32} color={data?.lossPercent > 10 ? "#d32f2f" : "#4caf50"} 
-              />
-            </View>
-          </View>
-
-          {/* --- FINANCIAL IMPACT (New Section) --- */}
-          <View style={styles.card}>
-             <Text style={styles.cardHeading}>ESTIMATED EXTRA COSTS</Text>
-             <SummaryRow label="DG Fuel Expenses" value={`₹ ${data?.dgCost || 0}`} icon="fuel" color="#d32f2f" />
-             <Text style={styles.infoText}>*This cost will be divided among DG-linked tenants.</Text>
-          </View>
-
-          {/* --- WARNINGS --- */}
-          {(data?.lossPercent > 10 || data?.totalTenantUnits === 0) && (
-            <View style={styles.warningCard}>
-              <View style={styles.rowInline}>
-                <MaterialCommunityIcons name="alert-outline" size={20} color="#856404" />
-                <Text style={styles.warningTitle}>Analysis Warnings</Text>
-              </View>
-              {data?.lossPercent > 10 && <Text style={styles.warningText}>• High common loss detected ({data?.lossPercent}%). Check for leakage.</Text>}
-              {data?.totalTenantUnits === 0 && <Text style={styles.warningText}>• No approved tenant readings for this period.</Text>}
-            </View>
-          )}
-
-          <TouchableOpacity style={styles.finalizeBtn} onPress={handleFinalize}>
-            <MaterialCommunityIcons name="file-check" size={22} color="white" />
-            <Text style={styles.finalizeBtnText}>FINALIZE & GENERATE BILLS</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      )}
-    </View>
-  );
 };
 
-// Reusable Summary Component
-const SummaryRow = ({ label, value, icon, color }) => (
-  <View style={styles.row}>
-    <View style={styles.rowLeft}>
-      <MaterialCommunityIcons name={icon} size={20} color={color} />
-      <Text style={styles.rowLabel}>{label}</Text>
+const Row = ({ label, value, color = '#111827', icon, bold, unit = "kWh" }) => (
+    <View style={styles.row}>
+        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+            {icon && <MaterialCommunityIcons name={icon} size={16} color={color} style={{marginRight: 8}} />}
+            <Text style={[styles.rowLabel, bold && { fontWeight: 'bold', color: '#000' }]}>{label}</Text>
+        </View>
+        <Text style={[styles.rowValue, { color }, bold && { fontSize: 18, fontWeight: 'bold' }]}>
+            {value} <Text style={{fontSize: 10, fontWeight: 'normal'}}>{unit}</Text>
+        </Text>
     </View>
-    <Text style={[styles.rowValue, {color}]}>{value}</Text>
-  </View>
 );
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FE' },
-  blueHeader: { backgroundColor: '#333399', paddingHorizontal: 25, paddingTop: 60, paddingBottom: 35, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomLeftRadius: 35, borderBottomRightRadius: 35, elevation: 10 },
-  headerTitle: { color: 'white', fontSize: 24, fontWeight: '900' },
-  monthSelector: { flexDirection: 'row', alignItems: 'center', marginTop: 5 },
-  headerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '700' },
-  
-  loaderBox: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
-  loaderText: { marginTop: 10, color: '#666', fontWeight: 'bold' },
-
-  card: { backgroundColor: 'white', marginHorizontal: 20, marginTop: 20, borderRadius: 25, padding: 20, elevation: 4, shadowColor: '#333399', shadowOpacity: 0.1, shadowRadius: 10 },
-  cardHeading: { fontSize: 11, fontWeight: '900', color: '#BBB', marginBottom: 20, letterSpacing: 1 },
-  
-  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 18, alignItems: 'center' },
-  rowLeft: { flexDirection: 'row', alignItems: 'center' },
-  rowLabel: { marginLeft: 12, color: '#555', fontWeight: '700', fontSize: 14 },
-  rowValue: { fontWeight: '900', fontSize: 16 },
-  
-  divider: { height: 1, backgroundColor: '#F0F0F0', marginVertical: 10 },
-  
-  netBox: { backgroundColor: '#F0F2FF', padding: 15, borderRadius: 15, flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, alignItems: 'center' },
-  netLabel: { fontWeight: '900', color: '#333399', fontSize: 13 },
-  netValue: { fontWeight: '900', fontSize: 20, color: '#333399' },
-  
-  lossBox: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 18, borderRadius: 20, marginTop: 5 },
-  lossNormal: { backgroundColor: '#E8F5E9' },
-  lossHigh: { backgroundColor: '#FFEBEE' },
-  lossLabel: { fontSize: 11, fontWeight: '900', color: '#666' },
-  lossValue: { fontSize: 18, fontWeight: '900', marginTop: 3 },
-
-  infoText: { fontSize: 10, color: '#999', fontStyle: 'italic', marginTop: 5 },
-
-  warningCard: { marginHorizontal: 20, marginTop: 20, padding: 15, backgroundColor: '#FFF9C4', borderRadius: 20, borderWidth: 1, borderColor: '#FBC02D' },
-  rowInline: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  warningTitle: { fontWeight: '900', marginLeft: 8, color: '#856404' },
-  warningText: { fontSize: 12, color: '#856404', marginBottom: 4, fontWeight: '600' },
-
-  finalizeBtn: { backgroundColor: '#333399', marginHorizontal: 20, marginTop: 30, padding: 22, borderRadius: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', elevation: 5 },
-  finalizeBtnText: { color: 'white', fontWeight: '900', fontSize: 15, marginLeft: 10, letterSpacing: 1 },
-  
-  emptyBox: { alignItems: 'center', marginTop: 50 },
-  emptyText: { color: '#AAA', fontWeight: 'bold' }
+    container: { flex: 1, backgroundColor: '#F9FAFB' },
+    header: { backgroundColor: '#333399', padding: 20, flexDirection: 'row', alignItems: 'center', borderBottomLeftRadius: 20, borderBottomRightRadius: 20 },
+    headerTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
+    headerSub: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
+    loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    mainCard: { backgroundColor: '#FFF', padding: 20, borderRadius: 20, elevation: 5 },
+    row: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 10, alignItems: 'center' },
+    rowLabel: { fontSize: 13, color: '#4B5563', fontWeight: '500' },
+    rowValue: { fontSize: 15, fontWeight: '700' },
+    darkDivider: { height: 1, backgroundColor: '#F3F4F6', marginVertical: 12 },
+    lossRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, backgroundColor: '#F8FAFC', padding: 15, borderRadius: 15 },
+    lossLabel: { fontSize: 11, color: '#64748B', fontWeight: 'bold' },
+    lossValue: { fontSize: 20, fontWeight: '900', color: '#1E293B' },
+    lossBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+    lossPercentText: { fontWeight: 'bold', fontSize: 14 },
+    footer: { padding: 16, backgroundColor: '#FFF', borderTopWidth: 1, borderColor: '#EEE' },
+    btn: { backgroundColor: '#333399', padding: 18, borderRadius: 15, alignItems: 'center' },
+    btnText: { color: '#FFF', fontWeight: 'bold' },
+    noteBox: { flexDirection: 'row', alignItems: 'center', padding: 15, marginTop: 15 },
+    noteText: { fontSize: 12, color: '#6B7280', marginLeft: 8, fontStyle: 'italic' }
 });
 
 export default ReconciliationScreen;
