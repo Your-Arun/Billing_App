@@ -59,6 +59,26 @@ router.get('/history/:adminId', async (req, res) => {
 
 
 
+// 🗑️ DELETE BILL ROUTE
+router.delete('/delete/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ msg: "Invalid Bill ID format" });
+    }
 
+    const bill = await Bill.findById(id);
+    if (!bill) {
+      return res.status(404).json({ msg: "Bill record not found" });
+    }
+
+    await Bill.findByIdAndDelete(id);
+
+    res.json({ success: true, msg: "Bill deleted from database ✅" });
+  } catch (err) {
+    console.error("Delete Error Backend:", err.message);
+    res.status(500).json({ msg: "Server Error: Could not delete" });
+  }
+});
 
 module.exports = router;
