@@ -92,14 +92,12 @@ router.get('/list/:adminId', async (req, res) => {
 
 
 
-router.get('/summary/:adminId', async (req, res) => {
+router.get('/dgsummary/:adminId', async (req, res) => {
   try {
     const adminId = new mongoose.Types.ObjectId(req.params.adminId);
 
     const data = await DGLog.aggregate([
-      {
-        $match: { adminId }
-      },
+      { $match: { adminId } },
       {
         $group: {
           _id: '$dgName',
@@ -107,9 +105,7 @@ router.get('/summary/:adminId', async (req, res) => {
           totalCost: { $sum: '$fuelCost' }
         }
       },
-      {
-        $sort: { _id: 1 }
-      }
+      { $sort: { _id: 1 } }
     ]);
 
     res.json({
@@ -118,9 +114,11 @@ router.get('/summary/:adminId', async (req, res) => {
     });
 
   } catch (err) {
-    console.error(err);
     res.status(500).json({ msg: err.message });
   }
 });
+
+
+
 
 module.exports = router;

@@ -32,6 +32,7 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+
 router.get('/:adminId', async (req, res) => {
   try {
     const tenants = await Tenant.find({ adminId: req.params.adminId }).sort({ updatedAt: -1 });

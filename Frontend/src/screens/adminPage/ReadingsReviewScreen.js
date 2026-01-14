@@ -19,8 +19,12 @@ const ReadingsReviewScreen = ({ navigation }) => {
     const [data, setData] = useState(null);
     const [billl, setBill] = useState(null);
     const [solar, setSolar] = useState(null);
-    const [dg, setDg] = useState(null);
+    const [dg, setDg] = useState({
+        totalDGs: 0,
+        dgSummary: []
+    });
     const [loading, setLoading] = useState(false);
+    const [tenants, setTenants] = useState(false);
 
     const [startDate, setStartDate] = useState(
         new Date(new Date().getFullYear(), new Date().getMonth(), 1)
@@ -58,16 +62,19 @@ const ReadingsReviewScreen = ({ navigation }) => {
         }
     }, [user.id]);
 
-const fetchDg = useCallback(async () => {
+
+    const fetchDg = useCallback(async () => {
         try {
             setLoading(true);
             const res = await axios.get(
-                `${API_URL}/dg/summary/${user.id}`
+                `${API_URL}/dg/dgsummary/${user.id}`
             );
-            // const latestBill = res.data?.[0] || 0;
-            // setDg({ dg: latestBill });
-            setDg(res.data)
-            console.log("Fetched dg data:", res.data);
+
+            setDg({
+                totalDGs: res.data?.totalDGs || 0,
+                dgSummary: res.data?.dgSummary || []
+            });
+
         } catch (err) {
             console.log('Fetch error frontend:', err.message);
         } finally {
@@ -75,13 +82,45 @@ const fetchDg = useCallback(async () => {
         }
     }, [user.id]);
 
+
+    const fetchTenants = useCallback(async () => {
+        try {
+            setLoading(true);
+
+            const res = await axios.get(
+                `${API_URL}/readings/all/${user.id}`
+            );
+
+            const cleanedData = res.data
+                .filter(item => item.tenantId) // ❌ null tenants remove
+                .map(item => ({
+                    tenantName: item.tenantId.name,
+                    meterId: item.tenantId.meterId,
+                    opening: item.openingReading ?? 0,
+                    closing: item.closingReading ?? 0,
+                    status: item.status
+                }));
+
+            setTenants(cleanedData);
+
+            console.log('TENANT DATA:', cleanedData);
+
+        } catch (err) {
+            console.log('Fetch error tenants:', err.message);
+        } finally {
+            setLoading(false);
+        }
+    }, [user.id]);
+
+
     useEffect(() => {
         fetchbill();
         fetchSolar();
         fetchDg();
-    }, [fetchSolar], [fetchbill], [fetchDg]);
+        fetchTenants();
+    }, [fetchSolar, fetchbill, fetchDg, fetchTenants]);
 
-    if (loading && !data) {
+    if (loading) {
         return (
             <View style={styles.loader}>
                 <ActivityIndicator size="large" color="#333399" />
@@ -99,25 +138,6 @@ const fetchDg = useCallback(async () => {
                 <Text style={styles.headerTitle}>Readings Review</Text>
             </View>
 
-            {/* DATE RANGE */}
-            <View style={styles.dateRangeBox}>
-                <TouchableOpacity onPress={() => setShowPicker('start')} style={styles.dateTab}>
-                    <Text style={styles.dateLabel}>FROM</Text>
-                    <Text style={styles.dateVal}>
-                        {startDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
-                    </Text>
-                </TouchableOpacity>
-
-                <MaterialCommunityIcons name="arrow-right" size={20} color="#CCC" />
-
-                <TouchableOpacity onPress={() => setShowPicker('end')} style={styles.dateTab}>
-                    <Text style={styles.dateLabel}>TO</Text>
-                    <Text style={styles.dateVal}>
-                        {endDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
-                    </Text>
-                </TouchableOpacity>
-            </View>
-
             <ScrollView showsVerticalScrollIndicator={false}>
                 {/* SUMMARY CARDS */}
                 <View style={styles.summaryGrid}>
@@ -126,37 +146,77 @@ const fetchDg = useCallback(async () => {
                     <SummaryCard label="SOLAR GEN" value={solar?.solar?.unitsGenerated || 0} unit="kWh" color="#00C853" />
 
                 </View>
+                {/* ===== DG SECTION ===== */}
                 <View style={styles.summaryGrid}>
+                    <SummaryCard
+                        label="DG TOTAL"
+                        value={dg.dgSummary.reduce((sum, d) => sum + d.totalUnits, 0)}
+                        unit="kWh"
+                        color="#D84315"
+                    />
+                    <SummaryCard
+                        label="DG TOTAL"
+                        value={dg.dgSummary.reduce((sum, d) => sum + d.totalCost, 0)}
+                        unit="kWh"
+                        color="#D84315"
+                    />
 
-                    <SummaryCard label="DG TOTAL" value={dg?.dg?.totalUnits || 0} unit="kWh" />
+                    {/* <View style={styles.dgList}>
+    {dg.dgSummary.map((item, index) => (
+      <View key={index} style={styles.dgCard}>
+        <View>
+          <Text style={styles.dgName}>{item._id}</Text>
+          <Text style={styles.dgUnits}>{item.totalUnits} kWh</Text>
+        </View>
+
+        <Text style={styles.dgCost}>₹ {item.totalCost}</Text>
+      </View>
+    ))}
+  </View> */}
                 </View>
 
                 <Text style={styles.sectionTitle}>Tenant Data Verification</Text>
-
-                {/* TABLE */}
                 <View style={styles.table}>
+                    {/* ===== TABLE HEADER ===== */}
                     <View style={styles.tableHeader}>
                         <Text style={[styles.hText, { flex: 2 }]}>TENANT</Text>
                         <Text style={[styles.hText, { flex: 2 }]}>METER</Text>
                         <Text style={[styles.hText, { flex: 1.5 }]}>OPENING</Text>
                         <Text style={[styles.hText, { flex: 1.5, textAlign: 'right' }]}>CLOSING</Text>
+                        <Text style={[styles.hText, { flex: 1.5, textAlign: 'right' }]}>SPIKE</Text>
                     </View>
 
-                    {data?.tenants?.length > 0 ? (
-                        data.tenants.map((item, index) => (
-                            <View key={index} style={styles.tableRow}>
-                                <Text style={styles.tenantName}>{item.tenantName}</Text>
-                                <Text style={styles.meterSn}>{item.meterId}</Text>
-                                <Text style={styles.readVal}>{item.opening}</Text>
-                                <Text style={[styles.readVal, styles.closing]}>
-                                    {item.closing}
-                                </Text>
-                            </View>
-                        ))
+                    {/* ===== TABLE ROWS ===== */}
+                    {tenants.length > 0 ? (
+                        tenants.map((t, index) => {
+                            const spike = (t.closing ?? 0) - (t.opening ?? 0);
+                            return (
+                                <View key={index} style={styles.tableRow}>
+                                    <Text style={[styles.cell, { flex: 2 }]}>{t.tenantName}</Text>
+                                    <Text style={[styles.cell, { flex: 2 }]}>{t.meterId}</Text>
+                                    <Text style={[styles.cell, { flex: 1.5 }]}>{t.opening}</Text>
+                                    <Text style={[styles.cell, { flex: 1.5, textAlign: 'right' }]}>{t.closing}</Text>
+                                    <Text
+                                        style={[
+                                            styles.cell,
+                                            {
+                                                flex: 1.5,
+                                                textAlign: 'right',
+                                                color: spike > 0 ? '#0A8F08' : '#999'
+                                            }
+                                        ]}
+                                    >
+                                        {spike}
+                                    </Text>
+                                </View>
+                            );
+                        })
                     ) : (
-                        <Text style={styles.noData}>No tenant data</Text>
+                        <Text style={styles.noDataText}>No tenant data available</Text>
                     )}
                 </View>
+
+
             </ScrollView>
 
             {/* FOOTER */}
@@ -171,23 +231,6 @@ const fetchDg = useCallback(async () => {
                     <MaterialCommunityIcons name="send" size={22} />
                 </TouchableOpacity>
             </View>
-
-            {/* DATE PICKER */}
-            {showPicker && (
-                <DateTimePicker
-                    value={showPicker === 'start' ? startDate : endDate}
-                    mode="date"
-                    maximumDate={new Date()}
-                    onChange={(e, selectedDate) => {
-                        setShowPicker(null);
-                        if (selectedDate) {
-                            showPicker === 'start'
-                                ? setStartDate(selectedDate)
-                                : setEndDate(selectedDate);
-                        }
-                    }}
-                />
-            )}
         </View>
     );
 };
@@ -215,6 +258,7 @@ const styles = StyleSheet.create({
         flex: 1,
         textAlign: 'center',
         fontSize: 20,
+        marginBottom: 30,
         fontWeight: 'bold',
         color: '#333399'
     },
@@ -259,20 +303,7 @@ const styles = StyleSheet.create({
         marginBottom: 10
     },
 
-    tableHeader: {
-        flexDirection: 'row',
-        padding: 15,
-        backgroundColor: '#FAFAFA'
-    },
 
-    hText: { fontSize: 10, fontWeight: 'bold', color: '#999' },
-
-    tableRow: {
-        flexDirection: 'row',
-        padding: 15,
-        borderBottomWidth: 1,
-        borderColor: '#F5F5F5'
-    },
 
     tenantName: { flex: 2, fontWeight: 'bold' },
     meterSn: { flex: 2, color: '#00C853' },
@@ -296,7 +327,65 @@ const styles = StyleSheet.create({
         alignItems: 'center'
     },
 
-    submitText: { fontSize: 16, fontWeight: 'bold', marginRight: 8 }
+    submitText: { fontSize: 16, fontWeight: 'bold', marginRight: 8 }, dgContainer: {
+        paddingHorizontal: 15,
+        marginBottom: 20
+    },
+
+    dgCard: {
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#EEE',
+        borderRadius: 12,
+        marginBottom: 10
+    },
+
+    dgName: {
+        fontWeight: 'bold',
+        color: '#333399',
+        marginBottom: 4
+    },
+    table: {
+    marginTop: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginHorizontal: 15,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+     tableHeader: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    backgroundColor: '#F3F4F6',
+    borderBottomWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+    hText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#374151',
+  },
+
+   tableRow: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    borderBottomWidth: 1,
+    borderColor: '#F1F1F1',
+  },
+  cell: {
+    fontSize: 12,
+    color: '#111827',
+  },
+  noDataText: {
+    textAlign: 'center',
+    padding: 20,
+    color: '#999',
+  },
+
+
 });
 
 export default ReadingsReviewScreen;
