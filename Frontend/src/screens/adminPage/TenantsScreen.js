@@ -146,8 +146,6 @@ useEffect(() => {
           try {
             console.log("Deleting Tenant ID:", id);
             const res = await axios.delete(`${API_URL}/tenants/${id}`);
-            
-            // Backend se success aane par hi refresh karein
             if (res.data) {
                 setDetailModalVisible(false);
                 fetchTenants();
