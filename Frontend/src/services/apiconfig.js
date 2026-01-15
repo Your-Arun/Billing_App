@@ -1,3 +1,3 @@
 // src/services/apiconfig.js
-const API_URL = 'http://10.240.99.147:5000'; 
+const API_URL = 'https://billing-apps.onrender.com'; 
 export default API_URL;

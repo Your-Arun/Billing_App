@@ -87,7 +87,7 @@ const ReconciliationScreen = ({ route, navigation }) => {
                 });
             }
 
-            const totalInput = Number(grid) + Number(solar) + Number(dgU);
+            const totalInput = Number(grid) - Number(solar) + Number(dgU);
             const loss = totalInput - totalTenantUnitsSum;
             const lossP = totalInput > 0 ? ((loss / totalInput) * 100).toFixed(1) : 0;
 

@@ -118,7 +118,59 @@ router.get('/dgsummary/:adminId', async (req, res) => {
   }
 });
 
+// 🗑️ 6. स्पेसिफिक डेली लॉग डिलीट करना (Daily Entry)
+router.delete('/delete-log/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
 
+        // ID Check
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ msg: "Invalid Log ID" });
+        }
 
+        const deletedLog = await DGLog.findByIdAndDelete(id);
+
+        if (!deletedLog) {
+            return res.status(404).json({ msg: "Log entry not found" });
+        }
+
+        res.status(200).json({ success: true, msg: "Daily log deleted successfully ✅" });
+    } catch (err) {
+        console.error("Delete Log Error:", err.message);
+        res.status(500).json({ msg: "Server Error: Could not delete log" });
+    }
+});
+
+// 🗑️ 7. पूरा DG सेट डिलीट करना (Unit + All associated logs)
+router.delete('/delete-set/:id', async (req, res) => {
+    try {
+        const setId = req.params.id;
+
+        if (!mongoose.Types.ObjectId.isValid(setId)) {
+            return res.status(400).json({ msg: "Invalid Set ID" });
+        }
+
+        // 1. पहले DG Set की जानकारी निकालें
+        const setInfo = await DGSet.findById(setId);
+        if (!setInfo) {
+            return res.status(404).json({ msg: "DG Set not found" });
+        }
+
+        // 2. उस DG के नाम से जुड़े सारे Logs डिलीट करें (Cleanup)
+        // हम adminId और dgName दोनों मैच करते हैं सुरक्षा के लिए
+        await DGLog.deleteMany({ 
+            adminId: setInfo.adminId, 
+            dgName: setInfo.dgName 
+        });
+
+        // 3. अब मेन DG Set का नाम डिलीट करें
+        await DGSet.findByIdAndDelete(setId);
+
+        res.status(200).json({ success: true, msg: "DG Set and all history deleted 🗑️" });
+    } catch (err) {
+        console.error("Delete Set Error:", err.message);
+        res.status(500).json({ msg: "Server Error: Could not delete set" });
+    }
+});
 
 module.exports = router;
