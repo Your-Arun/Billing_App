@@ -139,16 +139,24 @@ useEffect(() => {
     setForm({ name: '', meterId: '', multiplierCT: '1', ratePerUnit: '', transformerLoss: '0', fixedCharge: '0' });
   };
 
-  const handleDelete = (id, name) => {
+ const handleDelete = (id, name) => {
     Alert.alert("Confirm Delete", `Remove ${name}?`, [
       { text: "Cancel" },
       { text: "Delete", style: "destructive", onPress: async () => {
           try {
-            await axios.delete(`${API_URL}/tenants/${id}`);
-            setDetailModalVisible(false);
-            fetchTenants();
-            Toast.show({ type: 'success', text1: 'Deleted 🗑️' });
-          } catch (e) { Toast.show({ type: 'error', text1: 'Error' }); }
+            console.log("Deleting Tenant ID:", id);
+            const res = await axios.delete(`${API_URL}/tenants/${id}`);
+            
+            // Backend se success aane par hi refresh karein
+            if (res.data) {
+                setDetailModalVisible(false);
+                fetchTenants();
+                Toast.show({ type: 'success', text1: 'Deleted 🗑️', text2: name + ' removed' });
+            }
+          } catch (e) { 
+            console.log("Delete Error Frontend:", e.response?.data || e.message);
+            Toast.show({ type: 'error', text1: 'Delete Failed', text2: 'Check server logs' }); 
+          }
       }}
     ]);
   };

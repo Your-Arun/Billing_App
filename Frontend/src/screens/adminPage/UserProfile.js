@@ -33,6 +33,7 @@ const UserProfile = ({ visible, onClose }) => {
               <Text style={styles.value}>{user?.role || "N/A"}</Text>
             </View>
 
+
             {user?.role === 'Admin' && (
               <View style={styles.detailRow}>
                 <Text style={styles.label}>Reading Taker Code:</Text>

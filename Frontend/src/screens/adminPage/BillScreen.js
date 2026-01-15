@@ -250,7 +250,7 @@ const BillScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F0F3F8', },
+  container: { flex: 1, backgroundColor: '#F0F3F8',  },
   header: { backgroundColor: '#333399', paddingHorizontal: 20, paddingVertical: 30, borderBottomLeftRadius: 30, borderBottomRightRadius: 30, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerTitle: { color: 'white', fontSize: 22, fontWeight: 'bold' },
   headerSub: { color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 2 },
