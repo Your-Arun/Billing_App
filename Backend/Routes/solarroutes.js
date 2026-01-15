@@ -111,7 +111,7 @@ router.delete('/delete/:id', async (req, res) => {
     // Check if ID is valid
     if (!id) return res.status(400).json({ msg: "ID is required" });
 
-    const deletedRecord = await Solar.findByIdAndDelete(id);
+    const deletedRecord = await SolarLog.findByIdAndDelete(id);
 
     if (!deletedRecord) {
       return res.status(404).json({ msg: "Solar record not found" });

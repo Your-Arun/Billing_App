@@ -121,7 +121,7 @@ const SolarScreen = () => {
             <View style={styles.card}>
               <Text style={styles.label}>SELECT LOG DATE</Text>
               <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDate(true)}>
-                <MaterialCommunityIcons name="calendar-search" size={22} color="#333399" />
+                <MaterialCommunityIcons name="calendar-search" size={22} color="#050507ff" />
                 <Text style={styles.dateText}>{date.toDateString()}</Text>
               </TouchableOpacity>
             </View>
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
   headerTitle: { color: '#FFF', fontSize: 24, fontWeight: '900', letterSpacing: 1 },
   headerSub: { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginTop: 4, fontWeight: '600' },
   
-  card: { backgroundColor: 'white', borderRadius: 24, padding: 20, marginBottom: 15, elevation: 4, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10 },
+  card: { backgroundColor: 'white', borderRadius: 24, padding: 20, marginBottom: 25, elevation: 4, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, marginTop:20 },
   label: { fontSize: 11, fontWeight: 'bold', color: '#9CA3AF', marginBottom: 12, letterSpacing: 1.5, textAlign: 'center' },
   
   dateBtn: { backgroundColor: '#F0F3FF', padding: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E0E7FF' },
