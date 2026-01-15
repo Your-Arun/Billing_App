@@ -103,7 +103,26 @@ router.get('/history/:adminId', async (req, res) => {
   }
 });
 
+// 🗑️ DELETE SOLAR LOG
+router.delete('/delete/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if ID is valid
+    if (!id) return res.status(400).json({ msg: "ID is required" });
 
+    const deletedRecord = await Solar.findByIdAndDelete(id);
+
+    if (!deletedRecord) {
+      return res.status(404).json({ msg: "Solar record not found" });
+    }
+
+    res.json({ success: true, msg: "Solar log deleted successfully ✅" });
+  } catch (err) {
+    console.error("Solar Delete Error:", err.message);
+    res.status(500).json({ msg: "Server Error: Could not delete record" });
+  }
+});
 
 
 
