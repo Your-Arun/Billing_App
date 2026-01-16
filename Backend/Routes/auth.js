@@ -96,7 +96,7 @@ router.post('/login/send-otp', async (req, res) => {
     const user = await User.findOne({ phone });
     if (!user) return res.status(400).json({ msg: 'User not found' });
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
 
     // 🔥 ONLY OTP delete, NOT USER
     await Otp.deleteMany({ phone });
