@@ -3,7 +3,12 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../Modals/User');
 const router = express.Router();
+const twilio = require('twilio')
+const dotenv = require('dotenv')
+const Otp = require('../Modals/Otp');
 
+
+dotenv.config();
 // SIGNUP
 router.post('/signup', async (req, res) => {
   try {
@@ -78,30 +83,30 @@ router.post('/signup', async (req, res) => {
 // });
 
 
+const client = twilio(
+  process.env.TWILIO_SID,
+  process.env.TWILIO_AUTH
+);
+
 router.post('/login/send-otp', async (req, res) => {
   try {
     const { phone } = req.body;
-    if (!phone) {
-      return res.status(400).json({ msg: 'Phone required' });
-    }
+    if (!phone) return res.status(400).json({ msg: 'Phone required' });
 
     const user = await User.findOne({ phone });
-    if (!user) {
-      return res.status(400).json({ msg: 'User not found' });
-    }
+    if (!user) return res.status(400).json({ msg: 'User not found' });
 
-    // Generate 6 digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Save OTP (2 min expiry)
-    await User.deleteMany({ phone }); // old otp remove
-    await User.create({
+    // 🔥 ONLY OTP delete, NOT USER
+    await Otp.deleteMany({ phone });
+
+    await Otp.create({
       phone,
       otp,
-      expiresAt: Date.now() + 2 * 60 * 1000
+      expiresAt: new Date(Date.now() + 2 * 60 * 1000)
     });
 
-    // Send OTP on WhatsApp (Twilio)
     await client.messages.create({
       from: process.env.TWILIO_WHATSAPP_FROM,
       to: `whatsapp:+91${phone}`,
@@ -116,29 +121,26 @@ router.post('/login/send-otp', async (req, res) => {
   }
 });
 
+
 router.post('/login/verify-otp', async (req, res) => {
   try {
     const { phone, otp } = req.body;
-    if (!phone || !otp) {
+    if (!phone || !otp)
       return res.status(400).json({ msg: 'Phone & OTP required' });
-    }
 
-    const otpRecord = await User.findOne({ phone, otp });
-    if (!otpRecord) {
+    const otpRecord = await Otp.findOne({ phone, otp });
+    if (!otpRecord)
       return res.status(400).json({ msg: 'Invalid OTP' });
-    }
 
-    if (otpRecord.expiresAt < Date.now()) {
+    if (otpRecord.expiresAt < Date.now())
       return res.status(400).json({ msg: 'OTP expired' });
-    }
 
     const user = await User.findOne({ phone });
-    if (!user) {
+    if (!user)
       return res.status(400).json({ msg: 'User not found' });
-    }
 
     // OTP used → delete
-    await User.deleteMany({ phone });
+    await Otp.deleteMany({ phone });
 
     const token = jwt.sign(
       { id: user._id, role: user.role },
