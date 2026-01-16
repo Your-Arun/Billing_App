@@ -189,7 +189,7 @@ router.put('/approve/:id', async (req, res) => {
 
     // 🟢 सुधार: यहाँ $inc इस्तेमाल करें ताकि रीडिंग प्लस (+) होती रहे
     await Tenant.findByIdAndUpdate(reading.tenantId, {
-      $inc: { currentClosing: reading.closingReading }, // 👈 पुरानी वैल्यू में नई वैल्यू जुड़ जाएगी
+       currentClosing: reading.closingReading , 
       lastUpdated: new Date()
     });
 

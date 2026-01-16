@@ -7,7 +7,9 @@ const UserSchema = new mongoose.Schema({
   companyName: { type: String },
   role: { type: String, enum: ['Admin', 'Reading Taker'], required: true },
   adminCode: { type: String, unique: true, sparse: true },
-  belongsToAdmin: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  belongsToAdmin: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  otp:{ type:String},
+  expiresAt: {type:Date}
 });
 
 module.exports = mongoose.model('User', UserSchema);

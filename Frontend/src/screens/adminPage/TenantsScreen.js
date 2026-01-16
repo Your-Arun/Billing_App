@@ -176,8 +176,8 @@ useEffect(() => {
       </View>
       <View style={styles.cardRight}>
         <View style={styles.readingPill}>
-          <Text style={styles.pillLabel}>Current</Text>
-          <Text style={styles.pillValue}>{item.currentClosing || item.openingMeter}</Text>
+          <Text style={styles.pillLabel}>Reading</Text>
+          <Text style={styles.pillValue}>{item.currentClosing ? item.currentClosing : (item.openingMeter || 0)}</Text>
         </View>
         <MaterialCommunityIcons name="chevron-right" size={24} color="#DDD" />
       </View>
@@ -282,7 +282,7 @@ useEffect(() => {
                    <DetailRowItem label="Fixed Monthly Charge" value={`₹ ${selectedTenant.fixedCharge}`} icon="cash-lock" />
                    <View style={styles.currentReadingCard}>
                       <Text style={styles.currentReadingLabel}>CURRENT CLOSING VALUE</Text>
-                      <Text style={styles.currentReadingValue}>{selectedTenant.currentClosing || "Awaiting Staff..."}</Text>
+                      <Text style={styles.currentReadingValue}>{selectedTenant.currentClosing ? selectedTenant.currentClosing : "No Readings Yet"}</Text>
                    </View>
                 </View>
                 <TouchableOpacity style={styles.closeFullBtn} onPress={() => setDetailModalVisible(false)}><Text style={{fontWeight:'bold'}}>Back to List</Text></TouchableOpacity>

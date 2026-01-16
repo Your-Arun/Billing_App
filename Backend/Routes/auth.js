@@ -53,16 +53,92 @@ router.post('/signup', async (req, res) => {
 });
 
 // LOGIN
-router.post('/login', async (req, res) => {
+// router.post('/login', async (req, res) => {
+//   try {
+//     const { phone, password } = req.body;
+//     if (!phone || !password) return res.status(400).json({ msg: 'Phone & password required' });
+
+//     const user = await User.findOne({ phone });
+//     if (!user) return res.status(400).json({ msg: 'Invalid phone or password' });
+
+//     const isMatch = await bcrypt.compare(password, user.password);
+//     if (!isMatch) return res.status(400).json({ msg: 'Invalid phone or password' });
+
+//     const token = jwt.sign(
+//       { id: user._id, role: user.role },
+//       process.env.JWT_SECRET || 'fallback_secret',
+//       { expiresIn: '1d' }
+//     );
+
+//     return res.json({ token, user });
+//   } catch (err) {
+//     console.error('LOGIN ERROR:', err);
+//     return res.status(500).json({ msg: 'Server error' });
+//   }
+// });
+
+
+router.post('/login/send-otp', async (req, res) => {
   try {
-    const { phone, password } = req.body;
-    if (!phone || !password) return res.status(400).json({ msg: 'Phone & password required' });
+    const { phone } = req.body;
+    if (!phone) {
+      return res.status(400).json({ msg: 'Phone required' });
+    }
 
     const user = await User.findOne({ phone });
-    if (!user) return res.status(400).json({ msg: 'Invalid phone or password' });
+    if (!user) {
+      return res.status(400).json({ msg: 'User not found' });
+    }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ msg: 'Invalid phone or password' });
+    // Generate 6 digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Save OTP (2 min expiry)
+    await User.deleteMany({ phone }); // old otp remove
+    await User.create({
+      phone,
+      otp,
+      expiresAt: Date.now() + 2 * 60 * 1000
+    });
+
+    // Send OTP on WhatsApp (Twilio)
+    await client.messages.create({
+      from: process.env.TWILIO_WHATSAPP_FROM,
+      to: `whatsapp:+91${phone}`,
+      body: `Your login OTP is ${otp}. Valid for 2 minutes.`
+    });
+
+    return res.json({ msg: 'OTP sent on WhatsApp' });
+
+  } catch (err) {
+    console.error('SEND OTP ERROR:', err);
+    return res.status(500).json({ msg: 'Server error' });
+  }
+});
+
+router.post('/login/verify-otp', async (req, res) => {
+  try {
+    const { phone, otp } = req.body;
+    if (!phone || !otp) {
+      return res.status(400).json({ msg: 'Phone & OTP required' });
+    }
+
+    const otpRecord = await User.findOne({ phone, otp });
+    if (!otpRecord) {
+      return res.status(400).json({ msg: 'Invalid OTP' });
+    }
+
+    if (otpRecord.expiresAt < Date.now()) {
+      return res.status(400).json({ msg: 'OTP expired' });
+    }
+
+    const user = await User.findOne({ phone });
+    if (!user) {
+      return res.status(400).json({ msg: 'User not found' });
+    }
+
+    // OTP used → delete
+    await User.deleteMany({ phone });
 
     const token = jwt.sign(
       { id: user._id, role: user.role },
@@ -71,10 +147,13 @@ router.post('/login', async (req, res) => {
     );
 
     return res.json({ token, user });
+
   } catch (err) {
-    console.error('LOGIN ERROR:', err);
+    console.error('VERIFY OTP ERROR:', err);
     return res.status(500).json({ msg: 'Server error' });
   }
 });
+
+
 
 module.exports = router;
