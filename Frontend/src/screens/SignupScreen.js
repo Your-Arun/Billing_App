@@ -11,6 +11,7 @@ const SignupScreen = ({ navigation }) => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [role, setRole] = useState('Reading Taker');
   const [adminCodeInput, setAdminCodeInput] = useState('');
@@ -42,6 +43,7 @@ const SignupScreen = ({ navigation }) => {
     const payload = {
       name,
       phone,
+      email,
       password,
       role
     };
@@ -89,6 +91,12 @@ const SignupScreen = ({ navigation }) => {
         placeholder="Full Name"
         value={name}
         onChangeText={setName}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
       />
 
       <TextInput

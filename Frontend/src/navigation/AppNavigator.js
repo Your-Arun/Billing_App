@@ -11,6 +11,7 @@ import DGScreen from '../screens/adminPage/DGScreen';
 import SolarScreen from '../screens/adminPage/SolarScreen';
 import ReconciliationScreen from '../screens/adminPage/ReconciliationScreen';
 import ReadingsReviewScreen from '../screens/adminPage/ReadingsReviewScreen';
+import ForgetScreen from '../screens/ForgetScreen';
 
 const Stack = createStackNavigator();
 
@@ -38,6 +39,7 @@ const AppNavigator = () => {
         <>
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Signup" component={SignupScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Forget" component={ForgetScreen} options={{ headerShown: false }} />
         </>
       ) : (
         <>

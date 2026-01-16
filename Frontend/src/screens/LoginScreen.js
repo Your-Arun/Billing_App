@@ -99,6 +99,11 @@ const LoginScreen = ({ navigation }) => {
               Don't have an account? <Text style={styles.linkBold}>Sign Up</Text>
             </Text>
           </TouchableOpacity>
+           <TouchableOpacity onPress={() => navigation.navigate('Forget')} style={styles.signupLink}>
+            <Text style={styles.linkText}>
+              <Text style={styles.linkBold}>Forget password</Text>
+            </Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
