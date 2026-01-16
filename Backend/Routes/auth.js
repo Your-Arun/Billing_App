@@ -87,7 +87,8 @@ const client = twilio(
   process.env.TWILIO_SID,
   process.env.TWILIO_AUTH
 );
-
+ const twillio = TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
+const cleanPhone = phone.replace(/\s+/g, '');
 router.post('/login/send-otp', async (req, res) => {
   try {
     const { phone } = req.body;
@@ -107,11 +108,12 @@ router.post('/login/send-otp', async (req, res) => {
       expiresAt: new Date(Date.now() + 2 * 60 * 1000)
     });
 
-    await client.messages.create({
-      from: process.env.TWILIO_WHATSAPP_FROM,
-      to: `whatsapp:+91${phone}`,
-      body: `Your login OTP is ${otp}. Valid for 2 minutes.`
-    });
+   await client.messages.create({
+  from: 'whatsapp:+14155238886',
+  to: `whatsapp:+91${phone}`,
+  body: `Your login OTP is ${otp}. Valid for 2 minutes.`
+});
+
 
     return res.json({ msg: 'OTP sent on WhatsApp' });
 
