@@ -10,84 +10,51 @@ import API_URL from '../services/apiconfig';
 
 const LoginScreen = ({ navigation }) => {
   const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
-  const [step, setStep] = useState(1); // 1 = send otp, 2 = verify otp
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const { login } = useContext(UserContext);
 
-  // 🔹 SEND OTP
-  const handleSendOtp = async () => {
-    if (!phone) {
-      return Toast.show({ type: 'error', text1: 'Phone required' });
-    }
+  const handleLogin = async () => {
+  if (!phone || !password) {
+    return Toast.show({ type: 'error', text1: 'Phone & Password required' });
+  }
 
-    setLoading(true);
-    try {
-      await axios.post(`${API_URL}/login/send-otp`, { phone });
+  setLoading(true);
+  try {
+    const res = await axios.post(`${API_URL}/login`, { phone, password });
 
-      Toast.show({
-        type: 'success',
-        text1: 'OTP Sent',
-        text2: 'Check your WhatsApp'
-      });
+    const userData = {
+      id: res.data.user._id,
+      name: res.data.user.name,
+      role: res.data.user.role,
+      companyName: res.data.user.companyName,
+      token: res.data.token,
+      adminCode: res.data.user.adminCode || null,
+      belongsToAdmin: res.data.user.belongsToAdmin || null
+    };
 
-      setStep(2);
-    } catch (err) {
-      Toast.show({
-        type: 'error',
-        text1: 'Failed',
-        text2: err.response?.data?.msg || 'OTP not sent'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+    await login(userData);
 
-  // 🔹 VERIFY OTP
-  const handleVerifyOtp = async () => {
-    if (!otp) {
-      return Toast.show({ type: 'error', text1: 'OTP required' });
-    }
+    Toast.show({
+      type: 'success',
+      text1: 'Login Successful',
+      text2: `Welcome ${userData.name}`
+    });
 
-    setLoading(true);
-    try {
-      const res = await axios.post(`${API_URL}/login/verify-otp`, {
-        phone,
-        otp
-      });
+    if (userData.role === 'Admin') navigation.replace('Dashboard');
+    else navigation.replace('ReadingTakerScreen');
 
-      const userData = {
-        id: res.data.user._id,
-        name: res.data.user.name,
-        role: res.data.user.role,
-        companyName: res.data.user.companyName,
-        token: res.data.token,
-        adminCode: res.data.user.adminCode || null,
-        belongsToAdmin: res.data.user.belongsToAdmin || null
-      };
-
-      await login(userData);
-
-      Toast.show({
-        type: 'success',
-        text1: 'Login Successful',
-        text2: `Welcome ${userData.name}`
-      });
-
-      if (userData.role === 'Admin') navigation.replace('Dashboard');
-      else navigation.replace('ReadingTakerScreen');
-
-    } catch (err) {
-      Toast.show({
-        type: 'error',
-        text1: 'Invalid OTP',
-        text2: err.response?.data?.msg || 'OTP verification failed'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (err) {
+    Toast.show({
+      type: 'error',
+      text1: 'Login Failed',
+      text2: err.response?.data?.msg || 'Invalid phone or password'
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <KeyboardAvoidingView
@@ -101,9 +68,7 @@ const LoginScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.formCard}>
-          <Text style={styles.loginText}>
-            {step === 1 ? 'Login with Phone' : 'Enter OTP'}
-          </Text>
+          <Text style={styles.loginText}>Login to Account</Text>
 
           <TextInput
             style={styles.input}
@@ -111,38 +76,29 @@ const LoginScreen = ({ navigation }) => {
             value={phone}
             onChangeText={setPhone}
             keyboardType="phone-pad"
-            editable={step === 1}
           />
 
-          {step === 2 && (
-            <TextInput
-              style={styles.input}
-              placeholder="Enter OTP"
-              value={otp}
-              onChangeText={setOtp}
-              keyboardType="numeric"
-            />
-          )}
+          <TextInput
+            style={styles.input}
+            placeholder="Password (Minimun 4 digit)"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
 
           <TouchableOpacity
             style={[styles.loginButton, loading && styles.disabledButton]}
-            onPress={step === 1 ? handleSendOtp : handleVerifyOtp}
+            onPress={handleLogin}
             disabled={loading}
           >
-            {loading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text style={styles.buttonText}>
-                {step === 1 ? 'SEND OTP' : 'VERIFY OTP'}
-              </Text>
-            )}
+            {loading ? <ActivityIndicator color="white" /> : <Text style={styles.buttonText}>LOGIN</Text>}
           </TouchableOpacity>
 
-          {step === 2 && (
-            <TouchableOpacity onPress={() => setStep(1)} style={styles.signupLink}>
-              <Text style={styles.linkText}>Change Phone Number</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity onPress={() => navigation.navigate('Signup')} style={styles.signupLink}>
+            <Text style={styles.linkText}>
+              Don't have an account? <Text style={styles.linkBold}>Sign Up</Text>
+            </Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
