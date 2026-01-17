@@ -12,13 +12,16 @@ const nodemailer = require('nodemailer');
 
 dotenv.config();
 
-
-// 📧 Render/Cloud Compatible Transporter
 const transporter = nodemailer.createTransport({
-  host: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false, // Port 587 ke liye false
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS, // Bina space wala 16 digit code
+  },
+  tls: {
+    rejectUnauthorized: false // Cloud hosting connection fix
   }
 });
 
@@ -178,21 +181,18 @@ router.post("/forgot-password", async (req, res) => {
   try {
     if (!identifier) return res.status(400).json({ msg: "Email or Phone is required." });
 
-    // Format check
     const isEmail = /\S+@\S+\.\S+/.test(identifier);
     const user = await User.findOne(isEmail ? { email: identifier.toLowerCase() } : { phone: identifier });
     
-    if (!user) return res.status(404).json({ msg: "User with this email/phone not found." });
+    if (!user) return res.status(404).json({ msg: "User not found." });
 
     // ✅ STEP 1: OTP Generate aur Send karna
     if (!otp && !newPassword) {
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      
-      // OTP ko hash karke DB mein save karein (Security ke liye)
       const hashedOtp = await bcrypt.hash(generatedOtp, 10);
 
       user.resetPasswordToken = hashedOtp; 
-      user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins valid
+      user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
       await user.save();
 
       if (isEmail) {
@@ -200,46 +200,31 @@ router.post("/forgot-password", async (req, res) => {
           from: `"Property Manager" <${process.env.EMAIL_USER}>`,
           to: user.email,
           subject: "Password Reset OTP",
-          html: `
-            <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee;">
-              <h2 style="color: #333399;">Password Reset Request</h2>
-              <p>Aapka 6-digit verification code niche diya gaya hai:</p>
-              <div style="background: #f4f4f9; padding: 20px; text-align: center;">
-                <h1 style="letter-spacing: 10px; color: #333;">${generatedOtp}</h1>
-              </div>
-              <p>Yeh code 10 minute tak valid hai.</p>
-            </div>
-          `,
+          html: `<h3>Reset Code: ${generatedOtp}</h3><p>Valid for 10 minutes.</p>`,
         });
         return res.status(200).json({ msg: "OTP sent to your email." });
       } else {
-        // SMS Logic yahan aayega
-        console.log(`SMS OTP: ${generatedOtp}`);
+        console.log(`Phone OTP: ${generatedOtp}`);
         return res.status(200).json({ msg: "OTP sent to your phone." });
       }
     }
 
     // ✅ STEP 2: OTP Verify aur Password Reset karna
     if (otp && newPassword) {
-      // Expiry check
       if (!user.resetPasswordToken || !user.resetPasswordExpires || new Date(user.resetPasswordExpires) < new Date()) {
         return res.status(400).json({ msg: "OTP expired. Request a new one." });
       }
 
-      // Hash OTP ko compare karein
       const isOtpValid = await bcrypt.compare(otp, user.resetPasswordToken);
       if (!isOtpValid) return res.status(400).json({ msg: "Invalid OTP." });
 
-      // Naya Password hash karein
-      const salt = await bcrypt.genSalt(12);
-      user.password = await bcrypt.hash(newPassword, salt);
-      
-      // Fields clear karein
+      // Naya Password hash karke save karein
+      user.password = await bcrypt.hash(newPassword, 10);
       user.resetPasswordToken = null;
       user.resetPasswordExpires = null;
       await user.save();
 
-      return res.status(200).json({ msg: "Password has been reset successfully. ✅", success: true });
+      return res.status(200).json({ msg: "Password reset successful! ✅" });
     }
 
     res.status(400).json({ msg: "Invalid request." });
@@ -248,5 +233,4 @@ router.post("/forgot-password", async (req, res) => {
     res.status(500).json({ msg: "Server error. Try again." });
   }
 });
-
 module.exports = router;
