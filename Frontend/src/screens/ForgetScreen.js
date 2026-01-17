@@ -15,37 +15,35 @@ export default function ForgetScreen({ navigation }) {
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSendOTP = async () => {
-    if (!email) return Toast.show({ type: 'error', text1: 'Enter email' });
-    setLoading(true);
-    try {
-      // Backend expects 'identifier'
-      const res = await axios.post(`${API_URL}/forgot-password`, { identifier: email });
-      Toast.show({ type: 'success', text1: 'OTP Sent 📧' });
-      setStep(2);
-    } catch (error) {
-      Toast.show({ type: 'error', text1: 'Error', text2: error.response?.data?.msg || 'Failed' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResetPassword = async () => {
-    if (otp.length < 6 || !newPassword) return Toast.show({ type: 'error', text1: 'Fill all fields' });
-    setLoading(true);
-    try {
-      // Step 2 needs identifier, otp, and newPassword
-      const res = await axios.post(`${API_URL}/forgot-password`, { 
-        identifier: email, 
-        otp, 
-        newPassword 
-      });
-      Toast.show({ type: 'success', text1: 'Success ✅', text2: 'Password Changed' });
-      navigation.navigate('Login');
-    } catch (error) {
-      Toast.show({ type: 'error', text1: 'Failed', text2: error.response?.data?.msg || 'Invalid OTP' });
-    } finally {
-      setLoading(false);
+  const handleAction = async () => {
+    if (step === 1) {
+      if (!email) return Toast.show({ type: 'error', text1: 'Email required' });
+      setLoading(true);
+      try {
+        await axios.post(`${API_URL}/forgot-password`, { identifier: email });
+        Toast.show({ type: 'success', text1: 'OTP Sent 📧', text2: 'Check your email' });
+        setStep(2);
+      } catch (error) {
+        Toast.show({ type: 'error', text1: 'Error', text2: error.response?.data?.msg || 'Failed' });
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      if (!otp || !newPassword) return Toast.show({ type: 'error', text1: 'Fill all fields' });
+      setLoading(true);
+      try {
+        await axios.post(`${API_URL}/forgot-password`, { 
+          identifier: email, 
+          otp, 
+          newPassword 
+        });
+        Toast.show({ type: 'success', text1: 'Success ✅', text2: 'Password Updated' });
+        navigation.navigate('Login');
+      } catch (error) {
+        Toast.show({ type: 'error', text1: 'Failed', text2: error.response?.data?.msg || 'Invalid OTP' });
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -58,33 +56,31 @@ export default function ForgetScreen({ navigation }) {
 
       <View style={styles.content}>
         <MaterialCommunityIcons name={step === 1 ? "lock-reset" : "shield-check"} size={60} color="#333399" />
-        <Text style={styles.title}>{step === 1 ? "Forgot Password?" : "Reset Password"}</Text>
+        <Text style={styles.title}>{step === 1 ? "Forgot Password?" : "Verify OTP"}</Text>
         
-        {step === 1 ? (
-          <View style={styles.inputWrapper}>
+        <View style={styles.inputWrapper}>
+          {step === 1 ? (
             <View style={styles.inputBox}>
               <MaterialCommunityIcons name="email-outline" size={20} color="#666" style={{marginRight: 10}} />
-              <TextInput style={styles.textInput} placeholder="Registered Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+              <TextInput style={styles.textInput} placeholder="Enter your email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
             </View>
-            <TouchableOpacity style={styles.mainBtn} onPress={handleSendOTP} disabled={loading}>
-              {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnText}>SEND OTP</Text>}
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.inputWrapper}>
-            <View style={styles.inputBox}>
-              <MaterialCommunityIcons name="numeric" size={20} color="#666" style={{marginRight: 10}} />
-              <TextInput style={styles.textInput} placeholder="6-Digit OTP" value={otp} onChangeText={setOtp} keyboardType="numeric" maxLength={6} />
-            </View>
-            <View style={[styles.inputBox, {marginTop: 15}]}>
-              <MaterialCommunityIcons name="lock-outline" size={20} color="#666" style={{marginRight: 10}} />
-              <TextInput style={styles.textInput} placeholder="New Password" value={newPassword} onChangeText={setNewPassword} secureTextEntry />
-            </View>
-            <TouchableOpacity style={styles.mainBtn} onPress={handleResetPassword} disabled={loading}>
-              {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnText}>UPDATE PASSWORD</Text>}
-            </TouchableOpacity>
-          </View>
-        )}
+          ) : (
+            <>
+              <View style={styles.inputBox}>
+                <MaterialCommunityIcons name="numeric" size={20} color="#666" style={{marginRight: 10}} />
+                <TextInput style={styles.textInput} placeholder="6-Digit OTP" value={otp} onChangeText={setOtp} keyboardType="numeric" maxLength={6} />
+              </View>
+              <View style={[styles.inputBox, {marginTop: 15}]}>
+                <MaterialCommunityIcons name="lock-outline" size={20} color="#666" style={{marginRight: 10}} />
+                <TextInput style={styles.textInput} placeholder="Enter new password" value={newPassword} onChangeText={setNewPassword} secureTextEntry />
+              </View>
+            </>
+          )}
+
+          <TouchableOpacity style={styles.mainBtn} onPress={handleAction} disabled={loading}>
+            {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnText}>{step === 1 ? "SEND CODE" : "RESET PASSWORD"}</Text>}
+          </TouchableOpacity>
+        </View>
       </View>
     </ScrollView>
   );

@@ -13,18 +13,15 @@ const nodemailer = require('nodemailer');
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // Port 587 ke liye false
+  service: "gmail",
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS, // Bina space wala 16 digit code
+    pass: process.env.EMAIL_PASS, // 16 digit App Password
   },
   tls: {
-    rejectUnauthorized: false // Cloud hosting connection fix
+    rejectUnauthorized: false // Render timeout se bachne ke liye
   }
 });
-
 
 // SIGNUP
 router.post('/signup', async (req, res) => {
@@ -174,63 +171,80 @@ router.post('/login', async (req, res) => {
 //   }
 // });
 
-
 router.post("/forgot-password", async (req, res) => {
   const { identifier, otp, newPassword } = req.body;
 
   try {
-    if (!identifier) return res.status(400).json({ msg: "Email or Phone is required." });
+    if (!identifier) return res.status(400).json({ msg: "Email is required." });
 
-    const isEmail = /\S+@\S+\.\S+/.test(identifier);
-    const user = await User.findOne(isEmail ? { email: identifier.toLowerCase() } : { phone: identifier });
-    
-    if (!user) return res.status(404).json({ msg: "User not found." });
+    // Find user by email
+    const user = await User.findOne({ email: identifier.toLowerCase() });
+    if (!user) return res.status(404).json({ msg: "User with this email not found." });
 
-    // ✅ STEP 1: OTP Generate aur Send karna
+    // ---------------------------------------------------------
+    // STEP 1: Agar sirf Email aaya hai (OTP bhejna hai)
+    // ---------------------------------------------------------
     if (!otp && !newPassword) {
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      // OTP hash karke save karein security ke liye
       const hashedOtp = await bcrypt.hash(generatedOtp, 10);
 
       user.resetPasswordToken = hashedOtp; 
       user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
       await user.save();
 
-      if (isEmail) {
-        await transporter.sendMail({
-          from: `"Property Manager" <${process.env.EMAIL_USER}>`,
-          to: user.email,
-          subject: "Password Reset OTP",
-          html: `<h3>Reset Code: ${generatedOtp}</h3><p>Valid for 10 minutes.</p>`,
-        });
-        return res.status(200).json({ msg: "OTP sent to your email." });
-      } else {
-        console.log(`Phone OTP: ${generatedOtp}`);
-        return res.status(200).json({ msg: "OTP sent to your phone." });
-      }
+      // Email send karein
+      await transporter.sendMail({
+        from: `"Property Manager" <${process.env.EMAIL_USER}>`,
+        to: user.email,
+        subject: "Password Reset Verification Code",
+        html: `
+          <div style="font-family: sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+            <h2 style="color: #333399;">Password Reset</h2>
+            <p>Aapka verification code niche diya gaya hai:</p>
+            <h1 style="background: #f4f4f9; padding: 10px; text-align: center; letter-spacing: 5px;">${generatedOtp}</h1>
+            <p>Yeh code 10 minute tak valid hai.</p>
+          </div>
+        `,
+      });
+
+      return res.status(200).json({ msg: "OTP sent to your email." });
     }
 
-    // ✅ STEP 2: OTP Verify aur Password Reset karna
+    // ---------------------------------------------------------
+    // STEP 2: Agar OTP aur Password dono aaye hain (Reset karna hai)
+    // ---------------------------------------------------------
     if (otp && newPassword) {
+      // Expiry check
       if (!user.resetPasswordToken || !user.resetPasswordExpires || new Date(user.resetPasswordExpires) < new Date()) {
         return res.status(400).json({ msg: "OTP expired. Request a new one." });
       }
 
+      // OTP verify karein
       const isOtpValid = await bcrypt.compare(otp, user.resetPasswordToken);
-      if (!isOtpValid) return res.status(400).json({ msg: "Invalid OTP." });
+      if (!isOtpValid) return res.status(400).json({ msg: "Invalid OTP code." });
 
-      // Naya Password hash karke save karein
-      user.password = await bcrypt.hash(newPassword, 10);
+      // Naya password hash karke save karein
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(newPassword, salt);
+      
+      // Clear OTP fields
       user.resetPasswordToken = null;
       user.resetPasswordExpires = null;
       await user.save();
 
-      return res.status(200).json({ msg: "Password reset successful! ✅" });
+      return res.status(200).json({ msg: "Password has been reset successfully! ✅" });
     }
 
-    res.status(400).json({ msg: "Invalid request." });
+    res.status(400).json({ msg: "Invalid request data." });
+
   } catch (error) {
     console.error("Forgot-password error:", error);
-    res.status(500).json({ msg: "Server error. Try again." });
+    res.status(500).json({ msg: "Server error. Please try again." });
   }
 });
+
+
+
 module.exports = router;
