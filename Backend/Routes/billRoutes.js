@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
 const pdf = require('pdf-parse');
 const axios = require('axios');
 
-// Cloudinary Config (Check .env)
+// Cloudinary Config
 cloudinary.config({
   cloud_name: process.env.cloud_name,
   api_key: process.env.api_key,
@@ -26,131 +26,111 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ storage: storage , limits: { fileSize: 10 * 1024 * 1024 } }); 
 
-router.post('/add', upload.single('billFile'), async (req, res) => {
-  try {
-    const { adminId, month, totalUnits, energyCharges, fixedCharges, taxes } = req.body;
-    const total = Number(energyCharges) + Number(fixedCharges) + Number(taxes);
-
-    const newBill = new Bill({
-      adminId: new mongoose.Types.ObjectId(adminId),
-      month,
-      totalUnits: Number(totalUnits),
-      energyCharges: Number(energyCharges),
-      fixedCharges: Number(fixedCharges),
-      taxes: Number(taxes),
-      totalAmount: total,
-      billUrl: req.file ? req.file.path : "" 
-    });
-
-    await newBill.save();
-    res.status(201).json(newBill);
-  } catch (err) {
-    console.error("Save Error:", err.message);
-    res.status(400).json({ msg: err.message });
-  }
-});
-
-router.get('/history/:adminId', async (req, res) => {
-  try {
-    const history = await Bill.find({ adminId: req.params.adminId }).sort({ createdAt: -1 });
-    res.json(history);
-  } catch (err) {
-    res.status(500).json({ msg: err.message });
-  }
-});
-
-
-
-// 🗑️ DELETE BILL ROUTE
-router.delete('/delete/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ msg: "Invalid Bill ID format" });
-    }
-
-    const bill = await Bill.findById(id);
-    if (!bill) {
-      return res.status(404).json({ msg: "Bill record not found" });
-    }
-
-    await Bill.findByIdAndDelete(id);
-
-    res.json({ success: true, msg: "Bill deleted from database ✅" });
-  } catch (err) {
-    console.error("Delete Error Backend:", err.message);
-    res.status(500).json({ msg: "Server Error: Could not delete" });
-  }
-});
-
-
+// 🪄 EXTRACTION ROUTE FIX
 router.post('/extract', upload.single('billFile'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ msg: "No file uploaded" });
 
-    // 1. Cloudinary URL से PDF को Buffer में लें
+    // 1. Cloudinary URL se PDF ko Buffer mein download karein
     const response = await axios.get(req.file.path, { responseType: 'arraybuffer' });
-    const dataBuffer = Buffer.from(response.data, 'utf-8');
+    const dataBuffer = Buffer.from(response.data);
     
     const data = await pdf(dataBuffer);
     const text = data.text;
 
-    // Helper function to extract numbers correctly
+    // 🛠️ Helper function: Regex se number nikalne ke liye aur comma (,) hatane ke liye
     const getVal = (regex) => {
       const match = text.match(regex);
-      return match ? match[1].trim() : "0.00";
+      if (match && match[1]) {
+        // Comma hatana zaroori hai (e.g. 2,28,352.50 -> 228352.50)
+        return match[1].replace(/,/g, '').trim();
+      }
+      return "0.00";
     };
 
-    // 2. सभी 1-18 पॉइंट्स का Extraction Logic
+    // 🛠️ AVVNL Bill Specific Regex Patterns
     const fullDetails = {
-      energy_charges_1: getVal(/1\s+Energy Charges\s+([\d.]+)/i),
-      fixed_charges_2: getVal(/2\s+Fixed Charges\s+([\d.]+)/i),
-      fuel_surcharge_3: getVal(/3\s+Fuel Surcharge.*?\s+([\d.]+)/i),
-      demand_surcharge_4: getVal(/4\s+Demand surcharge\s+([\d.]+)/i),
-      power_factor_incentive_5: getVal(/5\s+Power factor surcharge\/Incentive\s+\(-\)\s+([\d.-]+)/i),
-      unauthorized_use_6: getVal(/6\s+Unathourized Use Charges.*?\s+([\d.]+)/i),
-      ct_pt_rent_7: getVal(/7\s+CT\/PT Rent\s+([\d.]+)/i),
-      transformer_rent_8: getVal(/8\s+Transformer Rent\s+([\d.]+)/i),
-      others_tod_9: getVal(/9\s+\(I\).*?\(II\) TOD Surcharge\s+([\d.]+)/i),
-      rebates_10: getVal(/10\s+\(I\).*?\(II\).*?\s+([\d.-]+)/i),
-      
-      // 11. Total Nigam Dues (1 to 10)
-      total_nigam_dues_11: getVal(/11\s+Total Nigam Dues.*?([\d.]+)/i),
-      
-      electricity_duty_12: getVal(/12\s+Electricity Duty\s+([\d.]+)/i),
-      water_cess_13: getVal(/13\s+Water Conservation Cess.*?([\d.]+)/i),
-      urban_cess_14: getVal(/14\s+Urban Cess.*?([\d.]+)/i),
-      other_debit_15: getVal(/15\s+Other Debit\/Credit\s+([\d.]+)/i),
-      tcs_tds_16: getVal(/16\s+Tax collected at source.*?([\d.]+)/i),
-      adjustment_17: getVal(/17\s+Amount Adjusted.*?([\d.]+)/i),
-      
-      // 18. Total Amount (11 to 17)
-      total_amount_18: getVal(/18\s+Total Amount \(S\.No 11 to 17\)\s+([\d.]+)/i),
-
-      // Extra: Units (Top section of bill)
-      billed_units: getVal(/Net Billed Units\s+([\d.]+)/i),
+      billed_units: getVal(/Net Billed Units\s+([\d,.]+)/i),
+      energy_charges_1: getVal(/1\s+Energy Charges\s+([\d,.]+)/i),
+      fixed_charges_2: getVal(/2\s+Fixed Charges\s+([\d,.]+)/i),
+      fuel_surcharge_3: getVal(/3\s+Fuel Surcharge.*?\s+([\d,.]+)/i),
+      demand_surcharge_4: getVal(/4\s+Demand surcharge\s+([\d,.]+)/i),
+      power_factor_5: getVal(/5\s+Power factor surcharge\/Incentive.*?\s+([-\d,.]+)/i),
+      electricity_duty_12: getVal(/12\s+Electricity Duty\s+([\d,.]+)/i),
+      water_cess_13: getVal(/13\s+Water Conservation Cess.*?([\d,.]+)/i),
+      urban_cess_14: getVal(/14\s+Urban Cess.*?([\d,.]+)/i),
+      tcs_tds_16: getVal(/16\s+Tax collected at source.*?([\d,.]+)/i),
+      total_amount_18: getVal(/18\s+Total Amount \(S\.No 11 to 17\)\s+([\d,.]+)/i)
     };
 
-    // आपके फॉर्म के हिसाब से डेटा मैप करें
-    const responseData = {
-      units: fullDetails.billed_units,
-      energy: fullDetails.energy_charges_1,
-      fixed: fullDetails.fixed_charges_2,
-      taxes: (
-        parseFloat(fullDetails.electricity_duty_12) +
-        parseFloat(fullDetails.water_cess_13) +
-        parseFloat(fullDetails.urban_cess_14) +
-        parseFloat(fullDetails.tcs_tds_16)
-      ).toFixed(2),
-      all_points: fullDetails // इसमें 1-18 की पूरी लिस्ट है
-    };
+    // 🧮 Frontend form ke liye calculation
+    const units = fullDetails.billed_units;
+    const energy = fullDetails.energy_charges_1;
+    const fixed = fullDetails.fixed_charges_2;
 
-    res.json(responseData);
+    // Taxes = Duty + Water Cess + Urban Cess + TCS
+    const taxesCalc = (
+        parseFloat(fullDetails.electricity_duty_12 || 0) +
+        parseFloat(fullDetails.water_cess_13 || 0) +
+        parseFloat(fullDetails.urban_cess_14 || 0) +
+        parseFloat(fullDetails.tcs_tds_16 || 0)
+    ).toFixed(2);
+
+    res.json({
+      units: units,
+      energy: energy,
+      fixed: fixed,
+      taxes: taxesCalc,
+      totalAmount: fullDetails.total_amount_18,
+      all_points: fullDetails // Detail debugging ke liye
+    });
 
   } catch (err) {
-    console.error("Extraction Error:", err);
-    res.status(500).json({ msg: "PDF parsing failed" });
+    console.error("Extraction Error:", err.message);
+    res.status(500).json({ msg: "PDF parsing failed. Check bill format." });
   }
+});
+
+// BAAKI ROUTES (Add/Delete/History)
+router.post('/add', upload.single('billFile'), async (req, res) => {
+    try {
+      const { adminId, month, totalUnits, energyCharges, fixedCharges, taxes } = req.body;
+      const total = Number(energyCharges) + Number(fixedCharges) + Number(taxes);
+  
+      const newBill = new Bill({
+        adminId: new mongoose.Types.ObjectId(adminId),
+        month,
+        totalUnits: Number(totalUnits),
+        energyCharges: Number(energyCharges),
+        fixedCharges: Number(fixedCharges),
+        taxes: Number(taxes),
+        totalAmount: total.toFixed(2),
+        billUrl: req.file ? req.file.path : "" 
+      });
+  
+      await newBill.save();
+      res.status(201).json(newBill);
+    } catch (err) {
+      res.status(400).json({ msg: err.message });
+    }
+});
+
+router.get('/history/:adminId', async (req, res) => {
+    try {
+      const history = await Bill.find({ adminId: req.params.adminId }).sort({ createdAt: -1 });
+      res.json(history);
+    } catch (err) {
+      res.status(500).json({ msg: err.message });
+    }
+});
+
+router.delete('/delete/:id', async (req, res) => {
+    try {
+      await Bill.findByIdAndDelete(req.params.id);
+      res.json({ success: true, msg: "Deleted ✅" });
+    } catch (err) {
+      res.status(500).json({ msg: "Delete failed" });
+    }
 });
 
 module.exports = router;
