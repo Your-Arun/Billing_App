@@ -95,28 +95,28 @@ router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
 });
 
 // BAAKI ROUTES (Add/Delete/History)
-router.post('/add', upload.single('billFile'), async (req, res) => {
-    try {
-      const { adminId, month, totalUnits, energyCharges, fixedCharges, taxes } = req.body;
-      const total = Number(energyCharges) + Number(fixedCharges) + Number(taxes);
+// router.post('/add', upload.single('billFile'), async (req, res) => {
+//     try {
+//       const { adminId, month, totalUnits, energyCharges, fixedCharges, taxes } = req.body;
+//       const total = Number(energyCharges) + Number(fixedCharges) + Number(taxes);
   
-      const newBill = new Bill({
-        adminId: new mongoose.Types.ObjectId(adminId),
-        month,
-        totalUnits: Number(totalUnits),
-        energyCharges: Number(energyCharges),
-        fixedCharges: Number(fixedCharges),
-        taxes: Number(taxes),
-        totalAmount: total.toFixed(2),
-        billUrl: req.file ? req.file.path : "" 
-      });
+//       const newBill = new Bill({
+//         adminId: new mongoose.Types.ObjectId(adminId),
+//         month,
+//         totalUnits: Number(totalUnits),
+//         energyCharges: Number(energyCharges),
+//         fixedCharges: Number(fixedCharges),
+//         taxes: Number(taxes),
+//         totalAmount: total.toFixed(2),
+//         billUrl: req.file ? req.file.path : "" 
+//       });
   
-      await newBill.save();
-      res.status(201).json(newBill);
-    } catch (err) {
-      res.status(400).json({ msg: err.message });
-    }
-});
+//       await newBill.save();
+//       res.status(201).json(newBill);
+//     } catch (err) {
+//       res.status(400).json({ msg: err.message });
+//     }
+// });
 
 router.get('/history/:adminId', async (req, res) => {
     try {
