@@ -14,21 +14,29 @@ dotenv.config();
 
 
 const transporter = nodemailer.createTransport({
+  service: 'gmail',
   host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // true for 465, false for other ports
+  port: 587,
+  secure: false, // Port 587 ke liye false hota hai
   auth: {
-    user: process.env.EMAIL_USER, 
-    pass: process.env.EMAIL_PASS, // ⚠️ Normal password nahi, 16 digit "App Password" use karein
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS, // 16 digit App Password (bina space ke)
   },
+  // 🟢 Timeout issues fix karne ke liye ye settings add karein
+  connectionTimeout: 10000, // 10 seconds
+  greetingTimeout: 10000,
+  socketTimeout: 10000,
+  tls: {
+    rejectUnauthorized: false // Cloud hosting par certificate issues fix karta hai
+  }
 });
 
-// Connection check karne ke liye (Terminal mein check karein)
+// Check connection
 transporter.verify((error, success) => {
   if (error) {
-    console.log("Nodemailer Verification Error:", error);
+    console.log("Nodemailer Error:", error.message);
   } else {
-    console.log("Mail Server is ready! ✅");
+    console.log("Server is ready to take our messages ✅");
   }
 });
 

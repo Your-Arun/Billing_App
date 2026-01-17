@@ -110,7 +110,7 @@ export default function ForgetScreen({ navigation }) {
         {/* --- STEP 2 UI --- */}
         {step === 2 && (
           <View style={styles.inputWrapper}>
-            <Text style={styles.label}>6-Digit OTP</Text>
+            <Text style={styles.label}>4-Digit OTP</Text>
             <View style={styles.inputBox}>
               <MaterialCommunityIcons name="numeric" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
