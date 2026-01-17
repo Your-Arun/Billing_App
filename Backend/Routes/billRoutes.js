@@ -5,7 +5,7 @@ const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const Bill = require('../Modals/Bill');
 const mongoose = require('mongoose');
-const pdf = require('pdf-parse'); 
+const pdfParse = require('pdf-parse'); 
 const axios = require('axios');
 
 // Cloudinary Config
@@ -42,19 +42,17 @@ router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
 
     const dataBuffer = req.file.buffer;
 
-    // 🛡️ SAFETY CHECK: pdf-parse ko sahi se handle karne ke liye
+    // 🔍 DEBUG: Terminal mein check karne ke liye ki library ka type kya hai
+    console.log("PDF Library Type:", typeof pdfParse);
+
+    // 🟢 Seedha call karein, Render par standard require chalna chahiye
     let pdfData;
     try {
-      if (typeof pdf === 'function') {
-        pdfData = await pdf(dataBuffer);
-      } else if (pdf.default && typeof pdf.default === 'function') {
-        pdfData = await pdf.default(dataBuffer);
-      } else {
-        throw new Error("Library configuration error");
-      }
+      // Agar pdfParse function hai toh theek, warna error handle karein
+      pdfData = await pdfParse(dataBuffer);
     } catch (parseErr) {
-      console.error("Internal PDF Parse Error:", parseErr);
-      return res.status(500).json({ msg: "Cannot initialize PDF reader" });
+      console.error("PDF Parsing Step Error:", parseErr.message);
+      return res.status(500).json({ msg: "Error parsing PDF structure" });
     }
 
     const text = pdfData.text;
@@ -72,7 +70,7 @@ router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
       return "0.00";
     };
 
-    // AVVNL (Ajmer) Bill Specific Patterns
+    // AVVNL Bill Specific Patterns
     const extracted = {
       units: getVal(/Net Billed Units\s+([\d,.]+)/i),
       energy: getVal(/1\s+Energy Charges\s+([\d,.]+)/i),
