@@ -5,7 +5,8 @@ const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const Bill = require('../Modals/Bill');
 const mongoose = require('mongoose');
-const pdfParse = require('pdf-parse');
+const pdf = require('pdf-parse'); 
+const axios = require('axios');
 
 // Cloudinary Config
 cloudinary.config({
@@ -23,25 +24,43 @@ const storage = new CloudinaryStorage({
   },
 });
 
-const upload = multer({ storage: storage , limits: { fileSize: 10 * 1024 * 1024 } }); 
+// const upload = multer({ storage: storage , limits: { fileSize: 10 * 1024 * 1024 } }); 
+
 
 const storageMemory = multer.memoryStorage();
-const uploadMemory = multer({ storage: storageMemory });
+const uploadMemory = multer({ 
+  storage: storageMemory,
+  limits: { fileSize: 10 * 1024 * 1024 } 
+});
+
+
 
 // 🪄 EXTRACTION ROUTE FIX
 router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ msg: "No file uploaded" });
 
-    // req.file.buffer se data uthayein
     const dataBuffer = req.file.buffer;
-    
-    // 🟢 pdfParse ko function ki tarah call karein
-    const data = await pdfParse(dataBuffer);
-    const text = data.text;
+
+    // 🛡️ SAFETY CHECK: pdf-parse ko sahi se handle karne ke liye
+    let pdfData;
+    try {
+      if (typeof pdf === 'function') {
+        pdfData = await pdf(dataBuffer);
+      } else if (pdf.default && typeof pdf.default === 'function') {
+        pdfData = await pdf.default(dataBuffer);
+      } else {
+        throw new Error("Library configuration error");
+      }
+    } catch (parseErr) {
+      console.error("Internal PDF Parse Error:", parseErr);
+      return res.status(500).json({ msg: "Cannot initialize PDF reader" });
+    }
+
+    const text = pdfData.text;
 
     if (!text || text.trim().length === 0) {
-      return res.status(400).json({ msg: "PDF text is empty. Might be a scanned image." });
+      return res.status(400).json({ msg: "PDF contains no readable text." });
     }
 
     // 🛠️ Regex Helper
@@ -53,7 +72,7 @@ router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
       return "0.00";
     };
 
-    // AVVNL Bill Patterns
+    // AVVNL (Ajmer) Bill Specific Patterns
     const extracted = {
       units: getVal(/Net Billed Units\s+([\d,.]+)/i),
       energy: getVal(/1\s+Energy Charges\s+([\d,.]+)/i),
@@ -79,34 +98,34 @@ router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
     });
 
   } catch (err) {
-    console.error("Extraction Error:", err.message);
-    res.status(500).json({ msg: "PDF Parsing failed: " + err.message });
+    console.error("Global Extraction Error:", err.message);
+    res.status(500).json({ msg: "Extraction failed: " + err.message });
   }
 });
 
 // BAAKI ROUTES (Add/Delete/History)
-router.post('/add', upload.single('billFile'), async (req, res) => {
-    try {
-      const { adminId, month, totalUnits, energyCharges, fixedCharges, taxes } = req.body;
-      const total = Number(energyCharges) + Number(fixedCharges) + Number(taxes);
+// router.post('/add', upload.single('billFile'), async (req, res) => {
+//     try {
+//       const { adminId, month, totalUnits, energyCharges, fixedCharges, taxes } = req.body;
+//       const total = Number(energyCharges) + Number(fixedCharges) + Number(taxes);
   
-      const newBill = new Bill({
-        adminId: new mongoose.Types.ObjectId(adminId),
-        month,
-        totalUnits: Number(totalUnits),
-        energyCharges: Number(energyCharges),
-        fixedCharges: Number(fixedCharges),
-        taxes: Number(taxes),
-        totalAmount: total.toFixed(2),
-        billUrl: req.file ? req.file.path : "" 
-      });
+//       const newBill = new Bill({
+//         adminId: new mongoose.Types.ObjectId(adminId),
+//         month,
+//         totalUnits: Number(totalUnits),
+//         energyCharges: Number(energyCharges),
+//         fixedCharges: Number(fixedCharges),
+//         taxes: Number(taxes),
+//         totalAmount: total.toFixed(2),
+//         billUrl: req.file ? req.file.path : "" 
+//       });
   
-      await newBill.save();
-      res.status(201).json(newBill);
-    } catch (err) {
-      res.status(400).json({ msg: err.message });
-    }
-});
+//       await newBill.save();
+//       res.status(201).json(newBill);
+//     } catch (err) {
+//       res.status(400).json({ msg: err.message });
+//     }
+// });
 
 router.get('/history/:adminId', async (req, res) => {
     try {
