@@ -19,9 +19,6 @@ const transporter = nodemailer.createTransport({
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS, // Bina space wala 16 digit code
-  },
-  tls: {
-    rejectUnauthorized: false
   }
 });
 
