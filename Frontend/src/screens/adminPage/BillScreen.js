@@ -22,6 +22,7 @@ const BillScreen = () => {
   const [saving, setSaving] = useState(false);
   const [history, setHistory] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [extracting, setExtracting] = useState(false);
 
   const monthName = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
@@ -123,6 +124,44 @@ const BillScreen = () => {
   );
 };
 
+const handleAutoExtract = async () => {
+  if (!file) {
+    Toast.show({ type: 'error', text1: 'Please select a PDF first' });
+    return;
+  }
+
+  setExtracting(true);
+  try {
+    const formData = new FormData();
+    formData.append('billFile', {
+      uri: Platform.OS === 'android' ? file.uri : file.uri.replace('file://', ''),
+      name: file.name,
+      type: 'application/pdf',
+    });
+
+    const res = await axios.post(`${API_URL}/bill/extract`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+
+    if (res.data) {
+      setForm({
+        units: res.data.units,
+        energy: res.data.energy,
+        fixed: res.data.fixed,
+        taxes: res.data.taxes
+      });
+      Toast.show({ type: 'success', text1: 'Magic! Data Extracted ✨' });
+    }
+  } catch (error) {
+    console.log(error);
+    Toast.show({ type: 'error', text1: 'Extraction Failed', text2: 'Format might be different' });
+  } finally {
+    setExtracting(false);
+  }
+};
+
+
+
   const handleDownload = async (url, month) => {
     if (!url) return;
     try {
@@ -174,6 +213,22 @@ const BillScreen = () => {
                 {file ? file.name : "Upload Official PDF"}
               </Text>
             </TouchableOpacity>
+
+<TouchableOpacity 
+      style={[styles.extractBtn, !file && {backgroundColor: '#CCC'}]} 
+      onPress={handleAutoExtract}
+      disabled={!file || extracting}
+    >
+      {extracting ? (
+        <ActivityIndicator color="#FFF" />
+      ) : (
+        <>
+          <MaterialCommunityIcons name="auto-fix" size={20} color="white" />
+          <Text style={styles.extractText}>AUTO-FILL FROM PDF</Text>
+        </>
+      )}
+    </TouchableOpacity>
+
 
             <View style={styles.inputGroup}>
                 <View style={styles.fullInput}>
@@ -283,7 +338,23 @@ const styles = StyleSheet.create({
   actionCol: { flexDirection: 'row', gap: 10 },
   actionBtnDownload: { backgroundColor: '#E8F5E9', padding: 10, borderRadius: 12 },
   actionBtnDelete: { backgroundColor: '#FFEBEE', padding: 10, borderRadius: 12 },
-  emptyText: { textAlign: 'center', marginTop: 40, color: '#AAA', fontWeight: 'bold' }
+  emptyText: { textAlign: 'center', marginTop: 40, color: '#AAA', fontWeight: 'bold' },
+  extractBtn: {
+    backgroundColor: '#FF9800', // Orange color for extraction
+    padding: 12,
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    elevation: 2
+},
+extractText: {
+    color: 'white',
+    fontWeight: 'bold',
+    marginLeft: 8,
+    fontSize: 13
+}
 });
 
 export default BillScreen;
