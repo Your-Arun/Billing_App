@@ -184,7 +184,7 @@ router.post('/forget-password', async (req, res) => {
     }
 
     // 🔢 6-Digit OTP Generate karein
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
     
     // OTP ko token ki jagah save karein (Valid for 10 minutes)
     user.resetPasswordToken = otp;
