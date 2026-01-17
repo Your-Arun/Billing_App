@@ -14,30 +14,22 @@ dotenv.config();
 
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
   host: 'smtp.gmail.com',
   port: 587,
-  secure: false, // Port 587 ke liye false hota hai
+  secure: false, // Port 587 ke liye false
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS, // 16 digit App Password (bina space ke)
+    pass: process.env.EMAIL_PASS, // Bina space wala 16 digit App Password
   },
-  // 🟢 Timeout issues fix karne ke liye ye settings add karein
-  connectionTimeout: 10000, // 10 seconds
-  greetingTimeout: 10000,
-  socketTimeout: 10000,
   tls: {
-    rejectUnauthorized: false // Cloud hosting par certificate issues fix karta hai
+    rejectUnauthorized: false // Cloud hosting security fix
   }
 });
 
-// Check connection
-transporter.verify((error, success) => {
-  if (error) {
-    console.log("Nodemailer Error:", error.message);
-  } else {
-    console.log("Server is ready to take our messages ✅");
-  }
+// Check connection on start
+transporter.verify((error) => {
+  if (error) console.log("Nodemailer Error:", error.message);
+  else console.log("Mail Server Ready ✅");
 });
 
 
@@ -197,12 +189,10 @@ router.post('/forget-password', async (req, res) => {
     if (!email) return res.status(400).json({ msg: "Email is required" });
 
     const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ msg: "Is email ke sath koi user nahi mila." });
-    }
+    if (!user) return res.status(404).json({ msg: "Is email ke sath koi user nahi mila." });
 
-    // 🔢 4-Digit OTP (Aapne niche 4 digit logic use kiya hai)
-    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+    // 🔢 6-Digit OTP (Standardized)
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
     
     user.resetPasswordToken = otp;
     user.resetPasswordExpires = Date.now() + 600000; // 10 mins expiry
@@ -213,26 +203,23 @@ router.post('/forget-password', async (req, res) => {
       to: user.email,
       subject: 'Password Reset OTP',
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 500px; border: 1px solid #eee; padding: 20px;">
+        <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee;">
           <h2 style="color: #333399;">Password Reset Request</h2>
-          <p>Aapka verification code niche diya gaya hai:</p>
-          <div style="background: #f4f4f9; padding: 15px; text-align: center; border-radius: 8px;">
-            <h1 style="letter-spacing: 5px; color: #333; margin: 0;">${otp}</h1>
+          <p>Aapka 6-digit verification code niche diya gaya hai:</p>
+          <div style="background: #f4f4f9; padding: 20px; text-align: center;">
+            <h1 style="letter-spacing: 10px; color: #333;">${otp}</h1>
           </div>
-          <p>Yeh OTP 10 minute tak valid rahega.</p>
-          <p>Agar aapne yeh request nahi ki hai, toh kripya is email ko ignore karein.</p>
+          <p>Yeh OTP 10 minute tak valid hai.</p>
         </div>
       `
     };
 
-    // ⚠️ Mail bhejne ka wait karein
     await transporter.sendMail(mailOptions);
-    
-    return res.json({ msg: "OTP bhej diya gaya hai. Inbox check karein." });
+    res.json({ msg: "OTP bhej diya gaya hai. Inbox check karein." });
 
   } catch (err) {
-    console.error("MAIL SENDING ERROR:", err);
-    return res.status(500).json({ msg: "OTP bhejne mein dikkat aayi. Check server logs." });
+    console.error("MAIL ERROR:", err);
+    res.status(500).json({ msg: "Mail service error. Check App Password." });
   }
 });
 
@@ -247,11 +234,9 @@ router.post('/reset-password-otp', async (req, res) => {
       resetPasswordExpires: { $gt: Date.now() }
     });
 
-    if (!user) {
-      return res.status(400).json({ msg: "OTP galat hai ya expire ho chuka hai." });
-    }
+    if (!user) return res.status(400).json({ msg: "OTP galat hai ya expire ho chuka hai." });
 
-    // 🔐 Naya password hash karein
+    // Hash new password
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(newPassword, salt);
     
@@ -262,9 +247,9 @@ router.post('/reset-password-otp', async (req, res) => {
     res.json({ success: true, msg: "Password badal diya gaya hai! ✅" });
 
   } catch (err) {
-    console.error(err);
     res.status(500).json({ msg: "Server error" });
   }
 });
+
 
 module.exports = router;
