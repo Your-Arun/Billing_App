@@ -6,7 +6,7 @@ const router = express.Router();
 const twilio = require('twilio')
 const dotenv = require('dotenv')
 const Otp = require('../Modals/Otp');
-const crypto = require('crypto'); // Built-in Node module
+const crypto = require('crypto'); 
 const nodemailer = require('nodemailer');
 
 
@@ -241,7 +241,7 @@ router.post('/reset-password-otp', async (req, res) => {
     user.password = await bcrypt.hash(newPassword, salt);
     
     user.resetPasswordToken = undefined;
-    user.resetPasswordExpires = undefined;
+    user.resetPasswordExpires  = undefined;
 
     await user.save();
     res.json({ success: true, msg: "Password badal diya gaya hai! ✅" });
