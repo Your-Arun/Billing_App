@@ -5,7 +5,7 @@ const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const Bill = require('../Modals/Bill');
 const mongoose = require('mongoose');
-const pdfParse = require('pdf-parse'); 
+let pdfParse = require('pdf-parse');
 const axios = require('axios');
 
 // Cloudinary Config
@@ -26,13 +26,11 @@ const storage = new CloudinaryStorage({
 
 // const upload = multer({ storage: storage , limits: { fileSize: 10 * 1024 * 1024 } }); 
 
-
 const storageMemory = multer.memoryStorage();
 const uploadMemory = multer({ 
   storage: storageMemory,
-  limits: { fileSize: 10 * 1024 * 1024 } 
+  limits: { fileSize: 5 * 1024 * 1024 } 
 });
-
 
 
 // 🪄 EXTRACTION ROUTE FIX
@@ -42,23 +40,33 @@ router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
 
     const dataBuffer = req.file.buffer;
 
-    // 🔍 DEBUG: Terminal mein check karne ke liye ki library ka type kya hai
+    // 🔍 DEBUG: Yeh terminal mein check karne ke liye hai
+    console.log("PDF Library Raw:", pdfParse);
     console.log("PDF Library Type:", typeof pdfParse);
 
-    // 🟢 Seedha call karein, Render par standard require chalna chahiye
     let pdfData;
     try {
-      // Agar pdfParse function hai toh theek, warna error handle karein
-      pdfData = await pdfParse(dataBuffer);
+      // 🟢 STEP 2: Flexible Calling Logic
+      // Agar direct function hai toh wo use karein, warna .default check karein
+      if (typeof pdfParse === 'function') {
+        pdfData = await pdfParse(dataBuffer);
+      } else if (pdfParse.default && typeof pdfParse.default === 'function') {
+        pdfData = await pdfParse.default(dataBuffer);
+      } else {
+        // Agar dono nahi hain, toh ho sakta hai library kisi aur naam se export ho rahi ho
+        // Render par kabhi-kabhi yeh issue aata hai
+        const alternativeParse = require('pdf-parse/lib/pdf-parse.js');
+        pdfData = await alternativeParse(dataBuffer);
+      }
     } catch (parseErr) {
-      console.error("PDF Parsing Step Error:", parseErr.message);
-      return res.status(500).json({ msg: "Error parsing PDF structure" });
+      console.error("PDF Parsing Error detail:", parseErr);
+      return res.status(500).json({ msg: "Failed to parse PDF structure" });
     }
 
     const text = pdfData.text;
 
     if (!text || text.trim().length === 0) {
-      return res.status(400).json({ msg: "PDF contains no readable text." });
+      return res.status(400).json({ msg: "PDF is empty or scanned image." });
     }
 
     // 🛠️ Regex Helper
@@ -97,7 +105,7 @@ router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
 
   } catch (err) {
     console.error("Global Extraction Error:", err.message);
-    res.status(500).json({ msg: "Extraction failed: " + err.message });
+    res.status(500).json({ msg: "Server Error: " + err.message });
   }
 });
 
