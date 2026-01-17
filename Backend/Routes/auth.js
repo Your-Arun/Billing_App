@@ -13,15 +13,24 @@ const nodemailer = require('nodemailer');
 dotenv.config();
 
 
-// 📧 Nodemailer Transporter Setup
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true, // true for 465, false for other ports
   auth: {
-    user: process.env.EMAIL_USER, // Aapka Gmail
-    pass: process.env.EMAIL_PASS, // Aapka Gmail "App Password"
+    user: process.env.EMAIL_USER, 
+    pass: process.env.EMAIL_PASS, // ⚠️ Normal password nahi, 16 digit "App Password" use karein
   },
 });
 
+// Connection check karne ke liye (Terminal mein check karein)
+transporter.verify((error, success) => {
+  if (error) {
+    console.log("Nodemailer Verification Error:", error);
+  } else {
+    console.log("Mail Server is ready! ✅");
+  }
+});
 
 
 // SIGNUP
@@ -177,56 +186,53 @@ router.post('/login', async (req, res) => {
 router.post('/forget-password', async (req, res) => {
   try {
     const { email } = req.body;
+    if (!email) return res.status(400).json({ msg: "Email is required" });
 
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ msg: "Is email ke sath koi user nahi mila." });
     }
 
-    // 🔢 6-Digit OTP Generate karein
+    // 🔢 4-Digit OTP (Aapne niche 4 digit logic use kiya hai)
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
     
-    // OTP ko token ki jagah save karein (Valid for 10 minutes)
     user.resetPasswordToken = otp;
     user.resetPasswordExpires = Date.now() + 600000; // 10 mins expiry
     await user.save();
 
-    // ✉️ Email Content
     const mailOptions = {
+      from: `"Property Manager" <${process.env.EMAIL_USER}>`,
       to: user.email,
-      from: `Property Manager Admin <${process.env.EMAIL_USER}>`,
-      subject: 'Your Password Reset OTP',
+      subject: 'Password Reset OTP',
       html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+        <div style="font-family: Arial, sans-serif; max-width: 500px; border: 1px solid #eee; padding: 20px;">
           <h2 style="color: #333399;">Password Reset Request</h2>
-          <p>Aapne password reset ke liye request ki hai. Aapka verification code niche diya gaya hai:</p>
-          <div style="background: #F0F2FF; padding: 20px; text-align: center; border-radius: 10px;">
-            <h1 style="letter-spacing: 5px; color: #333399; margin: 0;">${otp}</h1>
+          <p>Aapka verification code niche diya gaya hai:</p>
+          <div style="background: #f4f4f9; padding: 15px; text-align: center; border-radius: 8px;">
+            <h1 style="letter-spacing: 5px; color: #333; margin: 0;">${otp}</h1>
           </div>
-          <p style="margin-top: 20px;">Yeh OTP 10 minute tak valid rahega.</p>
+          <p>Yeh OTP 10 minute tak valid rahega.</p>
           <p>Agar aapne yeh request nahi ki hai, toh kripya is email ko ignore karein.</p>
-          <hr style="border: none; border-top: 1px solid #EEE;" />
-          <small>Property Manager System Admin</small>
         </div>
       `
     };
 
+    // ⚠️ Mail bhejne ka wait karein
     await transporter.sendMail(mailOptions);
-    res.json({ msg: "Aapke email par 6-digit OTP bhej diya gaya hai." });
+    
+    return res.json({ msg: "OTP bhej diya gaya hai. Inbox check karein." });
 
   } catch (err) {
-    console.error("Mail Error:", err);
-    res.status(500).json({ msg: "OTP bhejne mein dikkat aayi." });
+    console.error("MAIL SENDING ERROR:", err);
+    return res.status(500).json({ msg: "OTP bhejne mein dikkat aayi. Check server logs." });
   }
 });
 
 
-// 🔐 2. RESET PASSWORD - VERIFY OTP & UPDATE
 router.post('/reset-password-otp', async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
 
-    // 1. User dhoondein jiska email aur OTP match kare aur expiry bachi ho
     const user = await User.findOne({
       email: email,
       resetPasswordToken: otp,
@@ -237,18 +243,19 @@ router.post('/reset-password-otp', async (req, res) => {
       return res.status(400).json({ msg: "OTP galat hai ya expire ho chuka hai." });
     }
 
-    // 2. Naya Password set karein
-    user.password = newPassword; // Agar model mein hashing hai toh wo auto-hash ho jayega
+    // 🔐 Naya password hash karein
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
 
     await user.save();
-
-    res.json({ success: true, msg: "Password kamyabi se badal diya gaya hai! ✅" });
+    res.json({ success: true, msg: "Password badal diya gaya hai! ✅" });
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({ msg: "Password reset nahi ho paya." });
+    res.status(500).json({ msg: "Server error" });
   }
 });
 
