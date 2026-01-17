@@ -13,23 +13,16 @@ const nodemailer = require('nodemailer');
 dotenv.config();
 
 
+// 📧 Render/Cloud Compatible Transporter
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // Port 587 ke liye false
+  host: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS, // Bina space wala 16 digit App Password
+    pass: process.env.EMAIL_PASS, // Bina space wala 16 digit code
   },
   tls: {
-    rejectUnauthorized: false // Cloud hosting security fix
+    rejectUnauthorized: false
   }
-});
-
-// Check connection on start
-transporter.verify((error) => {
-  if (error) console.log("Nodemailer Error:", error.message);
-  else console.log("Mail Server Ready ✅");
 });
 
 
@@ -182,74 +175,81 @@ router.post('/login', async (req, res) => {
 // });
 
 
-// 📧 1. FORGET PASSWORD - SEND OTP
-router.post('/forget-password', async (req, res) => {
+router.post("/forgot-password", async (req, res) => {
+  const { identifier, otp, newPassword } = req.body;
+
   try {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ msg: "Email is required" });
+    if (!identifier) return res.status(400).json({ msg: "Email or Phone is required." });
 
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ msg: "Is email ke sath koi user nahi mila." });
-
-    // 🔢 6-Digit OTP (Standardized)
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Format check
+    const isEmail = /\S+@\S+\.\S+/.test(identifier);
+    const user = await User.findOne(isEmail ? { email: identifier.toLowerCase() } : { phone: identifier });
     
-    user.resetPasswordToken = otp;
-    user.resetPasswordExpires = Date.now() + 600000; // 10 mins expiry
-    await user.save();
+    if (!user) return res.status(404).json({ msg: "User with this email/phone not found." });
 
-    const mailOptions = {
-      from: `"Property Manager" <${process.env.EMAIL_USER}>`,
-      to: user.email,
-      subject: 'Password Reset OTP',
-      html: `
-        <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee;">
-          <h2 style="color: #333399;">Password Reset Request</h2>
-          <p>Aapka 6-digit verification code niche diya gaya hai:</p>
-          <div style="background: #f4f4f9; padding: 20px; text-align: center;">
-            <h1 style="letter-spacing: 10px; color: #333;">${otp}</h1>
-          </div>
-          <p>Yeh OTP 10 minute tak valid hai.</p>
-        </div>
-      `
-    };
+    // ✅ STEP 1: OTP Generate aur Send karna
+    if (!otp && !newPassword) {
+      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      // OTP ko hash karke DB mein save karein (Security ke liye)
+      const hashedOtp = await bcrypt.hash(generatedOtp, 10);
 
-    await transporter.sendMail(mailOptions);
-    res.json({ msg: "OTP bhej diya gaya hai. Inbox check karein." });
+      user.resetPasswordToken = hashedOtp; 
+      user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins valid
+      await user.save();
 
-  } catch (err) {
-    console.error("MAIL ERROR:", err);
-    res.status(500).json({ msg: "Mail service error. Check App Password." });
+      if (isEmail) {
+        await transporter.sendMail({
+          from: `"Property Manager" <${process.env.EMAIL_USER}>`,
+          to: user.email,
+          subject: "Password Reset OTP",
+          html: `
+            <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee;">
+              <h2 style="color: #333399;">Password Reset Request</h2>
+              <p>Aapka 6-digit verification code niche diya gaya hai:</p>
+              <div style="background: #f4f4f9; padding: 20px; text-align: center;">
+                <h1 style="letter-spacing: 10px; color: #333;">${generatedOtp}</h1>
+              </div>
+              <p>Yeh code 10 minute tak valid hai.</p>
+            </div>
+          `,
+        });
+        return res.status(200).json({ msg: "OTP sent to your email." });
+      } else {
+        // SMS Logic yahan aayega
+        console.log(`SMS OTP: ${generatedOtp}`);
+        return res.status(200).json({ msg: "OTP sent to your phone." });
+      }
+    }
+
+    // ✅ STEP 2: OTP Verify aur Password Reset karna
+    if (otp && newPassword) {
+      // Expiry check
+      if (!user.resetPasswordToken || !user.resetPasswordExpires || new Date(user.resetPasswordExpires) < new Date()) {
+        return res.status(400).json({ msg: "OTP expired. Request a new one." });
+      }
+
+      // Hash OTP ko compare karein
+      const isOtpValid = await bcrypt.compare(otp, user.resetPasswordToken);
+      if (!isOtpValid) return res.status(400).json({ msg: "Invalid OTP." });
+
+      // Naya Password hash karein
+      const salt = await bcrypt.genSalt(12);
+      user.password = await bcrypt.hash(newPassword, salt);
+      
+      // Fields clear karein
+      user.resetPasswordToken = null;
+      user.resetPasswordExpires = null;
+      await user.save();
+
+      return res.status(200).json({ msg: "Password has been reset successfully. ✅", success: true });
+    }
+
+    res.status(400).json({ msg: "Invalid request." });
+  } catch (error) {
+    console.error("Forgot-password error:", error);
+    res.status(500).json({ msg: "Server error. Try again." });
   }
 });
-
-
-router.post('/reset-password-otp', async (req, res) => {
-  try {
-    const { email, otp, newPassword } = req.body;
-
-    const user = await User.findOne({
-      email: email,
-      resetPasswordToken: otp,
-      resetPasswordExpires: { $gt: Date.now() }
-    });
-
-    if (!user) return res.status(400).json({ msg: "OTP galat hai ya expire ho chuka hai." });
-
-    // Hash new password
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(newPassword, salt);
-    
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpires  = undefined;
-
-    await user.save();
-    res.json({ success: true, msg: "Password badal diya gaya hai! ✅" });
-
-  } catch (err) {
-    res.status(500).json({ msg: "Server error" });
-  }
-});
-
 
 module.exports = router;
