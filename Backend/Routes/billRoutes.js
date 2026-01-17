@@ -5,8 +5,8 @@ const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const Bill = require('../Modals/Bill');
 const mongoose = require('mongoose');
-let pdfParse = require('pdf-parse');
-const axios = require('axios');
+const pdf = require('pdf-parse');
+
 
 // Cloudinary Config
 cloudinary.config({
@@ -40,33 +40,31 @@ router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
 
     const dataBuffer = req.file.buffer;
 
-    // 🔍 DEBUG: Yeh terminal mein check karne ke liye hai
-    console.log("PDF Library Raw:", pdfParse);
-    console.log("PDF Library Type:", typeof pdfParse);
-
     let pdfData;
     try {
-      // 🟢 STEP 2: Flexible Calling Logic
-      // Agar direct function hai toh wo use karein, warna .default check karein
-      if (typeof pdfParse === 'function') {
-        pdfData = await pdfParse(dataBuffer);
-      } else if (pdfParse.default && typeof pdfParse.default === 'function') {
-        pdfData = await pdfParse.default(dataBuffer);
+      // 🟢 STEP 2: Logs ke hisab se flexible calling logic
+      if (typeof pdf === 'function') {
+        // Standard pdf-parse
+        pdfData = await pdf(dataBuffer);
+      } else if (pdf.default && typeof pdf.default === 'function') {
+        // Babel/ESM default export
+        pdfData = await pdf.default(dataBuffer);
+      } else if (typeof pdf.PDFParse === 'function') {
+        // Agar aapke logs wala object hai (PDFParse class/function)
+        pdfData = await pdf.PDFParse(dataBuffer);
       } else {
-        // Agar dono nahi hain, toh ho sakta hai library kisi aur naam se export ho rahi ho
-        // Render par kabhi-kabhi yeh issue aata hai
-        const alternativeParse = require('pdf-parse/lib/pdf-parse.js');
-        pdfData = await alternativeParse(dataBuffer);
+        // Last resort: Agar koi bhi function nahi mila
+        console.error("Library structure detected:", Object.keys(pdf));
+        return res.status(500).json({ msg: "PDF library is not a function. Check installation." });
       }
     } catch (parseErr) {
-      console.error("PDF Parsing Error detail:", parseErr);
-      return res.status(500).json({ msg: "Failed to parse PDF structure" });
+      console.error("PDF Parsing Step Error:", parseErr.message);
+      return res.status(500).json({ msg: "Error reading PDF text." });
     }
 
     const text = pdfData.text;
-
     if (!text || text.trim().length === 0) {
-      return res.status(400).json({ msg: "PDF is empty or scanned image." });
+      return res.status(400).json({ msg: "PDF contains no readable text (Might be a scan)." });
     }
 
     // 🛠️ Regex Helper
