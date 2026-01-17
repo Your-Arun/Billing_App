@@ -5,7 +5,7 @@ const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const Bill = require('../Modals/Bill');
 const mongoose = require('mongoose');
-const pdf = require('pdf-parse');
+const pdfParse = require('pdf-parse');
 
 // Cloudinary Config
 cloudinary.config({
@@ -33,14 +33,15 @@ router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ msg: "No file uploaded" });
 
-    // Seedha buffer se read karein (Cloudinary URL ki zaroorat hi nahi)
+    // req.file.buffer se data uthayein
     const dataBuffer = req.file.buffer;
     
-    const data = await pdf(dataBuffer);
+    // 🟢 pdfParse ko function ki tarah call karein
+    const data = await pdfParse(dataBuffer);
     const text = data.text;
 
     if (!text || text.trim().length === 0) {
-      return res.status(400).json({ msg: "PDF is empty or scanned image." });
+      return res.status(400).json({ msg: "PDF text is empty. Might be a scanned image." });
     }
 
     // 🛠️ Regex Helper
@@ -79,7 +80,7 @@ router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
 
   } catch (err) {
     console.error("Extraction Error:", err.message);
-    res.status(500).json({ msg: "Server Error: " + err.message });
+    res.status(500).json({ msg: "PDF Parsing failed: " + err.message });
   }
 });
 
