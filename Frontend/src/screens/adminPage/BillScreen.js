@@ -63,50 +63,44 @@ const BillScreen = () => {
     } catch (err) { console.log("Picker Error"); }
   };
 
-  // 🪄 3. AUTO EXTRACT LOGIC (Backend Fix ke sath Sync)
-  const handleAutoExtract = async () => {
-    if (!file) {
-      return Toast.show({ type: 'error', text1: 'Wait!', text2: 'Please select a PDF first' });
-    }
+ const handleAutoExtract = async () => {
+  if (!file) {
+    Toast.show({ type: 'error', text1: 'Please select a PDF first' });
+    return;
+  }
 
-    setExtracting(true);
-    try {
-      const formData = new FormData();
-      // URI handling for both platforms
-      const fileUri = Platform.OS === 'ios' ? file.uri.replace('file://', '') : file.uri;
+  setExtracting(true);
+  try {
+    const formData = new FormData();
+    const fileUri = Platform.OS === 'ios' ? file.uri.replace('file://', '') : file.uri;
 
-      formData.append('billFile', {
-        uri: fileUri,
-        name: file.name,
-        type: 'application/pdf',
+    formData.append('billFile', {
+      uri: fileUri,
+      name: file.name,
+      type: 'application/pdf',
+    });
+
+    const res = await axios.post(`${API_URL}/bill/extract`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+
+    // 🪄 यहाँ सुनिश्चित करें कि डेटा आ रहा है
+    if (res.data) {
+      setForm({
+        units: String(res.data.units || '0'),
+        energy: String(res.data.energy || '0'),
+        fixed: String(res.data.fixed || '0'),
+        taxes: String(res.data.taxes || '0')
       });
-
-      const res = await axios.post(`${API_URL}/bill/extract`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-
-      if (res.data) {
-        // Backend se aaye calculated values ko set karein
-        setForm({
-          units: String(res.data.units || ''),
-          energy: String(res.data.energy || ''),
-          fixed: String(res.data.fixed || ''),
-          taxes: String(res.data.taxes || '')
-        });
-        Toast.show({ type: 'success', text1: 'Magic! ✨', text2: 'Form filled from PDF data' });
-      }
-    } catch (error) {
-      
-      const errorMsg = error.response?.data?.msg || "Format not recognized";
-  Toast.show({ 
-    type: 'error', 
-    text1: 'Extraction Failed', 
-    text2: errorMsg // Ab aapko asli wajah dikhegi
-  });
-    } finally {
-      setExtracting(false);
+      Toast.show({ type: 'success', text1: 'Magic! ✨', text2: 'Data auto-filled' });
     }
-  };
+  } catch (error) {
+    console.log("Error:", error.response?.data);
+    Toast.show({ type: 'error', text1: 'Extraction Failed', text2: 'Try manual entry' });
+  } finally {
+    setExtracting(false);
+  }
+};
 
   // 4. Save Final Record
   const handleSaveBill = async () => {

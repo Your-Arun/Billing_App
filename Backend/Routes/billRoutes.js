@@ -5,7 +5,7 @@ const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const Bill = require('../Modals/Bill');
 const mongoose = require('mongoose');
-const pdf = require('pdf-parse');
+const pdfParse = require('pdf-parse');
 
 
 // Cloudinary Config
@@ -27,10 +27,7 @@ const storage = new CloudinaryStorage({
 // const upload = multer({ storage: storage , limits: { fileSize: 10 * 1024 * 1024 } }); 
 
 const storageMemory = multer.memoryStorage();
-const uploadMemory = multer({ 
-  storage: storageMemory,
-  limits: { fileSize: 5 * 1024 * 1024 } 
-});
+const uploadMemory = multer({ storage: storageMemory });
 
 
 // 🪄 EXTRACTION ROUTE FIX
@@ -39,54 +36,40 @@ router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
     if (!req.file) return res.status(400).json({ msg: "No file uploaded" });
 
     const dataBuffer = req.file.buffer;
+    const data = await pdfParse(dataBuffer);
+    const text = data.text;
 
-    let pdfData;
-    try {
-      // 🟢 STEP 2: Logs ke hisab se flexible calling logic
-      if (typeof pdf === 'function') {
-        // Standard pdf-parse
-        pdfData = await pdf(dataBuffer);
-      } else if (pdf.default && typeof pdf.default === 'function') {
-        // Babel/ESM default export
-        pdfData = await pdf.default(dataBuffer);
-      } else if (typeof pdf.PDFParse === 'function') {
-        // Agar aapke logs wala object hai (PDFParse class/function)
-        pdfData = await pdf.PDFParse(dataBuffer);
-      } else {
-        // Last resort: Agar koi bhi function nahi mila
-        console.error("Library structure detected:", Object.keys(pdf));
-        return res.status(500).json({ msg: "PDF library is not a function. Check installation." });
-      }
-    } catch (parseErr) {
-      console.error("PDF Parsing Step Error:", parseErr.message);
-      return res.status(500).json({ msg: "Error reading PDF text." });
-    }
+    // --- DEBUGGING के लिए टर्मिनल में टेक्स्ट देखें ---
+    // console.log(text); 
 
-    const text = pdfData.text;
-    if (!text || text.trim().length === 0) {
-      return res.status(400).json({ msg: "PDF contains no readable text (Might be a scan)." });
-    }
-
-    // 🛠️ Regex Helper
+    // 🛠️ Super Flexible Regex Helper
     const getVal = (regex) => {
       const match = text.match(regex);
       if (match && match[1]) {
-        return match[1].replace(/,/g, '').trim();
+        return match[1].replace(/,/g, '').trim(); // कोमा हटाकर वैल्यू दें
       }
       return "0.00";
     };
 
-    // AVVNL Bill Specific Patterns
+    // 🔍 AVVNL Bill के लिए सटीक पैटर्न्स (Flexible version)
     const extracted = {
+      // Net Billed Units: अक्सर "Units" और नंबर के बीच एक्स्ट्रा टेक्स्ट होता है
       units: getVal(/Net Billed Units\s+([\d,.]+)/i),
-      energy: getVal(/1\s+Energy Charges\s+([\d,.]+)/i),
-      fixed: getVal(/2\s+Fixed Charges\s+([\d,.]+)/i),
-      duty: getVal(/12\s+Electricity Duty\s+([\d,.]+)/i),
-      wcc: getVal(/13\s+Water Conservation Cess.*?([\d,.]+)/i),
-      uc: getVal(/14\s+Urban Cess.*?([\d,.]+)/i),
-      tcs: getVal(/16\s+Tax collected at source.*?([\d,.]+)/i)
+      
+      // Energy Charges (Point 1): "1 Energy Charges" के बाद वाली संख्या
+      energy: getVal(/1\s+Energy\s+Charges\s+([\d,.]+)/i),
+      
+      // Fixed Charges (Point 2): "2 Fixed Charges" के बाद वाली संख्या
+      fixed: getVal(/2\s+Fixed\s+Charges\s+([\d,.]+)/i),
+      
+      // Taxes (12, 13, 14, 16) - इन सबको अलग-अलग निकालकर जोड़ेंगे
+      duty: getVal(/12\s+Electricity\s+Duty\s+([\d,.]+)/i),
+      wcc: getVal(/13\s+Water\s+Conservation\s+Cess.*?([\d,.]+)/i),
+      uc: getVal(/14\s+Urban\s+Cess.*?([\d,.]+)/i),
+      tcs: getVal(/16\s+Tax\s+collected\s+at\s+source.*?([\d,.]+)/i)
     };
 
+    // 🧮 सब टैक्स को जोड़कर एक वैल्यू बनाएं
     const totalTaxes = (
       parseFloat(extracted.duty || 0) +
       parseFloat(extracted.wcc || 0) +
@@ -94,42 +77,46 @@ router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
       parseFloat(extracted.tcs || 0)
     ).toFixed(2);
 
+    // अगर Energy या Fixed "0.00" आ रहा है, तो एक और बैकअप पैटर्न ट्राई करें
+    let finalEnergy = extracted.energy !== "0.00" ? extracted.energy : getVal(/Energy\s+Charges\s+([\d,.]+)/i);
+    let finalFixed = extracted.fixed !== "0.00" ? extracted.fixed : getVal(/Fixed\s+Charges\s+([\d,.]+)/i);
+
     res.json({
       units: extracted.units,
-      energy: extracted.energy,
-      fixed: extracted.fixed,
+      energy: finalEnergy,
+      fixed: finalFixed,
       taxes: totalTaxes
     });
 
   } catch (err) {
-    console.error("Global Extraction Error:", err.message);
-    res.status(500).json({ msg: "Server Error: " + err.message });
+    console.error("Extraction Error:", err.message);
+    res.status(500).json({ msg: "Extraction failed: " + err.message });
   }
 });
 
 // BAAKI ROUTES (Add/Delete/History)
-// router.post('/add', upload.single('billFile'), async (req, res) => {
-//     try {
-//       const { adminId, month, totalUnits, energyCharges, fixedCharges, taxes } = req.body;
-//       const total = Number(energyCharges) + Number(fixedCharges) + Number(taxes);
+router.post('/add', upload.single('billFile'), async (req, res) => {
+    try {
+      const { adminId, month, totalUnits, energyCharges, fixedCharges, taxes } = req.body;
+      const total = Number(energyCharges) + Number(fixedCharges) + Number(taxes);
   
-//       const newBill = new Bill({
-//         adminId: new mongoose.Types.ObjectId(adminId),
-//         month,
-//         totalUnits: Number(totalUnits),
-//         energyCharges: Number(energyCharges),
-//         fixedCharges: Number(fixedCharges),
-//         taxes: Number(taxes),
-//         totalAmount: total.toFixed(2),
-//         billUrl: req.file ? req.file.path : "" 
-//       });
+      const newBill = new Bill({
+        adminId: new mongoose.Types.ObjectId(adminId),
+        month,
+        totalUnits: Number(totalUnits),
+        energyCharges: Number(energyCharges),
+        fixedCharges: Number(fixedCharges),
+        taxes: Number(taxes),
+        totalAmount: total.toFixed(2),
+        billUrl: req.file ? req.file.path : "" 
+      });
   
-//       await newBill.save();
-//       res.status(201).json(newBill);
-//     } catch (err) {
-//       res.status(400).json({ msg: err.message });
-//     }
-// });
+      await newBill.save();
+      res.status(201).json(newBill);
+    } catch (err) {
+      res.status(400).json({ msg: err.message });
+    }
+});
 
 router.get('/history/:adminId', async (req, res) => {
     try {
