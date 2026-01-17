@@ -96,12 +96,13 @@ const BillScreen = () => {
         Toast.show({ type: 'success', text1: 'Magic! ✨', text2: 'Form filled from PDF data' });
       }
     } catch (error) {
-      console.log("Extraction Error:", error.response?.data || error.message);
-      Toast.show({ 
-        type: 'error', 
-        text1: 'Failed', 
-        text2: 'Could not read PDF. Make sure it is an AVVNL bill.' 
-      });
+      
+      const errorMsg = error.response?.data?.msg || "Format not recognized";
+  Toast.show({ 
+    type: 'error', 
+    text1: 'Extraction Failed', 
+    text2: errorMsg // Ab aapko asli wajah dikhegi
+  });
     } finally {
       setExtracting(false);
     }
