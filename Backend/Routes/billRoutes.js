@@ -6,7 +6,6 @@ const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const Bill = require('../Modals/Bill');
 const mongoose = require('mongoose');
 const pdf = require('pdf-parse');
-const axios = require('axios');
 
 // Cloudinary Config
 cloudinary.config({
@@ -26,35 +25,25 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ storage: storage , limits: { fileSize: 10 * 1024 * 1024 } }); 
 
+const storageMemory = multer.memoryStorage();
+const uploadMemory = multer({ storage: storageMemory });
+
 // 🪄 EXTRACTION ROUTE FIX
-router.post('/extract', upload.single('billFile'), async (req, res) => {
+router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ msg: "No file uploaded" });
 
-    console.log("File uploaded to:", req.file.path);
-
-    // 1. Cloudinary URL se file download karein
-    const response = await axios.get(req.file.path, { 
-      responseType: 'arraybuffer',
-      timeout: 10000 // 10 second timeout
-    });
+    // Seedha buffer se read karein (Cloudinary URL ki zaroorat hi nahi)
+    const dataBuffer = req.file.buffer;
     
-    const dataBuffer = Buffer.from(response.data);
-    
-    // 2. PDF Parse karein
     const data = await pdf(dataBuffer);
     const text = data.text;
 
-    // --- DEBUGGING: Terminal mein check karein text aa raha hai ya nahi ---
     if (!text || text.trim().length === 0) {
-      console.log("OCR ERROR: PDF text is empty. Might be a scanned image.");
-      return res.status(400).json({ msg: "This PDF looks like a scanned image. Cannot extract data." });
+      return res.status(400).json({ msg: "PDF is empty or scanned image." });
     }
-    // console.log("--- EXTRACTED TEXT START ---");
-    // console.log(text); // Is line ko uncomment karke pura text dekh sakte hain
-    // console.log("--- EXTRACTED TEXT END ---");
 
-    // 🛠️ Robust Regex Helper
+    // 🛠️ Regex Helper
     const getVal = (regex) => {
       const match = text.match(regex);
       if (match && match[1]) {
@@ -63,25 +52,17 @@ router.post('/extract', upload.single('billFile'), async (req, res) => {
       return "0.00";
     };
 
-    // 🛠️ AVVNL patterns ko aur flexible banaya hai
+    // AVVNL Bill Patterns
     const extracted = {
-      // Net Billed Units (Top right ke paas)
       units: getVal(/Net Billed Units\s+([\d,.]+)/i),
-      
-      // Point 1: Energy Charges
       energy: getVal(/1\s+Energy Charges\s+([\d,.]+)/i),
-      
-      // Point 2: Fixed Charges
       fixed: getVal(/2\s+Fixed Charges\s+([\d,.]+)/i),
-      
-      // Taxes calculation (Duty + WCC + Urban Cess + TCS)
       duty: getVal(/12\s+Electricity Duty\s+([\d,.]+)/i),
       wcc: getVal(/13\s+Water Conservation Cess.*?([\d,.]+)/i),
       uc: getVal(/14\s+Urban Cess.*?([\d,.]+)/i),
       tcs: getVal(/16\s+Tax collected at source.*?([\d,.]+)/i)
     };
 
-    // Final Taxes calculation
     const totalTaxes = (
       parseFloat(extracted.duty || 0) +
       parseFloat(extracted.wcc || 0) +
@@ -93,13 +74,12 @@ router.post('/extract', upload.single('billFile'), async (req, res) => {
       units: extracted.units,
       energy: extracted.energy,
       fixed: extracted.fixed,
-      taxes: totalTaxes,
-      msg: "Data extracted successfully"
+      taxes: totalTaxes
     });
 
   } catch (err) {
-    console.error("CRITICAL ERROR:", err.message);
-    res.status(500).json({ msg: "Server failed to read PDF: " + err.message });
+    console.error("Extraction Error:", err.message);
+    res.status(500).json({ msg: "Server Error: " + err.message });
   }
 });
 
