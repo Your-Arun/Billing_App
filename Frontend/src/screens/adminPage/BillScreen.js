@@ -61,6 +61,44 @@ const BillScreen = () => {
     } catch (err) { console.log("Picker Error"); }
   };
 
+  // 🪄 AUTO EXTRACT LOGIC (Backend Fix के साथ)
+  const handleAutoExtract = async () => {
+    if (!file) {
+      Toast.show({ type: 'error', text1: 'Please select a PDF first' });
+      return;
+    }
+
+    setExtracting(true);
+    try {
+      const formData = new FormData();
+      formData.append('billFile', {
+        uri: Platform.OS === 'android' ? file.uri : file.uri.replace('file://', ''),
+        name: file.name,
+        type: 'application/pdf',
+      });
+
+      const res = await axios.post(`${API_URL}/bill/extract`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (res.data) {
+        // बैकएंड से आए 1-18 डेटा को फॉर्म में भरना
+        setForm({
+          units: String(res.data.units),
+          energy: String(res.data.energy),
+          fixed: String(res.data.fixed),
+          taxes: String(res.data.taxes)
+        });
+        Toast.show({ type: 'success', text1: 'Success! ✨', text2: 'Bill data extracted successfully' });
+      }
+    } catch (error) {
+      console.log("Extraction Error:", error);
+      Toast.show({ type: 'error', text1: 'Extraction Failed', text2: 'Format not recognized' });
+    } finally {
+      setExtracting(false);
+    }
+  };
+
   const handleSaveBill = async () => {
     if (!form.units || !form.energy || !file) {
       Toast.show({ type: 'error', text1: 'Missing Fields', text2: 'PDF and basic info required' });
@@ -92,102 +130,34 @@ const BillScreen = () => {
       setFile(null);
       fetchHistory();
     } catch (e) {
-      Toast.show({ type: 'error', text1: 'Error', text2: 'Check file size or server' });
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Server save failed' });
     } finally { setSaving(false); }
   };
 
-  // 🗑️ DELETE FUNCTION
   const handleDelete = (id) => {
-  Alert.alert(
-    "Delete Record",
-    "Are you sure?",
-    [
+    Alert.alert("Delete Record", "Are you sure?", [
       { text: "Cancel", style: "cancel" },
-      { 
-        text: "Delete", 
-        style: "destructive", 
-        onPress: async () => {
+      { text: "Delete", style: "destructive", onPress: async () => {
           try {
             const response = await axios.delete(`${API_URL}/bill/delete/${id}`);
-            
             if (response.data.success) {
-               Toast.show({ type: 'success', text1: 'Bill Deleted 🗑️' });
-               fetchHistory(); // List refresh karein
+               Toast.show({ type: 'success', text1: 'Deleted 🗑️' });
+               fetchHistory();
             }
-          } catch (err) {
-            console.log("Frontend Delete Error:", err.response?.data || err.message);
-            Alert.alert("Error", "Delete request failed. Check console.");
-          }
+          } catch (err) { Toast.show({ type: 'error', text1: 'Delete failed' }); }
         } 
       }
-    ]
-  );
-};
-
-const handleAutoExtract = async () => {
-  if (!file) {
-    Toast.show({ type: 'error', text1: 'Please select a PDF first' });
-    return;
-  }
-
-  setExtracting(true);
-  try {
-    const formData = new FormData();
-    formData.append('billFile', {
-      uri: Platform.OS === 'android' ? file.uri : file.uri.replace('file://', ''),
-      name: file.name,
-      type: 'application/pdf',
-    });
-
-    const res = await axios.post(`${API_URL}/bill/extract`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
-
-    if (res.data) {
-      setForm({
-        units: res.data.units,
-        energy: res.data.energy,
-        fixed: res.data.fixed,
-        taxes: res.data.taxes
-      });
-      Toast.show({ type: 'success', text1: 'Magic! Data Extracted ✨' });
-    }
-  } catch (error) {
-    console.log(error);
-    Toast.show({ type: 'error', text1: 'Extraction Failed', text2: 'Format might be different' });
-  } finally {
-    setExtracting(false);
-  }
-};
-
-
-
-  const handleDownload = async (url, month) => {
-    if (!url) return;
-    try {
-      Toast.show({ type: 'info', text1: 'Downloading...' });
-      const fileName = `Bill_${month.replace(/\s+/g, '_')}.pdf`;
-      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
-      const downloadRes = await FileSystem.downloadAsync(url, fileUri);
-      
-      await Sharing.shareAsync(downloadRes.uri, {
-        mimeType: 'application/pdf',
-        dialogTitle: `Official Bill - ${month}`,
-      });
-    } catch (e) {
-      Alert.alert("Error", "Could not download PDF.");
-    }
+    ]);
   };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      {/* HEADER SECTION */}
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Grid Billing</Text>
-          <Text style={styles.headerSub}>Manage your source records</Text>
+          <Text style={styles.headerSub}>Electricity Bill Management</Text>
         </View>
         <TouchableOpacity style={styles.headerIcon} onPress={onRefresh}>
            <MaterialCommunityIcons name="refresh" size={24} color="#FFF" />
@@ -205,37 +175,37 @@ const handleAutoExtract = async () => {
               onPress={pickDocument}
             >
               <MaterialCommunityIcons 
-                name={file ? "file-check" : "cloud-upload-outline"} 
+                name={file ? "file-check" : "file-pdf-box"} 
                 size={40} 
                 color={file ? "#00C853" : "#333399"} 
               />
               <Text style={[styles.uploadText, file && {color: '#00C853'}]}>
-                {file ? file.name : "Upload Official PDF"}
+                {file ? file.name : "Select Bill PDF"}
               </Text>
             </TouchableOpacity>
 
-<TouchableOpacity 
-      style={[styles.extractBtn, !file && {backgroundColor: '#CCC'}]} 
-      onPress={handleAutoExtract}
-      disabled={!file || extracting}
-    >
-      {extracting ? (
-        <ActivityIndicator color="#FFF" />
-      ) : (
-        <>
-          <MaterialCommunityIcons name="auto-fix" size={20} color="white" />
-          <Text style={styles.extractText}>AUTO-FILL FROM PDF</Text>
-        </>
-      )}
-    </TouchableOpacity>
-
+            {/* ✨ Magic Extract Button */}
+            <TouchableOpacity 
+              style={[styles.extractBtn, !file && {backgroundColor: '#E0E0E0'}]} 
+              onPress={handleAutoExtract}
+              disabled={!file || extracting}
+            >
+              {extracting ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <>
+                  <MaterialCommunityIcons name="auto-fix" size={20} color="white" />
+                  <Text style={styles.extractText}>AUTO-FILL FROM PDF</Text>
+                </>
+              )}
+            </TouchableOpacity>
 
             <View style={styles.inputGroup}>
                 <View style={styles.fullInput}>
-                   <Text style={styles.inputLabel}>Total Units Consumed</Text>
+                   <Text style={styles.inputLabel}>Total Billed Units (Top Section)</Text>
                    <TextInput 
                      style={styles.input} 
-                     placeholder="e.g. 1500" 
+                     placeholder="Units" 
                      keyboardType="numeric" 
                      value={form.units} 
                      onChangeText={(t)=>setForm({...form, units:t})} 
@@ -243,10 +213,10 @@ const handleAutoExtract = async () => {
                 </View>
                 
                 <View style={styles.fullInput}>
-                   <Text style={styles.inputLabel}>Energy Charges (₹)</Text>
+                   <Text style={styles.inputLabel}>Energy Charges (Point 1)</Text>
                    <TextInput 
                      style={styles.input} 
-                     placeholder="0.00" 
+                     placeholder="₹ 0.00" 
                      keyboardType="numeric" 
                      value={form.energy} 
                      onChangeText={(t)=>setForm({...form, energy:t})} 
@@ -255,11 +225,11 @@ const handleAutoExtract = async () => {
 
                 <View style={styles.row}>
                   <View style={styles.halfInput}>
-                     <Text style={styles.inputLabel}>Fixed (₹)</Text>
+                     <Text style={styles.inputLabel}>Fixed (Point 2)</Text>
                      <TextInput style={styles.input} keyboardType="numeric" value={form.fixed} onChangeText={(t)=>setForm({...form, fixed:t})} />
                   </View>
                   <View style={styles.halfInput}>
-                     <Text style={styles.inputLabel}>Taxes (₹)</Text>
+                     <Text style={styles.inputLabel}>Taxes (12,13,14,16)</Text>
                      <TextInput style={styles.input} keyboardType="numeric" value={form.taxes} onChangeText={(t)=>setForm({...form, taxes:t})} />
                   </View>
                 </View>
@@ -286,11 +256,7 @@ const handleAutoExtract = async () => {
                   <Text style={styles.historyAmt}>₹{item.totalAmount}</Text>
                </View>
             </View>
-            
             <View style={styles.actionCol}>
-               {/* <TouchableOpacity style={styles.actionBtnDownload} onPress={() => handleDownload(item.billUrl, item.month)}>
-                  <MaterialCommunityIcons name="download-outline" size={20} color="#00C853" />
-               </TouchableOpacity> */}
                <TouchableOpacity style={styles.actionBtnDelete} onPress={() => handleDelete(item._id)}>
                   <MaterialCommunityIcons name="trash-can-outline" size={20} color="#FF5252" />
                </TouchableOpacity>
@@ -298,35 +264,43 @@ const handleAutoExtract = async () => {
           </View>
         )}
         contentContainerStyle={{ paddingBottom: 50 }}
-        ListEmptyComponent={<Text style={styles.emptyText}>No billing records yet.</Text>}
       />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F0F3F8',  },
-  header: { backgroundColor: '#333399', paddingHorizontal: 20, paddingVertical: 30, borderBottomLeftRadius: 30, borderBottomRightRadius: 30, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  container: { flex: 1, backgroundColor: '#F0F3F8' },
+  header: { backgroundColor: '#333399', paddingHorizontal: 20, paddingTop: 30, paddingBottom: 30, borderBottomLeftRadius: 30, borderBottomRightRadius: 30, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerTitle: { color: 'white', fontSize: 22, fontWeight: 'bold' },
   headerSub: { color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 2 },
   headerIcon: { backgroundColor: 'rgba(255,255,255,0.1)', padding: 10, borderRadius: 12 },
-  
-  formCard: { backgroundColor: 'white', margin: 20, borderRadius: 24, padding: 20, elevation: 4, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10 },
-  cardLabel: { fontSize: 12, fontWeight: 'bold', color: '#BBB', marginBottom: 15, letterSpacing: 1 },
-  uploadBox: { backgroundColor: '#F8F9FF', borderStyle: 'dashed', borderWidth: 2, borderColor: '#333399', borderRadius: 15, padding: 20, alignItems: 'center', marginBottom: 20 },
+  formCard: { backgroundColor: 'white', margin: 20, borderRadius: 24, padding: 20, elevation: 4 },
+  cardLabel: { fontSize: 11, fontWeight: 'bold', color: '#BBB', marginBottom: 15, letterSpacing: 1 },
+  uploadBox: { backgroundColor: '#F8F9FF', borderStyle: 'dashed', borderWidth: 2, borderColor: '#333399', borderRadius: 15, padding: 20, alignItems: 'center', marginBottom: 15 },
   uploadBoxActive: { borderColor: '#00C853', backgroundColor: '#F1FFF1' },
-  uploadText: { color: '#333399', marginTop: 8, fontSize: 13, fontWeight: 'bold', textAlign: 'center' },
+  uploadText: { color: '#333399', marginTop: 8, fontSize: 13, fontWeight: 'bold' },
   
+  extractBtn: {
+    backgroundColor: '#FF9800',
+    padding: 14,
+    borderRadius: 15,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    elevation: 3
+  },
+  extractText: { color: 'white', fontWeight: 'bold', marginLeft: 8, fontSize: 14 },
+
   inputLabel: { fontSize: 11, fontWeight: 'bold', color: '#777', marginBottom: 5, marginLeft: 2 },
   input: { backgroundColor: '#F5F7FB', padding: 12, borderRadius: 12, marginBottom: 15, fontSize: 15, color: '#333', fontWeight: 'bold', borderWidth: 1, borderColor: '#E0E5F0' },
   row: { flexDirection: 'row', justifyContent: 'space-between' },
   fullInput: { width: '100%' },
   halfInput: { width: '48%' },
-  
-  submitBtn: { backgroundColor: '#333399', paddingVertical: 18, borderRadius: 15, marginTop: 10, elevation: 2 },
+  submitBtn: { backgroundColor: '#333399', paddingVertical: 18, borderRadius: 15, marginTop: 10 },
   btnContent: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   submitText: { color: 'white', fontWeight: 'bold', fontSize: 15, marginRight: 8 },
-
   historyCard: { backgroundColor: 'white', marginHorizontal: 20, marginBottom: 12, borderRadius: 18, padding: 16, flexDirection: 'row', alignItems: 'center', elevation: 2 },
   infoCol: { flex: 1 },
   historyMonth: { fontSize: 16, fontWeight: 'bold', color: '#1A1C3D' },
@@ -334,27 +308,8 @@ const styles = StyleSheet.create({
   tag: { backgroundColor: '#F0F3FF', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginRight: 10 },
   tagText: { color: '#333399', fontSize: 11, fontWeight: 'bold' },
   historyAmt: { fontSize: 14, fontWeight: 'bold', color: '#666' },
-  
-  actionCol: { flexDirection: 'row', gap: 10 },
-  actionBtnDownload: { backgroundColor: '#E8F5E9', padding: 10, borderRadius: 12 },
+  actionCol: { flexDirection: 'row' },
   actionBtnDelete: { backgroundColor: '#FFEBEE', padding: 10, borderRadius: 12 },
-  emptyText: { textAlign: 'center', marginTop: 40, color: '#AAA', fontWeight: 'bold' },
-  extractBtn: {
-    backgroundColor: '#FF9800', // Orange color for extraction
-    padding: 12,
-    borderRadius: 12,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-    elevation: 2
-},
-extractText: {
-    color: 'white',
-    fontWeight: 'bold',
-    marginLeft: 8,
-    fontSize: 13
-}
 });
 
 export default BillScreen;
