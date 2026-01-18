@@ -26,89 +26,71 @@ const upload = multer({ storage: storage });
 const storageMemory = multer.memoryStorage();
 const uploadMemory = multer({ storage: storageMemory });
 
-// --- 🛠️ REGEX HELPER FUNCTION ---
-const extractValue = (text, regex) => {
-  const match = text.match(regex);
-  if (match && match[1]) {
-    return match[1].replace(/,/g, '').trim();
-  }
-  return "0.00";
-};
 
-// 🪄 EXTRACTION ROUTE
 router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ msg: "No file uploaded" });
 
     const dataBuffer = req.file.buffer;
     const data = await pdfParse(dataBuffer);
-    const text = data.text;
+    
+    // 1. पूरे टेक्स्ट को एक लाइन में कर दें और कोमा (,) हटा दें
+    let text = data.text.replace(/,/g, ''); 
 
-    // कोमा हटाने और क्लीन नंबर देने के लिए फंक्शन
-    const cleanNum = (val) => {
-      if (!val) return "0.00";
-      // कोमा हटाएं और अगर माइनस है तो उसे संभालें
-      let cleaned = val.replace(/,/g, '').trim();
-      return isNaN(parseFloat(cleaned)) ? "0.00" : cleaned;
-    };
-
-    // 🛠️ AVVNL स्पेसिफिक स्ट्रॉन्ग Regex हेल्पर
-    // यह पॉइंट नंबर और उसके लेबल के बाद आने वाली पहली संख्या को पकड़ेगा
-    const getVal = (pointNum, labelKeywords) => {
-      // पैटर्न: "पॉइंट नंबर" फिर "कीवर्ड्स" फिर "कुछ भी" फिर "संख्या"
-      // उदाहरण: 1\s+Energy\s+Charges[\s\S]*?([\d,.]+)
-      const regex = new RegExp(`${pointNum}\\s+${labelKeywords}[\\s\\S]*?([\\d,.]+)`, 'i');
+    // 🛠️ नया "Smart Search" फंक्शन
+    const findValue = (keyword) => {
+      // यह लॉजिक कीवर्ड ढूंढेगा और उसके बाद आने वाली पहली संख्या (जैसे 123.45) को उठाएगा
+      const regex = new RegExp(`${keyword}[\\s\\S]{1,60}?([\\d.]+)`, 'i');
       const match = text.match(regex);
-      return match ? cleanNum(match[1]) : "0.00";
+      if (match && match[1]) {
+        // चेक करें कि निकाली गई वैल्यू सिर्फ एक बिंदी तो नहीं (जैसे "." या "0.")
+        return parseFloat(match[1]) > 0 ? match[1] : "0.00";
+      }
+      return "0.00";
     };
 
-    // 🔍 सभी 1 से 18 पॉइंट्स का डेटा (AVVNL फॉर्मेट के हिसाब से)
-    const points = {
-      p1_energy: getVal(1, "Energy\\s+Charges"),
-      p2_fixed: getVal(2, "Fixed\\s+Charges"),
-      p3_fuel: getVal(3, "Fuel\\s+Surcharge"),
-      p4_demand: getVal(4, "Demand\\s+surcharge"),
-      p5_pf: getVal(5, "Power\\s+factor"),
-      p6_unauth: getVal(6, "Unathourized\\s+Use"),
-      p7_ctpt: getVal(7, "CT/PT\\s+Rent"),
-      p8_trans: getVal(8, "Transformer\\s+Rent"),
-      p9_others: getVal(9, "Others\\s+if\\s+any"),
-      p10_rebate: getVal(10, "Voltage\\s+Rebate"),
-      p11_nigam_dues: getVal(11, "Total\\s+Nigam\\s+Dues"),
-      p12_duty: getVal(12, "Electricity\\s+Duty"),
-      p13_wcc: getVal(13, "Water\\s+Conservation"),
-      p14_uc: getVal(14, "Urban\\s+Cess"),
-      p15_debit: getVal(15, "Other\\s+Debit"),
-      p16_tcs: getVal(16, "Tax\\s+collected"),
-      p17_adjust: getVal(17, "Amount\\s+Adjusted"),
-      p18_total: getVal(18, "Total\\s+Amount"),
+    // 🔍 कीवर्ड्स के आधार पर डेटा निकालें (AVVNL स्पेसिफिक)
+    const extracted = {
+      // Net Billed Units (बिल के टॉप में होता है)
+      units: findValue("Net Billed Units"),
       
-      // Top section unique match
-      net_units: text.match(/Net\s+Billed\s+Units\s+([\d,.]+)/i)?.[1].replace(/,/g, '') || "0.00"
+      // Point 1: Energy Charges
+      energy: findValue("Energy Charges"),
+      
+      // Point 2: Fixed Charges
+      fixed: findValue("Fixed Charges"),
+      
+      // Taxes (अलग-अलग पॉइंट्स)
+      duty: findValue("Electricity Duty"),
+      wcc: findValue("Water Conservation Cess"),
+      uc: findValue("Urban Cess"),
+      tcs: findValue("Tax collected at source"),
+      
+      // Point 18: Total Amount
+      total_18: findValue("Total Amount")
     };
 
-    // 🧮 Taxes (12+13+14+16) का जोड़
-    const taxesTotal = (
-      parseFloat(points.p12_duty) +
-      parseFloat(points.p13_wcc) +
-      parseFloat(points.p14_uc) +
-      parseFloat(points.p16_tcs)
+    // 🧮 Taxes का जोड़ (Duty + WCC + UC + TCS)
+    const totalTaxes = (
+      parseFloat(extracted.duty) +
+      parseFloat(extracted.wcc) +
+      parseFloat(extracted.uc) +
+      parseFloat(extracted.tcs)
     ).toFixed(2);
 
-    // रिपॉन्स भेजें जो फ्रंटएंड के फॉर्म से मैच करे
+    // रिस्पॉन्स भेजें
     res.json({
-      units: points.net_units,
-      energy: points.p1_energy,
-      fixed: points.p2_fixed,
-      taxes: taxesTotal,
-      total_amount_18: points.p18_total,
-      full_breakdown: points // टेस्टिंग के लिए पूरा डेटा भी भेज रहे हैं
+      units: extracted.units !== "0.00" ? extracted.units : "0.00",
+      energy: extracted.energy !== "0.00" ? extracted.energy : "0.00",
+      fixed: extracted.fixed !== "0.00" ? extracted.fixed : "0.00",
+      taxes: totalTaxes,
+      total_amount_18: extracted.total_18
     });
-    console.log(points)
 
+    console.log(extracted)
   } catch (err) {
     console.error("Extraction Error:", err.message);
-    res.status(500).json({ msg: "Extraction failed: " + err.message });
+    res.status(500).json({ msg: "Extraction failed. Server Error." });
   }
 });
 
