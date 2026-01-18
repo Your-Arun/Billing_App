@@ -138,7 +138,7 @@ const ReadingsReviewScreen = ({ navigation }) => {
                             </View>
                             <View style={{ flex: 1.2, alignItems: 'center' }}>
                                 
-                                <Text style={styles.tLabel}>SPIKE</Text>
+                                <Text style={styles.tLabel}>USED</Text>
                                 <Text style={styles.spike}>{t.spike}</Text>
                             </View>
                             <TouchableOpacity onPress={() => { 
