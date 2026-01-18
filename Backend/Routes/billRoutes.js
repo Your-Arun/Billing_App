@@ -40,68 +40,73 @@ router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ msg: "No file uploaded" });
 
-    let text = "";
     const dataBuffer = req.file.buffer;
+    const data = await pdfParse(dataBuffer);
+    const text = data.text;
 
-    // 1️⃣ पहले PDF-Parse से टेक्स्ट निकालने की कोशिश करें (Digital PDF के लिए)
-    const pdfData = await pdfParse(dataBuffer);
-    text = pdfData.text;
-
-    // 2️⃣ अगर टेक्स्ट बहुत कम है या खाली है, तो मान लें कि यह Scanned PDF है
-    if (!text || text.trim().length < 50) {
-      console.log("Digital Text failed, attempting OCR...");
-      // नोट: OCR के लिए PDF को इमेज में बदलना पड़ता है, जो सर्वर पर भारी हो सकता है।
-      // अभी के लिए हम Error देंगे, पर आप Tesseract यहाँ कन्फ़िगर कर सकते हैं।
-      return res.status(400).json({ msg: "PDF is a scanned image. Please upload a digital PDF copy." });
-    }
-
-    // 🔍 1 से 18 तक के सटीक पैटर्न्स (Based on AVVNL Format)
-    const points = {
-      p1_energy_charges: extractValue(text, /1\s+Energy\s+Charges\s+([\d,.]+)/i),
-      p2_fixed_charges: extractValue(text, /2\s+Fixed\s+Charges\s+([\d,.]+)/i),
-      p3_fuel_surcharge: extractValue(text, /3\s+Fuel\s+Surcharge.*?\s+([\d,.]+)/i),
-      p4_demand_surcharge: extractValue(text, /4\s+Demand\s+surcharge\s+([\d,.]+)/i),
-      p5_pf_incentive: extractValue(text, /5\s+Power\s+factor\s+surcharge\/Incentive.*?\s+([-\d,.]+)/i),
-      p6_unauth_charges: extractValue(text, /6\s+Unathourized\s+Use\s+Charges.*?\s+([\d,.]+)/i),
-      p7_ct_pt_rent: extractValue(text, /7\s+CT\/PT\s+Rent\s+([\d,.]+)/i),
-      p8_trans_rent: extractValue(text, /8\s+Transformer\s+Rent\s+([\d,.]+)/i),
-      p9_others_tod: extractValue(text, /9\s+\(I\).*?\(II\)\s+TOD\s+Surcharge\s+([\d,.]+)/i),
-      p10_voltage_rebate: extractValue(text, /10\s+\(I\).*?\s+([-\d,.]+)/i),
-      p11_total_nigam_dues: extractValue(text, /11\s+Total\s+Nigam\s+Dues.*?([\d,.]+)/i),
-      p12_electricity_duty: extractValue(text, /12\s+Electricity\s+Duty\s+([\d,.]+)/i),
-      p13_wcc: extractValue(text, /13\s+Water\s+Conservation\s+Cess.*?([\d,.]+)/i),
-      p14_urban_cess: extractValue(text, /14\s+Urban\s+Cess.*?([\d,.]+)/i),
-      p15_other_debit: extractValue(text, /15\s+Other\s+Debit\/Credit\s+([\d,.]+)/i),
-      p16_tcs_tds: extractValue(text, /16\s+Tax\s+collected\s+at\s+source.*?([\d,.]+)/i),
-      p17_adjustment: extractValue(text, /17\s+Amount\s+Adjusted.*?([\d,.]+)/i),
-      p18_total_amount: extractValue(text, /18\s+Total\s+Amount\s+\(S\.No\s+11\s+to\s+17\)\s+([\d,.]+)/i),
-      
-      // Extra Info
-      billed_units: extractValue(text, /Net\s+Billed\s+Units\s+([\d,.]+)/i),
+    // 🛠️ HELPER: कोमा हटाकर नंबर निकालने के लिए
+    const cleanNum = (val) => {
+      if (!val) return "0.00";
+      return val.replace(/,/g, '').trim();
     };
 
-    // 🧮 Frontend के लिए Taxes का जोड़ (12 + 13 + 14 + 16)
-    const calculatedTaxes = (
-      parseFloat(points.p12_electricity_duty) +
+    // 🛠️ ULTRA FLEXIBLE REGEX: यह पॉइंट नंबर और नाम के बाद आने वाली पहली संख्या को पकड़ेगा
+    const getPointVal = (pointNum, label) => {
+      // यह Regex चेक करेगा: पॉइंट नंबर -> कुछ भी टेक्स्ट -> लेबल -> कुछ भी टेक्स्ट -> संख्या
+      const regex = new RegExp(`${pointNum}\\s+${label}[\\s\\S]*?([\\d,.]+)`, 'i');
+      const match = text.match(regex);
+      return match ? cleanNum(match[1]) : "0.00";
+    };
+
+    // 🔍 1 से 18 पॉइंट्स का विस्तृत डेटा
+    const points = {
+      p1_energy: getPointVal(1, "Energy Charges"),
+      p2_fixed: getPointVal(2, "Fixed Charges"),
+      p3_fuel: getPointVal(3, "Fuel Surcharge"),
+      p4_demand: getPointVal(4, "Demand surcharge"),
+      p5_pf: getPointVal(5, "Power factor"),
+      p6_unauth: getPointVal(6, "Unathourized"),
+      p7_ctpt: getPointVal(7, "CT/PT Rent"),
+      p8_trans: getPointVal(8, "Transformer Rent"),
+      p11_nigam_dues: getPointVal(11, "Total Nigam Dues"),
+      p12_duty: getPointVal(12, "Electricity Duty"),
+      p13_wcc: getPointVal(13, "Water Conservation"),
+      p14_uc: getPointVal(14, "Urban Cess"),
+      p15_debit: getPointVal(15, "Other Debit"),
+      p16_tcs: getPointVal(16, "Tax collected"),
+      p17_adjust: getPointVal(17, "Amount Adjusted"),
+      p18_total: getPointVal(18, "Total Amount"),
+      
+      // Top section details
+      net_units: text.match(/Net Billed Units\s+([\d,.]+)/i)?.[1].replace(/,/g, '') || "0.00"
+    };
+
+    // 🧮 Taxes (12+13+14+16)
+    const taxesTotal = (
+      parseFloat(points.p12_duty) +
       parseFloat(points.p13_wcc) +
-      parseFloat(points.p14_urban_cess) +
-      parseFloat(points.p16_tcs_tds)
+      parseFloat(points.p14_uc) +
+      parseFloat(points.p16_tcs)
     ).toFixed(2);
 
+    // रिपॉन्स भेजें
     res.json({
-      units: points.billed_units,
-      energy: points.p1_energy_charges,
-      fixed: points.p2_fixed_charges,
-      taxes: calculatedTaxes,
-      totalAmount: points.p18_total_amount,
-      full_breakdown: points // सभी 18 पॉइंट्स यहाँ हैं
+      units: points.net_units,
+      energy: points.p1_energy,
+      fixed: points.p2_fixed,
+      taxes: taxesTotal,
+      total_bill: points.p18_total,
+      full_data: points // सभी 18 पॉइंट्स यहाँ भी हैं
     });
+
+      console.log(points)
 
   } catch (err) {
     console.error("Extraction Error:", err.message);
     res.status(500).json({ msg: "Extraction failed: " + err.message });
   }
 });
+
 
 // 💾 SAVE RECORD ROUTE (Now un-commented and fixed)
 router.post('/add', upload.single('billFile'), async (req, res) => {
