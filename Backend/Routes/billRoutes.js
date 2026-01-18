@@ -40,7 +40,7 @@ router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
     const text = data.text;
 
     // --- DEBUGGING के लिए टर्मिनल में टेक्स्ट देखें ---
-    // console.log(text); 
+    console.log(text); 
 
     // 🛠️ Super Flexible Regex Helper
     const getVal = (regex) => {

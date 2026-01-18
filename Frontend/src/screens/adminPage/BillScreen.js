@@ -63,7 +63,7 @@ const BillScreen = () => {
     } catch (err) { console.log("Picker Error"); }
   };
 
- const handleAutoExtract = async () => {
+const handleAutoExtract = async () => {
   if (!file) {
     Toast.show({ type: 'error', text1: 'Please select a PDF first' });
     return;
