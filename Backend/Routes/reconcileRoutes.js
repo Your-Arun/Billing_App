@@ -34,7 +34,7 @@ router.get('/range-summary/:adminId', async (req, res) => {
         tenantId: tenant._id,
         adminId,
         status: 'Approved',
-        createdAt: { $gte: fromDate, $lte: toDate }
+        createdAt: { $gte: fromDate }
       }).sort({ createdAt: -1 });
 
       // ✅ CLOSING = last reading WITHIN range
