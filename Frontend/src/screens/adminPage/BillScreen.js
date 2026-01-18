@@ -6,8 +6,6 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { UserContext } from '../../services/UserContext';
@@ -26,14 +24,14 @@ const BillScreen = () => {
 
   const monthName = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
-  // 1. Fetch History
+  // 1. हिस्ट्री लोड करना
   const fetchHistory = useCallback(async () => {
     if (!adminId) return;
     try {
       const res = await axios.get(`${API_URL}/bill/history/${adminId}`);
       setHistory(res.data || []);
     } catch (e) {
-      console.log("Fetch Error history");
+      console.log("Fetch Error History");
     }
   }, [adminId]);
 
@@ -47,7 +45,7 @@ const BillScreen = () => {
     setRefreshing(false);
   }, [fetchHistory]);
 
-  // 2. Document Picker
+  // 2. PDF सिलेक्ट करना
   const pickDocument = async () => {
     try {
       let result = await DocumentPicker.getDocumentAsync({ 
@@ -58,54 +56,59 @@ const BillScreen = () => {
       if (!result.canceled) {
         const pickedFile = result.assets[0];
         setFile(pickedFile);
-        Toast.show({ type: 'success', text1: 'PDF Loaded ✅', text2: pickedFile.name });
+        Toast.show({ type: 'success', text1: 'PDF Selected ✅', text2: pickedFile.name });
       }
     } catch (err) { console.log("Picker Error"); }
   };
 
-const handleAutoExtract = async () => {
-  if (!file) {
-    Toast.show({ type: 'error', text1: 'Please select a PDF first' });
-    return;
-  }
-
-  setExtracting(true);
-  try {
-    const formData = new FormData();
-    const fileUri = Platform.OS === 'ios' ? file.uri.replace('file://', '') : file.uri;
-
-    formData.append('billFile', {
-      uri: fileUri,
-      name: file.name,
-      type: 'application/pdf',
-    });
-
-    const res = await axios.post(`${API_URL}/bill/extract`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
-
-    // 🪄 यहाँ सुनिश्चित करें कि डेटा आ रहा है
-    if (res.data) {
-      setForm({
-        units: String(res.data.units || '0'),
-        energy: String(res.data.energy || '0'),
-        fixed: String(res.data.fixed || '0'),
-        taxes: String(res.data.taxes || '0')
-      });
-      Toast.show({ type: 'success', text1: 'Magic! ✨', text2: 'Data auto-filled' });
+  // 🪄 3. AUTO EXTRACT (PDF से डेटा निकालना)
+  const handleAutoExtract = async () => {
+    if (!file) {
+      return Toast.show({ type: 'error', text1: 'Wait!', text2: 'Please select a PDF first' });
     }
-  } catch (error) {
-    console.log("Error:", error.response?.data);
-    Toast.show({ type: 'error', text1: 'Extraction Failed', text2: 'Try manual entry' });
-  } finally {
-    setExtracting(false);
-  }
-};
 
-  // 4. Save Final Record
+    setExtracting(true);
+    try {
+      const formData = new FormData();
+      const fileUri = Platform.OS === 'ios' ? file.uri.replace('file://', '') : file.uri;
+
+      formData.append('billFile', {
+        uri: fileUri,
+        name: file.name,
+        type: 'application/pdf',
+      });
+
+      // बैकएंड एंडपॉइंट पर भेजना
+      const res = await axios.post(`${API_URL}/bill/extract`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (res.data) {
+        // बैकएंड से आए डेटा को फॉर्म में भरना
+        setForm({
+          units: String(res.data.units || ''),
+          energy: String(res.data.energy || ''),
+          fixed: String(res.data.fixed || ''),
+          taxes: String(res.data.taxes || '')
+        });
+        Toast.show({ 
+          type: 'success', 
+          text1: 'Magic Done! ✨', 
+          text2: 'Values filled from PDF points' 
+        });
+      }
+    } catch (error) {
+      const errorMsg = error.response?.data?.msg || "Scanned PDF or different format";
+      Toast.show({ type: 'error', text1: 'Extraction Failed', text2: errorMsg });
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  // 4. डेटा सेव करना
   const handleSaveBill = async () => {
     if (!form.units || !form.energy || !file) {
-      return Toast.show({ type: 'error', text1: 'Incomplete', text2: 'Please fill units and energy charges' });
+      return Toast.show({ type: 'error', text1: 'Incomplete', text2: 'Check Units and Energy charges' });
     }
     
     setSaving(true);
@@ -128,23 +131,24 @@ const handleAutoExtract = async () => {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      Toast.show({ type: 'success', text1: 'Verified & Saved ✨' });
+      Toast.show({ type: 'success', text1: 'Verified & Saved ✅' });
       setForm({ units: '', energy: '', fixed: '', taxes: '' });
       setFile(null);
       fetchHistory();
     } catch (e) {
-      Toast.show({ type: 'error', text1: 'Save Error', text2: 'Server did not respond' });
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Server save failed' });
     } finally { setSaving(false); }
   };
 
+  // 5. डिलीट करना
   const handleDelete = (id) => {
-    Alert.alert("Delete Record", "This will permanently remove the bill entry. Continue?", [
+    Alert.alert("Delete Record", "क्या आप इस बिल रिकॉर्ड को मिटाना चाहते हैं?", [
       { text: "Cancel", style: "cancel" },
       { text: "Delete", style: "destructive", onPress: async () => {
           try {
             const response = await axios.delete(`${API_URL}/bill/delete/${id}`);
             if (response.data.success) {
-               Toast.show({ type: 'success', text1: 'Deleted 🗑️' });
+               Toast.show({ type: 'success', text1: 'Removed 🗑️' });
                fetchHistory();
             }
           } catch (err) { Toast.show({ type: 'error', text1: 'Delete failed' }); }
@@ -157,11 +161,11 @@ const handleAutoExtract = async () => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      {/* HEADER SECTION */}
+      {/* --- HEADER --- */}
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Main Grid Bill</Text>
-          <Text style={styles.headerSub}>Verify and extract monthly records</Text>
+          <Text style={styles.headerSub}>Extract and Save Source Records</Text>
         </View>
         <TouchableOpacity style={styles.headerIcon} onPress={onRefresh}>
            <MaterialCommunityIcons name="refresh" size={24} color="#FFF" />
@@ -172,9 +176,9 @@ const handleAutoExtract = async () => {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListHeaderComponent={
           <View style={styles.formCard}>
-            <Text style={styles.cardLabel}>BILL ENTRY FOR {monthName.toUpperCase()}</Text>
+            <Text style={styles.cardLabel}>NEW BILL ENTRY - {monthName.toUpperCase()}</Text>
             
-            {/* 📁 File Picker Box */}
+            {/* 📁 File Picker */}
             <TouchableOpacity 
               style={[styles.uploadBox, file && styles.uploadBoxActive]} 
               onPress={pickDocument}
@@ -185,11 +189,11 @@ const handleAutoExtract = async () => {
                 color={file ? "#00C853" : "#333399"} 
               />
               <Text style={[styles.uploadText, file && {color: '#00C853'}]}>
-                {file ? file.name : "Select Electricity Bill PDF"}
+                {file ? file.name : "Select AVVNL Bill PDF"}
               </Text>
             </TouchableOpacity>
 
-            {/* 🪄 Extract Button (Active only when file is selected) */}
+            {/* 🪄 Magic Extraction Button */}
             <TouchableOpacity 
               style={[styles.extractBtn, !file && styles.disabledBtn]} 
               onPress={handleAutoExtract}
@@ -200,18 +204,18 @@ const handleAutoExtract = async () => {
               ) : (
                 <>
                   <MaterialCommunityIcons name="auto-fix" size={20} color="white" />
-                  <Text style={styles.extractText}>AUTO-FILL DATA FROM PDF</Text>
+                  <Text style={styles.extractText}>AUTO-FILL FROM PDF (1-18 POINTS)</Text>
                 </>
               )}
             </TouchableOpacity>
 
-            {/* 📝 Form Fields */}
+            {/* 📝 Inputs */}
             <View style={styles.inputGroup}>
                 <View style={styles.fullInput}>
-                   <Text style={styles.inputLabel}>Total Net Billed Units</Text>
+                   <Text style={styles.inputLabel}>Net Billed Units</Text>
                    <TextInput 
                      style={styles.input} 
-                     placeholder="Units consumed" 
+                     placeholder="0.00" 
                      keyboardType="numeric" 
                      value={form.units} 
                      onChangeText={(t)=>setForm({...form, units:t})} 
@@ -219,10 +223,10 @@ const handleAutoExtract = async () => {
                 </View>
                 
                 <View style={styles.fullInput}>
-                   <Text style={styles.inputLabel}>Energy Charges (₹)</Text>
+                   <Text style={styles.inputLabel}>Energy Charges (Point 1)</Text>
                    <TextInput 
                      style={styles.input} 
-                     placeholder="Base amount" 
+                     placeholder="₹ 0.00" 
                      keyboardType="numeric" 
                      value={form.energy} 
                      onChangeText={(t)=>setForm({...form, energy:t})} 
@@ -231,7 +235,7 @@ const handleAutoExtract = async () => {
 
                 <View style={styles.row}>
                   <View style={styles.halfInput}>
-                     <Text style={styles.inputLabel}>Fixed Charges</Text>
+                     <Text style={styles.inputLabel}>Fixed (Point 2)</Text>
                      <TextInput style={styles.input} keyboardType="numeric" value={form.fixed} onChangeText={(t)=>setForm({...form, fixed:t})} placeholder="₹ 0.00" />
                   </View>
                   <View style={styles.halfInput}>
@@ -244,8 +248,8 @@ const handleAutoExtract = async () => {
             <TouchableOpacity style={styles.submitBtn} onPress={handleSaveBill} disabled={saving}>
               {saving ? <ActivityIndicator color="white" /> : (
                 <View style={styles.btnContent}>
-                  <Text style={styles.submitText}>SAVE & SYNC RECORD</Text>
-                  <MaterialCommunityIcons name="cloud-upload" size={20} color="white" />
+                  <Text style={styles.submitText}>VERIFY & SAVE RECORD</Text>
+                  <MaterialCommunityIcons name="check-circle" size={20} color="white" />
                 </View>
               )}
             </TouchableOpacity>
@@ -290,7 +294,7 @@ const styles = StyleSheet.create({
   
   extractBtn: { backgroundColor: '#FF9800', padding: 14, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 25, elevation: 4 },
   disabledBtn: { backgroundColor: '#E0E0E0', elevation: 0 },
-  extractText: { color: 'white', fontWeight: 'bold', marginLeft: 8, fontSize: 14 },
+  extractText: { color: 'white', fontWeight: 'bold', marginLeft: 8, fontSize: 12 },
 
   inputLabel: { fontSize: 11, fontWeight: 'bold', color: '#777', marginBottom: 6, marginLeft: 5 },
   input: { backgroundColor: '#F8FAFD', padding: 14, borderRadius: 15, marginBottom: 18, fontSize: 15, color: '#333', fontWeight: 'bold', borderWidth: 1, borderColor: '#EBF1F9' },
