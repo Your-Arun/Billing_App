@@ -44,44 +44,50 @@ router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
     const data = await pdfParse(dataBuffer);
     const text = data.text;
 
-    // 🛠️ HELPER: कोमा हटाकर नंबर निकालने के लिए
+    // कोमा हटाने और क्लीन नंबर देने के लिए फंक्शन
     const cleanNum = (val) => {
       if (!val) return "0.00";
-      return val.replace(/,/g, '').trim();
+      // कोमा हटाएं और अगर माइनस है तो उसे संभालें
+      let cleaned = val.replace(/,/g, '').trim();
+      return isNaN(parseFloat(cleaned)) ? "0.00" : cleaned;
     };
 
-    // 🛠️ ULTRA FLEXIBLE REGEX: यह पॉइंट नंबर और नाम के बाद आने वाली पहली संख्या को पकड़ेगा
-    const getPointVal = (pointNum, label) => {
-      // यह Regex चेक करेगा: पॉइंट नंबर -> कुछ भी टेक्स्ट -> लेबल -> कुछ भी टेक्स्ट -> संख्या
-      const regex = new RegExp(`${pointNum}\\s+${label}[\\s\\S]*?([\\d,.]+)`, 'i');
+    // 🛠️ AVVNL स्पेसिफिक स्ट्रॉन्ग Regex हेल्पर
+    // यह पॉइंट नंबर और उसके लेबल के बाद आने वाली पहली संख्या को पकड़ेगा
+    const getVal = (pointNum, labelKeywords) => {
+      // पैटर्न: "पॉइंट नंबर" फिर "कीवर्ड्स" फिर "कुछ भी" फिर "संख्या"
+      // उदाहरण: 1\s+Energy\s+Charges[\s\S]*?([\d,.]+)
+      const regex = new RegExp(`${pointNum}\\s+${labelKeywords}[\\s\\S]*?([\\d,.]+)`, 'i');
       const match = text.match(regex);
       return match ? cleanNum(match[1]) : "0.00";
     };
 
-    // 🔍 1 से 18 पॉइंट्स का विस्तृत डेटा
+    // 🔍 सभी 1 से 18 पॉइंट्स का डेटा (AVVNL फॉर्मेट के हिसाब से)
     const points = {
-      p1_energy: getPointVal(1, "Energy Charges"),
-      p2_fixed: getPointVal(2, "Fixed Charges"),
-      p3_fuel: getPointVal(3, "Fuel Surcharge"),
-      p4_demand: getPointVal(4, "Demand surcharge"),
-      p5_pf: getPointVal(5, "Power factor"),
-      p6_unauth: getPointVal(6, "Unathourized"),
-      p7_ctpt: getPointVal(7, "CT/PT Rent"),
-      p8_trans: getPointVal(8, "Transformer Rent"),
-      p11_nigam_dues: getPointVal(11, "Total Nigam Dues"),
-      p12_duty: getPointVal(12, "Electricity Duty"),
-      p13_wcc: getPointVal(13, "Water Conservation"),
-      p14_uc: getPointVal(14, "Urban Cess"),
-      p15_debit: getPointVal(15, "Other Debit"),
-      p16_tcs: getPointVal(16, "Tax collected"),
-      p17_adjust: getPointVal(17, "Amount Adjusted"),
-      p18_total: getPointVal(18, "Total Amount"),
+      p1_energy: getVal(1, "Energy\\s+Charges"),
+      p2_fixed: getVal(2, "Fixed\\s+Charges"),
+      p3_fuel: getVal(3, "Fuel\\s+Surcharge"),
+      p4_demand: getVal(4, "Demand\\s+surcharge"),
+      p5_pf: getVal(5, "Power\\s+factor"),
+      p6_unauth: getVal(6, "Unathourized\\s+Use"),
+      p7_ctpt: getVal(7, "CT/PT\\s+Rent"),
+      p8_trans: getVal(8, "Transformer\\s+Rent"),
+      p9_others: getVal(9, "Others\\s+if\\s+any"),
+      p10_rebate: getVal(10, "Voltage\\s+Rebate"),
+      p11_nigam_dues: getVal(11, "Total\\s+Nigam\\s+Dues"),
+      p12_duty: getVal(12, "Electricity\\s+Duty"),
+      p13_wcc: getVal(13, "Water\\s+Conservation"),
+      p14_uc: getVal(14, "Urban\\s+Cess"),
+      p15_debit: getVal(15, "Other\\s+Debit"),
+      p16_tcs: getVal(16, "Tax\\s+collected"),
+      p17_adjust: getVal(17, "Amount\\s+Adjusted"),
+      p18_total: getVal(18, "Total\\s+Amount"),
       
-      // Top section details
-      net_units: text.match(/Net Billed Units\s+([\d,.]+)/i)?.[1].replace(/,/g, '') || "0.00"
+      // Top section unique match
+      net_units: text.match(/Net\s+Billed\s+Units\s+([\d,.]+)/i)?.[1].replace(/,/g, '') || "0.00"
     };
 
-    // 🧮 Taxes (12+13+14+16)
+    // 🧮 Taxes (12+13+14+16) का जोड़
     const taxesTotal = (
       parseFloat(points.p12_duty) +
       parseFloat(points.p13_wcc) +
@@ -89,17 +95,16 @@ router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
       parseFloat(points.p16_tcs)
     ).toFixed(2);
 
-    // रिपॉन्स भेजें
+    // रिपॉन्स भेजें जो फ्रंटएंड के फॉर्म से मैच करे
     res.json({
       units: points.net_units,
       energy: points.p1_energy,
       fixed: points.p2_fixed,
       taxes: taxesTotal,
-      total_bill: points.p18_total,
-      full_data: points // सभी 18 पॉइंट्स यहाँ भी हैं
+      total_amount_18: points.p18_total,
+      full_breakdown: points // टेस्टिंग के लिए पूरा डेटा भी भेज रहे हैं
     });
-
-      console.log(points)
+    console.log(points)
 
   } catch (err) {
     console.error("Extraction Error:", err.message);
