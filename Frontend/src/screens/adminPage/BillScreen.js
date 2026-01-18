@@ -75,7 +75,7 @@ const BillScreen = () => {
       formData.append('billFile', {
         uri: fileUri,
         name: file.name,
-        type: 'application/pdf',
+         type: ['application/pdf', 'image/*'],
       });
 
       // बैकएंड एंडपॉइंट पर भेजना

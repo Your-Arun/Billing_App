@@ -31,69 +31,62 @@ router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ msg: "No file uploaded" });
 
-    const dataBuffer = req.file.buffer;
-    const data = await pdfParse(dataBuffer);
-    
-    // 1. पूरे टेक्स्ट को एक लाइन में कर दें और कोमा (,) हटा दें
-    let text = data.text.replace(/,/g, ''); 
+    let extractedText = "";
 
-    // 🛠️ नया "Smart Search" फंक्शन
+    // 1️⃣ अगर फाइल PDF है
+    if (req.file.mimetype === 'application/pdf') {
+      const data = await pdfParse(req.file.buffer);
+      extractedText = data.text;
+    } 
+    // 2️⃣ अगर फाइल फोटो (Image) है - असली "Scan" यहीं होगा
+    else {
+      const result = await Tesseract.recognize(req.file.buffer, 'eng');
+      extractedText = result.data.text;
+    }
+
+    // 🛠️ टेक्स्ट को साफ़ करें (कोमा हटाएं और सब एक लाइन में करें)
+    let cleanText = extractedText.replace(/,/g, '').replace(/\n/g, ' ');
+
+    // 🛠️ Smart Extraction Function
     const findValue = (keyword) => {
-      // यह लॉजिक कीवर्ड ढूंढेगा और उसके बाद आने वाली पहली संख्या (जैसे 123.45) को उठाएगा
+      // कीवर्ड के बाद 1 से 60 कैरेक्टर के अंदर जो भी नंबर मिले उसे उठा लो
       const regex = new RegExp(`${keyword}[\\s\\S]{1,60}?([\\d.]+)`, 'i');
-      const match = text.match(regex);
-      if (match && match[1]) {
-        // चेक करें कि निकाली गई वैल्यू सिर्फ एक बिंदी तो नहीं (जैसे "." या "0.")
-        return parseFloat(match[1]) > 0 ? match[1] : "0.00";
-      }
-      return "0.00";
+      const match = cleanText.match(regex);
+      return (match && match[1] && parseFloat(match[1]) > 0) ? match[1] : "0.00";
     };
 
-    // 🔍 कीवर्ड्स के आधार पर डेटा निकालें (AVVNL स्पेसिफिक)
-    const extracted = {
-      // Net Billed Units (बिल के टॉप में होता है)
+    // 🔍 AVVNL स्पेसिफिक डेटा निकालें
+    const results = {
       units: findValue("Net Billed Units"),
-      
-      // Point 1: Energy Charges
       energy: findValue("Energy Charges"),
-      
-      // Point 2: Fixed Charges
       fixed: findValue("Fixed Charges"),
-      
-      // Taxes (अलग-अलग पॉइंट्स)
       duty: findValue("Electricity Duty"),
-      wcc: findValue("Water Conservation Cess"),
+      wcc: findValue("Water Conservation"),
       uc: findValue("Urban Cess"),
       tcs: findValue("Tax collected at source"),
-      
-      // Point 18: Total Amount
-      total_18: findValue("Total Amount")
     };
 
     // 🧮 Taxes का जोड़ (Duty + WCC + UC + TCS)
     const totalTaxes = (
-      parseFloat(extracted.duty) +
-      parseFloat(extracted.wcc) +
-      parseFloat(extracted.uc) +
-      parseFloat(extracted.tcs)
+      parseFloat(results.duty) +
+      parseFloat(results.wcc) +
+      parseFloat(results.uc) +
+      parseFloat(results.tcs)
     ).toFixed(2);
 
-    // रिस्पॉन्स भेजें
     res.json({
-      units: extracted.units !== "0.00" ? extracted.units : "0.00",
-      energy: extracted.energy !== "0.00" ? extracted.energy : "0.00",
-      fixed: extracted.fixed !== "0.00" ? extracted.fixed : "0.00",
+      units: results.units,
+      energy: results.energy,
+      fixed: results.fixed,
       taxes: totalTaxes,
-      total_amount_18: extracted.total_18
+      msg: "Scan Successful! ✅"
     });
 
-    console.log(extracted)
   } catch (err) {
-    console.error("Extraction Error:", err.message);
-    res.status(500).json({ msg: "Extraction failed. Server Error." });
+    console.error("OCR Error:", err.message);
+    res.status(500).json({ msg: "Failed to scan image. Please enter manually." });
   }
 });
-
 
 // 💾 SAVE RECORD ROUTE (Now un-commented and fixed)
 router.post('/add', upload.single('billFile'), async (req, res) => {
