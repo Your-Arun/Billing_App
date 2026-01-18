@@ -33,13 +33,15 @@ router.get('/range-summary/:adminId', async (req, res) => {
       const openingReading = await Reading.findOne({
         tenantId: tenant._id,
         adminId,
-        createdAt: { $lt: fromDate }
+        status: 'Approved',
+        createdAt: { $gte: fromDate, $lte: toDate }
       }).sort({ createdAt: -1 });
 
       // ✅ CLOSING = last reading WITHIN range
       const closingReading = await Reading.findOne({
         tenantId: tenant._id,
         adminId,
+        status: 'Approved',
         createdAt: { $gte: fromDate, $lte: toDate }
       }).sort({ createdAt: -1 });
 
