@@ -16,11 +16,11 @@ router.get('/range-summary/:adminId', async (req, res) => {
       return res.status(400).json({ msg: 'From & To date required' });
     }
 
-    const fromDate = new Date(from);
-    fromDate.setHours(0, 0, 0, 0);
+    const fromDateEnd = new Date(from);
+    fromDateEnd.setHours(23, 59, 59, 999);
 
-    const toDate = new Date(to);
-    toDate.setHours(23, 59, 59, 999);
+      const toDateEnd = new Date(to);
+    toDateEnd.setHours(23, 59, 59, 999);
 
     // 🔹 All tenants
     const tenants = await Tenant.find({ adminId }).lean();
@@ -34,7 +34,7 @@ router.get('/range-summary/:adminId', async (req, res) => {
         tenantId: tenant._id,
         adminId,
         status: 'Approved',
-        createdAt: { $gte: fromDate }
+        createdAt: { $lte: fromDateEnd }
       }).sort({ createdAt: -1 });
 
       // ✅ CLOSING = last reading WITHIN range
@@ -42,7 +42,7 @@ router.get('/range-summary/:adminId', async (req, res) => {
         tenantId: tenant._id,
         adminId,
         status: 'Approved',
-        createdAt: { $gte: fromDate, $lte: toDate }
+        createdAt: { $lte: toDateEnd } 
       }).sort({ createdAt: -1 });
 
       const opening =
