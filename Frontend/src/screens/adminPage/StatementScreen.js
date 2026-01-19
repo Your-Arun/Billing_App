@@ -138,6 +138,63 @@ const StatementScreen = ({ route, navigation }) => {
         finally { setLoadingId({ id: null, type: null }); }
     };
 
+
+    // ... existing imports ...
+
+const handleUpload = async (item) => {
+    // 1. Start loading for this specific tenant
+    setLoadingId({ id: item.tenantId, type: 'upload' });
+
+    try {
+        // 2. Generate PDF locally
+        const html = createHTML(item);
+        const { uri } = await Print.printToFileAsync({ html });
+
+        // 3. Prepare FormData
+        const formData = new FormData();
+        const safeName = item.tenantName.replace(/\s+/g, '_');
+        
+        formData.append('invoiceFile', {
+            uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
+            name: `Invoice_${safeName}.pdf`,
+            type: 'application/pdf',
+        });
+
+        // Backend ke liye baaki details
+        formData.append('adminId', user.id || user._id);
+        formData.append('tenantId', item.tenantId);
+        formData.append('tenantName', item.tenantName);
+        formData.append('meterId', item.meterId);
+        formData.append('amount', item.totalBill);
+        formData.append('units', item.units);
+        formData.append('opening', item.opening);
+        formData.append('closing', item.closing);
+        formData.append('multiplier', item.multiplierCT);
+        formData.append('month', monthKey);
+        formData.append('dateRange', `${fromDate} - ${toDate}`);
+
+        // 4. API Call
+        const res = await axios.post(`${API_URL}/invoices/upload-single`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
+        if (res.data.success) {
+            Toast.show({ 
+                type: 'success', 
+                text1: 'Uploaded! ☁️', 
+                text2: `${item.tenantName}'s invoice saved in database.` 
+            });
+        }
+
+    } catch (error) {
+        console.log("Upload Error:", error.response?.data || error.message);
+        Alert.alert("Error", "Could not upload invoice to cloud.");
+    } finally {
+        setLoadingId({ id: null, type: null });
+    }
+};
+
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" />
@@ -205,16 +262,17 @@ const StatementScreen = ({ route, navigation }) => {
                                     )}
                                 </TouchableOpacity>
 
-                                 <TouchableOpacity 
-                                    style={[styles.miniBtn, { backgroundColor: '#E8F5E9' }]} 
-                                    onPress={() => handleUpload(item)}
-                                >
-                                    {loadingId.id === item.tenantId && loadingId.type === 'share' ? (
-                                        <ActivityIndicator size="small" color="#4CAF50" />
-                                    ) : (
-                                        <MaterialCommunityIcons name="upload" size={22} color="#f71010ff" />
-                                    )}
-                                </TouchableOpacity>
+                                <TouchableOpacity 
+    style={[styles.miniBtn, { backgroundColor: '#E8F5E9' }]} 
+    onPress={() => handleUpload(item)}
+    disabled={loadingId.id !== null}
+>
+    {loadingId.id === item.tenantId && loadingId.type === 'upload' ? (
+        <ActivityIndicator size="small" color="#4CAF50" />
+    ) : (
+        <MaterialCommunityIcons name="upload" size={22} color="#4CAF50" />
+    )}
+</TouchableOpacity>
                             </View>
                         </View>
                     </View>

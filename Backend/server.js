@@ -10,6 +10,7 @@ const solarroutes = require('./Routes/solarroutes');
 const readingroutes = require('./Routes/readingRoutes'); 
 const billroutes = require('./Routes/billRoutes'); 
 const reconcileroutes = require('./Routes/reconcileRoutes'); 
+const invoiceroutes = require('./Routes/invoiceroutes'); 
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use('/solar', solarroutes);
 app.use('/readings', readingroutes); 
 app.use('/bill', billroutes); 
 app.use('/reconcile', reconcileroutes); 
+app.use('/invoices', invoiceroutes); 
 
 
 
