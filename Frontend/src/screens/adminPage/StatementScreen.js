@@ -204,6 +204,17 @@ const StatementScreen = ({ route, navigation }) => {
                                         <MaterialCommunityIcons name="share-variant" size={22} color="#4CAF50" />
                                     )}
                                 </TouchableOpacity>
+
+                                 <TouchableOpacity 
+                                    style={[styles.miniBtn, { backgroundColor: '#E8F5E9' }]} 
+                                    onPress={() => handleUpload(item)}
+                                >
+                                    {loadingId.id === item.tenantId && loadingId.type === 'share' ? (
+                                        <ActivityIndicator size="small" color="#4CAF50" />
+                                    ) : (
+                                        <MaterialCommunityIcons name="upload" size={22} color="#f71010ff" />
+                                    )}
+                                </TouchableOpacity>
                             </View>
                         </View>
                     </View>
@@ -222,24 +233,31 @@ const StatementScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FE' },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#FFF' },
-    backCircle: { backgroundColor: '#F5F5F5', borderRadius: 25, width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
+    backCircle: { backgroundColor: '#F5F5F5', borderRadius: 20, width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
     headerTitle: { fontSize: 20, fontWeight: '800', color: '#1A1C3D' },
+    saveBtn: { padding: 5 },
     
-    // 🔍 Search Bar Styles
     searchContainer: { backgroundColor: '#FFF', paddingHorizontal: 16, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
     searchBox: { flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 12, paddingHorizontal: 12, height: 45, alignItems: 'center' },
-    searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: '#1F2937', fontWeight: '500' },
+    searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: '#1F2937' },
 
     tenantCard: { backgroundColor: '#FFF', borderRadius: 20, padding: 18, marginBottom: 12, elevation: 3, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8 },
-    tenantHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    nameRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
     tName: { fontSize: 16, fontWeight: 'bold', color: '#1A1C3D' },
-    tSub: { fontSize: 13, color: '#6B7280', marginTop: 3, fontWeight: '600' },
+    dateBadge: { backgroundColor: '#333399', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 8 },
+    dateBadgeText: { fontSize: 9, fontWeight: 'bold', color: '#FFF' },
+    tSub: { fontSize: 13, color: '#6B7280', marginTop: 2 },
     
     actionRow: { flexDirection: 'row', gap: 10 },
     miniBtn: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
     
-    emptyContainer: { alignItems: 'center', marginTop: 100 },
-    emptyText: { marginTop: 10, color: '#9CA3AF', fontSize: 14, fontWeight: '600' }
+    // Progress Modal Styles
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+    modalContent: { backgroundColor: 'white', padding: 30, borderRadius: 20, alignItems: 'center' },
+    progressText: { fontSize: 18, fontWeight: 'bold', marginTop: 15 },
+    progressSub: { fontSize: 14, color: '#666', marginTop: 5 },
+    emptyText: { textAlign: 'center', marginTop: 50, color: '#9CA3AF', fontWeight: 'bold' }
+    
 });
 
 export default StatementScreen;
