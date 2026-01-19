@@ -122,6 +122,8 @@ const ReconciliationScreen = ({ route, navigation }) => {
 
     const { gridUnits, gridAmount, gridFixedPrice, solarUnits, totalTenantUnitsSum, commonLoss, lossPercent, calculatedTenants } = processedData || {};
 
+    
+
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <StatusBar barStyle="light-content" />

@@ -179,7 +179,7 @@ const StatementScreen = ({ route, navigation }) => {
                     <View style={styles.tenantCard}>
                         <View style={styles.tenantHeader}>
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.tName}>{item.tenantName}</Text>
+                                <Text style={styles.tName}>{item.tenantName}▫️ {today}</Text>
                                 <Text style={styles.tSub}>₹{item.totalBill.toFixed(0)} • {item.units} kWh</Text>
                             </View>
                             <View style={styles.actionRow}>

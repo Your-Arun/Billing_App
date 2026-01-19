@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 // सभी मॉडल्स को इम्पोर्ट करें
 const Reading = require('../Modals/Reading');
 const Tenant = require('../Modals/Tenant');
+const Invoice = require('../Modals/Invoice');
 
 
 router.get('/range-summary/:adminId', async (req, res) => {
@@ -80,21 +81,24 @@ router.get('/range-summary/:adminId', async (req, res) => {
 
 
 // POST /api/invoices/add
-router.post('/add', async (req, res) => {
+router.post('invoices/add', async (req, res) => {
     try {
-        const { adminId, tenantId, tenantName, amount, units, pdfUrl, month, dateRange } = req.body;
-        const newInvoice = new Invoice({ adminId, tenantId, tenantName, amount, units, pdfUrl, month, dateRange });
+        const newInvoice = new Invoice(req.body);
         await newInvoice.save();
-        res.status(201).json({ success: true });
-    } catch (err) { res.status(500).json({ msg: err.message }); }
+        res.status(201).json({ success: true, data: newInvoice });
+    } catch (err) {
+        res.status(500).json({ msg: err.message });
+    }
 });
 
-// GET /api/invoices/:adminId
-router.get('/:adminId', async (req, res) => {
+// 📜 2. FETCH HISTORY BY ADMIN
+router.get('invoices/:adminId', async (req, res) => {
     try {
         const invoices = await Invoice.find({ adminId: req.params.adminId }).sort({ createdAt: -1 });
         res.json(invoices);
-    } catch (err) { res.status(500).json({ msg: err.message }); }
+    } catch (err) {
+        res.status(500).json({ msg: err.message });
+    }
 });
 
 
