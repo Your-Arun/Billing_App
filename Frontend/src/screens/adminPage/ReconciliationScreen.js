@@ -23,7 +23,7 @@ const ReconciliationScreen = ({ route, navigation }) => {
     const [loading, setLoading] = useState(true);
     const [reconData, setReconData] = useState({
         gridUnits: 0, gridAmount: 0, solarUnits: 0, dgUnits: 0, dgCost: 0,
-        totalTenantUnits: 0, netToAllocate: 0, commonLoss: 0, lossPercent: 0
+        totalTenantUnits: 0, netToAllocate: 0, commonLoss: 0, lossPercent: 0,fixedtenant:0
     });
     const [tenantBreakdown, setTenantBreakdown] = useState([]);
     
@@ -65,6 +65,7 @@ const ReconciliationScreen = ({ route, navigation }) => {
 
             const grid = billRes.status === 'fulfilled' ? (billRes.value.data?.[0]?.totalUnits || 0) : 0;
             const gridAmt = billRes.status === 'fulfilled' ? (billRes.value.data?.[0]?.totalAmount || 0) : 0;
+             const gridFixedPrice = billRes.status === 'fulfilled' ? (billRes.value.data?.[0]?.fixedCharges || 0) : 0;
             const solar = solarRes.status === 'fulfilled' ? (solarRes.value.data?.[0]?.unitsGenerated || 0) : 0;
             const dgU = dgRes.status === 'fulfilled' && dgRes.value.data?.dgSummary ? dgRes.value.data.dgSummary.reduce((sum, d) => sum + (Number(d.totalUnits) || 0), 0) : 0;
             const dgC = dgRes.status === 'fulfilled' && dgRes.value.data?.dgSummary ? dgRes.value.data.dgSummary.reduce((sum, d) => sum + (Number(d.totalCost) || 0), 0) : 0;
@@ -98,7 +99,7 @@ const ReconciliationScreen = ({ route, navigation }) => {
 
                     return {
                         ...t, units, amount, fixed, transLoss, dgCharge, totalBill,
-                        isDgDisabled, isLossDisabled
+                        isDgDisabled, isLossDisabled,gridFixedPrice
                     };
                 });
             }
@@ -110,7 +111,7 @@ const ReconciliationScreen = ({ route, navigation }) => {
             setReconData({
                 gridUnits: grid, gridAmount: gridAmt, solarUnits: solar,
                 dgUnits: dgU, dgCost: dgC, totalTenantUnits: totalTenantUnitsSum,
-                netToAllocate: totalInput, commonLoss: loss, lossPercent: lossP,
+                netToAllocate: totalInput, commonLoss: loss, lossPercent: lossP,fixedtenant:gridFixedPrice
             });
             setTenantBreakdown(calculatedTenants);
 
@@ -146,7 +147,7 @@ const ReconciliationScreen = ({ route, navigation }) => {
                         <Row label="Grid Units" value={reconData.gridUnits} icon="flash" color="#333399" />
 
                          <Row label="Bill Amount" value={reconData.gridAmount} icon="flash" color="#333399" />
-                         <Row label="Fixed Charged" value={reconData.gridAmount} icon="flash" color="#333399" />
+                         <Row label="Fixed Charged" value={reconData.fixedtenant} icon="flash" color="#333399" />
                         <Row label="Tenant Total Units" value={reconData.totalTenantUnits.toFixed(1)} icon="account-group" color="#4F46E5" bold />
                          <Row label="Solar Sum" value={reconData.solarUnits} icon="account-group" color="#f7eb01ff" bold />
                         <View style={styles.darkDivider} />
