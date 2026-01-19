@@ -1,7 +1,6 @@
-import React, { useState, useContext } from 'react';
+import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  Modal, TextInput, Alert
+  View, Text, StyleSheet, TouchableOpacity, ScrollView
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import UserProfile from './adminPage/UserProfile';
@@ -14,96 +13,139 @@ const Dashboard = ({ navigation }) => {
     { name: 'Approval', icon: 'check-decagram-outline', route: 'Approval' },
     { name: 'AVVNL Bill', icon: 'lightning-bolt-outline', route: 'Bill' },
     { name: 'Tenants', icon: 'account-group-outline', route: 'Tenants' },
-    { name: 'Statements', icon: 'file-document-outline', route: 'Home' },
-     { name: 'Reconciliation', icon: 'file-document-outline', route: 'Reconciliation' },
-      { name: 'MonthlyBilling', icon: 'file-document-outline', route: 'MonthlyBilling' },
+    { name: 'Reconciliation', icon: 'scale-balance', route: 'Reconciliation' },
+    { name: 'Monthly Billing', icon: 'calendar-month-outline', route: 'MonthlyBilling' },
+     { name: 'Statements', icon: 'calendar-month-outline', route: 'Statement' },
   ];
 
+  const today = new Date();
+  const displayDate = today.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+  const year = today.getFullYear();
 
-  const getFormattedDate = () => {
-    const date = new Date();
-    const day = date.getDate().toString().padStart(2, '0');
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const month = monthNames[date.getMonth()];
-    const year = date.getFullYear();
-
-    return {
-      displayDate: `${day} ${month}`,
-      cycleMonth: `${year}`
-    };
-  };
-  const { displayDate, cycleMonth } = getFormattedDate();
   return (
     <View style={styles.container}>
-     
+      
+      {/* ===== HEADER ===== */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => setProfileVisible(true)}>
-          <MaterialCommunityIcons name="account-circle" size={45} color="white" />
+          <MaterialCommunityIcons name="account-circle" size={48} color="#fff" />
         </TouchableOpacity>
-        <View style={styles.headerRight}>
-          <Text style={styles.dateText}>{displayDate}</Text>
-          <Text style={styles.monthText}>{cycleMonth}</Text>
+
+        <View style={styles.headerText}>
+          <Text style={styles.date}>{displayDate}</Text>
+          <Text style={styles.year}>{year}</Text>
         </View>
       </View>
 
-      <ScrollView style={styles.content}>
-    
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <View style={styles.iconGrid}>
+      {/* ===== BODY ===== */}
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.sectionTitle}>Dashboard</Text>
+
+        <View style={styles.grid}>
           {navIcons.map((item, index) => (
             <TouchableOpacity
               key={index}
-              style={styles.iconCard}
+              style={styles.card}
               onPress={() => navigation.navigate(item.route)}
+              activeOpacity={0.85}
             >
-              <MaterialCommunityIcons name={item.icon} size={30} color="#333399" />
-              <Text style={styles.iconLabel}>{item.name}</Text>
+              <View style={styles.iconBox}>
+                <MaterialCommunityIcons name={item.icon} size={26} color="#333399" />
+              </View>
+              <Text style={styles.cardText}>{item.name}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-
-        <View style={{ height: 100 }} />
+        <View style={{ height: 40 }} />
       </ScrollView>
 
-      <UserProfile 
-        visible={profileVisible} 
-        onClose={() => setProfileVisible(false)} 
+      {/* ===== PROFILE MODAL ===== */}
+      <UserProfile
+        visible={profileVisible}
+        onClose={() => setProfileVisible(false)}
       />
-
-
     </View>
   );
 };
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f7fa' },
-  header: {
-    backgroundColor: '#333399', paddingHorizontal: 20, paddingBottom: 30, paddingTop: 50,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    borderBottomLeftRadius: 30, borderBottomRightRadius: 30
+  container: {
+    flex: 1,
+    backgroundColor: '#F2F4F8',
   },
-  headerRight: { alignItems: 'flex-end' },
-  dateText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
-  monthText: { color: '#ccc', fontSize: 12 },
-  content: { padding: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 15, marginTop: 10 },
-  iconGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  iconCard: { backgroundColor: 'white', width: '31%', padding: 15, borderRadius: 15, alignItems: 'center', marginBottom: 15, elevation: 3 },
-  iconLabel: { fontSize: 10, fontWeight: 'bold', marginTop: 8, color: '#555' },
-  addTenantBtn: { backgroundColor: '#333399', flexDirection: 'row', padding: 15, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  addTenantBtnText: { color: 'white', fontWeight: 'bold', marginLeft: 10 },
-  statusList: { backgroundColor: 'white', borderRadius: 15, padding: 15 },
-  statusItem: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 0.5, borderColor: '#eee' },
-  statusLabel: { color: '#333' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
-  profileModal: { backgroundColor: 'white', borderRadius: 25, padding: 25, alignItems: 'center' },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, color: '#333399' },
-  profileDetail: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginBottom: 10 },
-  label: { fontWeight: 'bold', color: '#666' },
-  logoutBtn: { backgroundColor: '#d32f2f', padding: 12, borderRadius: 10, width: '100%', alignItems: 'center', marginTop: 20 },
-  input: { backgroundColor: '#f0f0f0', padding: 12, borderRadius: 10, marginBottom: 15, color: '#000' },
-  saveBtn: { backgroundColor: '#4caf50', padding: 15, borderRadius: 10, alignItems: 'center' }
+
+  header: {
+    backgroundColor: '#333399',
+    paddingTop: 55,
+    paddingBottom: 35,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+
+  headerText: {
+    alignItems: 'flex-end',
+  },
+
+  date: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+
+  year: {
+    color: '#D1D5FF',
+    fontSize: 12,
+    marginTop: 2,
+  },
+
+  content: {
+    padding: 20,
+  },
+
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 18,
+  },
+
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+
+  card: {
+    width: '47%',
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    paddingVertical: 24,
+    alignItems: 'center',
+    marginBottom: 16,
+    elevation: 3,
+  },
+
+  iconBox: {
+    backgroundColor: '#EEF0FF',
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+
+  cardText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+    textAlign: 'center',
+  },
 });
+
 
 export default Dashboard;

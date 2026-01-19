@@ -79,4 +79,23 @@ router.get('/range-summary/:adminId', async (req, res) => {
 
 
 
+// POST /api/invoices/add
+router.post('/add', async (req, res) => {
+    try {
+        const { adminId, tenantId, tenantName, amount, units, pdfUrl, month, dateRange } = req.body;
+        const newInvoice = new Invoice({ adminId, tenantId, tenantName, amount, units, pdfUrl, month, dateRange });
+        await newInvoice.save();
+        res.status(201).json({ success: true });
+    } catch (err) { res.status(500).json({ msg: err.message }); }
+});
+
+// GET /api/invoices/:adminId
+router.get('/:adminId', async (req, res) => {
+    try {
+        const invoices = await Invoice.find({ adminId: req.params.adminId }).sort({ createdAt: -1 });
+        res.json(invoices);
+    } catch (err) { res.status(500).json({ msg: err.message }); }
+});
+
+
 module.exports = router;

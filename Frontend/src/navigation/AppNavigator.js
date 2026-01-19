@@ -12,6 +12,7 @@ import SolarScreen from '../screens/adminPage/SolarScreen';
 import ReconciliationScreen from '../screens/adminPage/ReconciliationScreen';
 import ReadingsReviewScreen from '../screens/adminPage/ReadingsReviewScreen';
 import ForgetScreen from '../screens/ForgetScreen';
+import StatementScreen from '../screens/adminPage/StatementScreen';
 
 const Stack = createStackNavigator();
 
@@ -27,11 +28,11 @@ const AppNavigator = () => {
   }
 
   return (
-    <Stack.Navigator 
+    <Stack.Navigator
       screenOptions={{
-        animationEnabled: false, 
+        animationEnabled: false,
         headerStyle: { backgroundColor: '#333399' },
-        headerTintColor: '#fff', 
+        headerTintColor: '#fff',
         headerTitleStyle: { fontWeight: 'bold' },
       }}
     >
@@ -45,41 +46,46 @@ const AppNavigator = () => {
         <>
           {user.role === 'Admin' ? (
             <>
-            
-              <Stack.Screen 
+
+              <Stack.Screen
                 name="Dashboard"
-                component={TabNavigator} 
-                options={{ headerShown: false }} 
+                component={TabNavigator}
+                options={{ headerShown: false }}
               />
-              
-            
-              <Stack.Screen 
-                name="Solar" 
-                component={SolarScreen} 
-                options={{ title: 'Solar Entry', headerShown: true }} 
+
+
+              <Stack.Screen
+                name="Solar"
+                component={SolarScreen}
+                options={{ title: 'Solar Entry', headerShown: true }}
               />
-              <Stack.Screen 
-                name="DG" 
-                component={DGScreen} 
-                options={{ title: 'DG Log', headerShown: true }} 
+              <Stack.Screen
+                name="DG"
+                component={DGScreen}
+                options={{ title: 'DG Log', headerShown: true }}
               />
-               <Stack.Screen 
-                name="Reconciliation" 
-                component={ReconciliationScreen} 
-                options={{ title: '', headerShown: false }} 
+              <Stack.Screen
+                name="Reconciliation"
+                component={ReconciliationScreen}
+                options={{ title: '', headerShown: false }}
               />
-        <Stack.Screen 
-                name="MonthlyBilling" 
-                component={ReadingsReviewScreen} 
-                options={{ title: '', headerShown: false }} 
+              <Stack.Screen
+                name="MonthlyBilling"
+                component={ReadingsReviewScreen}
+                options={{ title: '', headerShown: false }}
               />
-              
+               <Stack.Screen
+                name="Statement"
+                component={StatementScreen}
+                options={{ title: '', headerShown: false }}
+              />
+
             </>
           ) : (
-            <Stack.Screen 
-              name="ReadingTakerScreen" 
-              component={ReadingTakerScreen} 
-              options={{ title: '', headerLeft: () => null ,headerShown: false}} 
+            <Stack.Screen
+              name="ReadingTakerScreen"
+              component={ReadingTakerScreen}
+              options={{ title: '', headerLeft: () => null, headerShown: false }}
             />
           )}
         </>
