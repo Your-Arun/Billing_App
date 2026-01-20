@@ -13,7 +13,14 @@ const StatementSchema = new mongoose.Schema({
   units: Number,
   totalAmount: Number,
 
-  pdfUrl: String,   // 🔥 SAME FORMAT PDF
+  pdfUrl: String,
+
+  // 🔥 ADD THIS
+  htmlContent: {
+    type: String,
+    required: true, maxlength: 500000 // ~500KB safe
+  }
+
 }, { timestamps: true });
 
 module.exports = mongoose.model('Statement', StatementSchema);

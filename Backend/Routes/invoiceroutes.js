@@ -3,6 +3,7 @@ const router = express.Router();
 const puppeteer = require('puppeteer');
 const cloudinary = require('cloudinary').v2;
 const Statement = require('../Modals/Invoice');
+require('dotenv').config(); 
 
 cloudinary.config({
   cloud_name: process.env.cloud_name,
@@ -70,11 +71,12 @@ router.post('/save', async (req, res) => {
       periodTo,
       units,
       totalAmount,
-      pdfUrl: uploadRes.secure_url
+      pdfUrl: uploadRes.secure_url,
+      htmlContent
     });
 
     res.status(201).json({ success: true, record });
-
+console.log("HTML length:", htmlContent.length);
   } catch (err) {
     console.error("Statement Save Error:", err);
     res.status(500).json({ msg: "PDF save failed" });

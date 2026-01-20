@@ -29,7 +29,7 @@ app.use('/solar', solarroutes);
 app.use('/readings', readingroutes); 
 app.use('/bill', billroutes); 
 app.use('/reconcile', reconcileroutes); 
-app.use('/invoices', invoiceroutes); 
+app.use('/statement', invoiceroutes); 
 
 
 

@@ -137,28 +137,28 @@ const StatementScreen = ({ route, navigation }) => {
         } catch (e) { Alert.alert("Error", "Could not share PDF"); }
         finally { setLoadingId({ id: null, type: null }); }
     };
-const handleSaveStatement = async (item) => {
-  try {
-    const html = createHTML(item);
+    const handleSaveStatement = async (item) => {
+        try {
+            const html = createHTML(item);
 
-    await axios.post(`${API_URL}/invoices/save`, {
-      adminId: user._id,
-      tenantId: item.tenantId,
-      tenantName: item.tenantName,
-      meterId: item.meterId,
-      periodFrom: startDate,
-      periodTo: endDate,
-      units: item.units,
-      totalAmount: item.totalBill,
-      htmlContent: html   // 🔥 SAME HTML
-    });
+            await axios.post(`${API_URL}/statement/save`, {
+                adminId: user._id,
+                tenantId: item.tenantId,
+                tenantName: item.tenantName,
+                meterId: item.meterId,
+                periodFrom: startDate,
+                periodTo: endDate,
+                units: item.units,
+                totalAmount: item.totalBill,
+                htmlContent: html   // 🔥 SAME HTML
+            });
 
-    Alert.alert("Saved", "Statement saved successfully");
+            Alert.alert("Saved", "Statement saved successfully");
 
-  } catch (e) {
-    Alert.alert("Error", "Could not save statement");
-  }
-};
+        } catch (e) {
+            Alert.alert("Error", "Could not save statement");
+        }
+    };
 
 
     return (
@@ -228,11 +228,11 @@ const handleSaveStatement = async (item) => {
                                     )}
                                 </TouchableOpacity>
                                 <TouchableOpacity
-  style={[styles.miniBtn, { backgroundColor: '#FFF7ED' }]}
-  onPress={() => handleSaveStatement(item)}
->
-  <MaterialCommunityIcons name="content-save" size={22} color="#FB923C" />
-</TouchableOpacity>
+                                    style={[styles.miniBtn, { backgroundColor: '#FFF7ED' }]}
+                                    onPress={() => handleSaveStatement(item)}
+                                >
+                                    <MaterialCommunityIcons name="content-save" size={22} color="#FB923C" />
+                                </TouchableOpacity>
 
                             </View>
                         </View>
