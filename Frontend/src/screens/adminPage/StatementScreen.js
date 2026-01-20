@@ -14,7 +14,7 @@ const StatementScreen = ({ route, navigation }) => {
     const { user } = useContext(UserContext);
     const { tenantBreakdown, startDate, endDate } = route.params;
     const [loadingId, setLoadingId] = useState({ id: null, type: null });
-    
+
     // 🔍 Search State
     const [searchText, setSearchText] = useState('');
 
@@ -24,7 +24,7 @@ const StatementScreen = ({ route, navigation }) => {
 
     // ⚡ Filtering Logic (Performs instantly as you type)
     const filteredTenants = useMemo(() => {
-        return tenantBreakdown.filter(item => 
+        return tenantBreakdown.filter(item =>
             item.tenantName.toLowerCase().includes(searchText.toLowerCase()) ||
             item.meterId.toLowerCase().includes(searchText.toLowerCase())
         );
@@ -137,68 +137,34 @@ const StatementScreen = ({ route, navigation }) => {
         } catch (e) { Alert.alert("Error", "Could not share PDF"); }
         finally { setLoadingId({ id: null, type: null }); }
     };
+const handleSaveStatement = async (item) => {
+  try {
+    const html = createHTML(item);
 
+    await axios.post(`${API_URL}/invoices/save`, {
+      adminId: user._id,
+      tenantId: item.tenantId,
+      tenantName: item.tenantName,
+      meterId: item.meterId,
+      periodFrom: startDate,
+      periodTo: endDate,
+      units: item.units,
+      totalAmount: item.totalBill,
+      htmlContent: html   // 🔥 SAME HTML
+    });
 
-    // ... existing imports ...
+    Alert.alert("Saved", "Statement saved successfully");
 
-const handleUpload = async (item) => {
-    // 1. Start loading for this specific tenant
-    setLoadingId({ id: item.tenantId, type: 'upload' });
-
-    try {
-        // 2. Generate PDF locally
-        const html = createHTML(item);
-        const { uri } = await Print.printToFileAsync({ html });
-
-        // 3. Prepare FormData
-        const formData = new FormData();
-        const safeName = item.tenantName.replace(/\s+/g, '_');
-        
-        formData.append('invoiceFile', {
-            uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
-            name: `Invoice_${safeName}.pdf`,
-            type: 'application/pdf',
-        });
-
-        // Backend ke liye baaki details
-        formData.append('adminId', user.id || user._id);
-        formData.append('tenantId', item.tenantId);
-        formData.append('tenantName', item.tenantName);
-        formData.append('meterId', item.meterId);
-        formData.append('amount', item.totalBill);
-        formData.append('units', item.units);
-        formData.append('opening', item.opening);
-        formData.append('closing', item.closing);
-        formData.append('multiplier', item.multiplierCT);
-        formData.append('month', monthKey);
-        formData.append('dateRange', `${fromDate} - ${toDate}`);
-
-        // 4. API Call
-        const res = await axios.post(`${API_URL}/invoices/upload-single`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        });
-
-        if (res.data.success) {
-            Toast.show({ 
-                type: 'success', 
-                text1: 'Uploaded! ☁️', 
-                text2: `${item.tenantName}'s invoice saved in database.` 
-            });
-        }
-
-    } catch (error) {
-        console.log("Upload Error:", error.response?.data || error.message);
-        Alert.alert("Error", "Could not upload invoice to cloud.");
-    } finally {
-        setLoadingId({ id: null, type: null });
-    }
+  } catch (e) {
+    Alert.alert("Error", "Could not save statement");
+  }
 };
 
 
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" />
-            
+
             {/* --- HEADER --- */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backCircle}>
@@ -240,8 +206,8 @@ const handleUpload = async (item) => {
                                 <Text style={styles.tSub}>₹{item.totalBill.toFixed(0)} • {item.units} kWh</Text>
                             </View>
                             <View style={styles.actionRow}>
-                                <TouchableOpacity 
-                                    style={[styles.miniBtn, { backgroundColor: '#F0F2FF' }]} 
+                                <TouchableOpacity
+                                    style={[styles.miniBtn, { backgroundColor: '#F0F2FF' }]}
                                     onPress={() => handleView(item)}
                                 >
                                     {loadingId.id === item.tenantId && loadingId.type === 'view' ? (
@@ -251,8 +217,8 @@ const handleUpload = async (item) => {
                                     )}
                                 </TouchableOpacity>
 
-                                <TouchableOpacity 
-                                    style={[styles.miniBtn, { backgroundColor: '#E8F5E9' }]} 
+                                <TouchableOpacity
+                                    style={[styles.miniBtn, { backgroundColor: '#E8F5E9' }]}
                                     onPress={() => handleShare(item)}
                                 >
                                     {loadingId.id === item.tenantId && loadingId.type === 'share' ? (
@@ -261,18 +227,13 @@ const handleUpload = async (item) => {
                                         <MaterialCommunityIcons name="share-variant" size={22} color="#4CAF50" />
                                     )}
                                 </TouchableOpacity>
-
-                                <TouchableOpacity 
-    style={[styles.miniBtn, { backgroundColor: '#E8F5E9' }]} 
-    onPress={() => handleUpload(item)}
-    disabled={loadingId.id !== null}
+                                <TouchableOpacity
+  style={[styles.miniBtn, { backgroundColor: '#FFF7ED' }]}
+  onPress={() => handleSaveStatement(item)}
 >
-    {loadingId.id === item.tenantId && loadingId.type === 'upload' ? (
-        <ActivityIndicator size="small" color="#4CAF50" />
-    ) : (
-        <MaterialCommunityIcons name="upload" size={22} color="#4CAF50" />
-    )}
+  <MaterialCommunityIcons name="content-save" size={22} color="#FB923C" />
 </TouchableOpacity>
+
                             </View>
                         </View>
                     </View>
@@ -294,7 +255,7 @@ const styles = StyleSheet.create({
     backCircle: { backgroundColor: '#F5F5F5', borderRadius: 20, width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
     headerTitle: { fontSize: 20, fontWeight: '800', color: '#1A1C3D' },
     saveBtn: { padding: 5 },
-    
+
     searchContainer: { backgroundColor: '#FFF', paddingHorizontal: 16, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
     searchBox: { flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 12, paddingHorizontal: 12, height: 45, alignItems: 'center' },
     searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: '#1F2937' },
@@ -305,17 +266,17 @@ const styles = StyleSheet.create({
     dateBadge: { backgroundColor: '#333399', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 8 },
     dateBadgeText: { fontSize: 9, fontWeight: 'bold', color: '#FFF' },
     tSub: { fontSize: 13, color: '#6B7280', marginTop: 2 },
-    
+
     actionRow: { flexDirection: 'row', gap: 10 },
     miniBtn: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-    
+
     // Progress Modal Styles
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
     modalContent: { backgroundColor: 'white', padding: 30, borderRadius: 20, alignItems: 'center' },
     progressText: { fontSize: 18, fontWeight: 'bold', marginTop: 15 },
     progressSub: { fontSize: 14, color: '#666', marginTop: 5 },
     emptyText: { textAlign: 'center', marginTop: 50, color: '#9CA3AF', fontWeight: 'bold' }
-    
+
 });
 
 export default StatementScreen;

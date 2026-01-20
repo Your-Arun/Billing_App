@@ -1,59 +1,84 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
+const puppeteer = require('puppeteer');
 const cloudinary = require('cloudinary').v2;
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const Invoice = require('../Modals/Invoice');
-const mongoose = require('mongoose');
+const Statement = require('../Modals/Invoice');
 
-// 1. Cloudinary Config (Aapke provided logic ke hisab se)
 cloudinary.config({
   cloud_name: process.env.cloud_name,
   api_key: process.env.api_key,
-  api_secret: process.env.api_secret
+  api_secret: process.env.api_secret,
 });
 
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: 'invoice', 
-    format: 'pdf', // Change to 'pdf'
-    resource_type: 'raw' // PDF ke liye 'raw' ya 'auto' zaroori hota hai
-  },
-});
+router.post('/save', async (req, res) => {
+  try {
+    const {
+      adminId,
+      tenantId,
+      tenantName,
+      meterId,
+      periodFrom,
+      periodTo,
+      units,
+      totalAmount,
+      htmlContent
+    } = req.body;
 
-const upload = multer({ storage: storage });
-
-// 2. Single Invoice Upload API
-router.post('/upload-single', upload.single('invoiceFile'), async (req, res) => {
-    try {
-        const { adminId, tenantId, tenantName, amount, units, month, dateRange, meterId, opening, closing, multiplier } = req.body;
-
-        if (!req.file) return res.status(400).json({ msg: "File upload failed" });
-
-        // Database mein entry save karein
-        const newInvoice = new Invoice({
-            adminId: new mongoose.Types.ObjectId(adminId),
-            tenantId: new mongoose.Types.ObjectId(tenantId),
-            tenantName,
-            meterId,
-            amount: Number(amount),
-            units: Number(units),
-            opening: Number(opening),
-            closing: Number(closing),
-            multiplier: Number(multiplier),
-            month,
-            dateRange,
-            pdfUrl: req.file.path // Cloudinary URL
-        });
-
-        await newInvoice.save();
-        res.status(201).json({ success: true, msg: "Invoice uploaded and saved! ✅", data: newInvoice });
-
-    } catch (err) {
-        console.error("Upload Error:", err.message);
-        res.status(500).json({ msg: err.message });
+    if (!htmlContent) {
+      return res.status(400).json({ msg: "HTML content missing" });
     }
+
+    // 🧠 1. Generate PDF from HTML
+    const browser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '20px', bottom: '20px' }
+    });
+
+    await browser.close();
+
+    // ☁️ 2. Upload to Cloudinary
+    const uploadRes = await new Promise((resolve, reject) => {
+      cloudinary.uploader.upload_stream(
+        {
+          folder: 'statements',
+          resource_type: 'raw',
+          format: 'pdf'
+        },
+        (err, result) => {
+          if (err) reject(err);
+          else resolve(result);
+        }
+      ).end(pdfBuffer);
+    });
+
+    // 🗄️ 3. Save DB record
+    const record = await Statement.create({
+      adminId,
+      tenantId,
+      tenantName,
+      meterId,
+      periodFrom,
+      periodTo,
+      units,
+      totalAmount,
+      pdfUrl: uploadRes.secure_url
+    });
+
+    res.status(201).json({ success: true, record });
+
+  } catch (err) {
+    console.error("Statement Save Error:", err);
+    res.status(500).json({ msg: "PDF save failed" });
+  }
 });
 
 module.exports = router;

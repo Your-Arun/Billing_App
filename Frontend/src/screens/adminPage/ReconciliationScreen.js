@@ -122,7 +122,7 @@ const ReconciliationScreen = ({ route, navigation }) => {
 
     const { gridUnits, gridAmount, gridFixedPrice, solarUnits, totalTenantUnitsSum, commonLoss, lossPercent, calculatedTenants } = processedData || {};
 
-    
+
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -184,30 +184,30 @@ const ReconciliationScreen = ({ route, navigation }) => {
                 ))}
             </ScrollView>
 
-           <View style={styles.footer}>
-    <TouchableOpacity 
-        style={styles.btn} 
-        onPress={() => {
-            // Check करें कि डेटा लोड हो चुका है
-            if (!processedData) return Alert.alert("Error", "Data is still loading");
+            <View style={styles.footer}>
+                <TouchableOpacity
+                    style={styles.btn}
+                    onPress={() => {
+                        // Check करें कि डेटा लोड हो चुका है
+                        if (!processedData) return Alert.alert("Error", "Data is still loading");
 
-            navigation.navigate('Statement', { 
-                tenantBreakdown: processedData.calculatedTenants, // useMemo से आया डेटा
-                startDate: startDate.toISOString(), 
-                endDate: endDate.toISOString(),
-                // 'reconData' की जगह अब हम 'processedData' भेजेंगे
-                summary: {
-                    gridUnits: processedData.gridUnits,
-                    gridAmount: processedData.gridAmount,
-                    commonLoss: processedData.commonLoss
-                }
-            });
-        }}
-    >
-        <Text style={styles.btnText}>GENERATE FINAL INVOICES</Text>
+                        navigation.navigate('Statement', {
+                            tenantBreakdown: processedData.calculatedTenants, // useMemo से आया डेटा
+                            startDate: startDate.toISOString(),
+                            endDate: endDate.toISOString(),
+                            // 'reconData' की जगह अब हम 'processedData' भेजेंगे
+                            summary: {
+                                gridUnits: processedData.gridUnits,
+                                gridAmount: processedData.gridAmount,
+                                commonLoss: processedData.commonLoss
+                            }
+                        });
+                    }}
+                >
+                    <Text style={styles.btnText}>GENERATE FINAL INVOICES</Text>
 
-    </TouchableOpacity>
-</View>
+                </TouchableOpacity>
+            </View>
         </SafeAreaView>
     );
 };
