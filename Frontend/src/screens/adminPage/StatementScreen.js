@@ -9,6 +9,8 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { UserContext } from '../../services/UserContext';
+import axios from 'axios';
+import API_URL from '../../services/apiconfig';
 
 const StatementScreen = ({ route, navigation }) => {
     const { user } = useContext(UserContext);
@@ -137,11 +139,15 @@ const StatementScreen = ({ route, navigation }) => {
         } catch (e) { Alert.alert("Error", "Could not share PDF"); }
         finally { setLoadingId({ id: null, type: null }); }
     };
-    const handleSaveStatement = async (item) => {
-        try {
-            const html = createHTML(item);
+   const handleSaveStatement = async (item) => {
+    try {
+        const html = createHTML(item);
 
-            await axios.post(`${API_URL}/statement/save`, {
+        console.log("HTML length:", html.length);
+
+        const res = await axios.post(
+            `${API_URL}/statement/save`,
+            {
                 adminId: user._id,
                 tenantId: item.tenantId,
                 tenantName: item.tenantName,
@@ -150,15 +156,23 @@ const StatementScreen = ({ route, navigation }) => {
                 periodTo: endDate,
                 units: item.units,
                 totalAmount: item.totalBill,
-                htmlContent: html   // 🔥 SAME HTML
-            });
+                htmlContent: html
+            },
+            {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
 
-            Alert.alert("Saved", "Statement saved successfully");
+        Alert.alert("Saved", "Statement saved successfully");
 
-        } catch (e) {
-            Alert.alert("Error", "Could not save statement");
-        }
-    };
+    } catch (e) {
+        console.log("SAVE ERROR:", e.response?.data || e.message);
+        Alert.alert("Error", "Could not save statement");
+    }
+};
+
 
 
     return (

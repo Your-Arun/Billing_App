@@ -18,7 +18,7 @@ const StatementSchema = new mongoose.Schema({
   // 🔥 ADD THIS
   htmlContent: {
     type: String,
-    required: true, maxlength: 500000 // ~500KB safe
+    required: true, 
   }
 
 }, { timestamps: true });

@@ -76,7 +76,7 @@ router.post('/save', async (req, res) => {
     });
 
     res.status(201).json({ success: true, record });
-console.log("HTML length:", htmlContent.length);
+console.log("HTML received length:", htmlContent?.length);
   } catch (err) {
     console.error("Statement Save Error:", err);
     res.status(500).json({ msg: "PDF save failed" });
