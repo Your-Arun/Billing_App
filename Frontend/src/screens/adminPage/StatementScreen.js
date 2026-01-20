@@ -143,8 +143,6 @@ const adminId = user?._id || user?.id;
     try {
         const html = createHTML(item);
 
-        console.log("HTML length:", html.length);
-
         const res = await axios.post(
             `${API_URL}/statement/save`,
             {
@@ -163,11 +161,8 @@ const adminId = user?._id || user?.id;
                     'Content-Type': 'application/json'
                 }
             }
-        );console.log("ADMIN ID:", user?._id);
-
-
-
-
+        );
+        console.log("ADMIN ID:", user?._id);
         Alert.alert("Saved", "Statement saved successfully");
 
     } catch (e) {

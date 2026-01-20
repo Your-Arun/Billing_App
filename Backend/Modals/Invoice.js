@@ -1,29 +1,20 @@
 const mongoose = require('mongoose');
 
 const StatementSchema = new mongoose.Schema({
-  adminId: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: true,
-    ref: "User"
-  },
-  tenantId: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: true,
-    ref: "Tenant"
-  },
+  adminId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  tenantId: { type: mongoose.Schema.Types.ObjectId, ref: "Tenant", required: true },
+
   tenantName: String,
   meterId: String,
-  periodFrom: String,
-  periodTo: String,
+
+  periodFrom: Date,
+  periodTo: Date,
+
   units: Number,
   totalAmount: Number,
 
-  htmlContent: {
-    type: String,     // ✅ SAME HTML
-    required: true
-  },
-
-  pdfUrl: String
+  htmlContent: String,   // ✅ ADD THIS
+  pdfUrl: String,
 }, { timestamps: true });
 
 
