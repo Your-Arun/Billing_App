@@ -28,7 +28,7 @@
     "nodemailer": "^7.0.12",
     "path": "^0.12.7",
     "pdf-parse": "^1.1.1",
-    "puppeteer-core": "^24.35.0",
+    "puppeteer": "^24.35.0",
     "tesseract.js": "^7.0.0",
     "twilio": "^5.11.2"
   }

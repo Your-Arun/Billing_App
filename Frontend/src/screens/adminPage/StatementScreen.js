@@ -163,7 +163,10 @@ const StatementScreen = ({ route, navigation }) => {
                     'Content-Type': 'application/json'
                 }
             }
-        );
+        );console.log("ADMIN ID:", user?._id);
+
+
+
 
         Alert.alert("Saved", "Statement saved successfully");
 

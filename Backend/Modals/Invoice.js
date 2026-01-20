@@ -1,26 +1,30 @@
 const mongoose = require('mongoose');
 
 const StatementSchema = new mongoose.Schema({
-  adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', required: true },
-
+  adminId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+    ref: "User"
+  },
+  tenantId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+    ref: "Tenant"
+  },
   tenantName: String,
   meterId: String,
-
-  periodFrom: Date,
-  periodTo: Date,
-
+  periodFrom: String,
+  periodTo: String,
   units: Number,
   totalAmount: Number,
 
-  pdfUrl: String,
-
-  // 🔥 ADD THIS
   htmlContent: {
-    type: String,
-    required: true, 
-  }
+    type: String,     // ✅ SAME HTML
+    required: true
+  },
 
+  pdfUrl: String
 }, { timestamps: true });
+
 
 module.exports = mongoose.model('Statement', StatementSchema);
