@@ -11,6 +11,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@sparticuz/chromium": "^143.0.4",
     "axios": "^1.13.2",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^1.41.3",
@@ -27,7 +28,7 @@
     "nodemailer": "^7.0.12",
     "path": "^0.12.7",
     "pdf-parse": "^1.1.1",
-    "puppeteer": "^24.35.0",
+    "puppeteer-core": "^24.35.0",
     "tesseract.js": "^7.0.0",
     "twilio": "^5.11.2"
   }
