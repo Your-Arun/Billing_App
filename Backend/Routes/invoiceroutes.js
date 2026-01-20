@@ -13,46 +13,35 @@ cloudinary.config({
 
 router.post('/save', async (req, res) => {
   try {
-    const {
-      adminId,
-      tenantId,
-      tenantName,
-      meterId,
-      periodFrom,
-      periodTo,
-      units,
-      totalAmount,
-      htmlContent
-    } = req.body;
+    const { htmlContent } = req.body;
 
-    if (!htmlContent) {
-      return res.status(400).json({ msg: "HTML content missing" });
-    }
-
-    // 🧠 1. Generate PDF from HTML
     const browser = await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--single-process'
+      ]
     });
 
     const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+    await page.setContent(htmlContent, { waitUntil: 'load' });
 
     const pdfBuffer = await page.pdf({
       format: 'A4',
       printBackground: true,
-      margin: { top: '20px', bottom: '20px' }
+      preferCSSPageSize: true,
     });
 
     await browser.close();
 
-    // ☁️ 2. Upload to Cloudinary
     const uploadRes = await new Promise((resolve, reject) => {
       cloudinary.uploader.upload_stream(
         {
           folder: 'statements',
           resource_type: 'raw',
-          format: 'pdf'
         },
         (err, result) => {
           if (err) reject(err);
@@ -61,26 +50,21 @@ router.post('/save', async (req, res) => {
       ).end(pdfBuffer);
     });
 
-    // 🗄️ 3. Save DB record
     const record = await Statement.create({
-      adminId,
-      tenantId,
-      tenantName,
-      meterId,
-      periodFrom,
-      periodTo,
-      units,
-      totalAmount,
-      pdfUrl: uploadRes.secure_url,
-      htmlContent
+      ...req.body,
+      pdfUrl: uploadRes.secure_url
     });
 
     res.status(201).json({ success: true, record });
-console.log("HTML received length:", htmlContent?.length);
+
   } catch (err) {
-    console.error("Statement Save Error:", err);
-    res.status(500).json({ msg: "PDF save failed" });
+    console.error("PDF ERROR FULL:", err);
+    res.status(500).json({
+      msg: "PDF save failed",
+      error: err.message
+    });
   }
 });
+
 
 module.exports = router;
