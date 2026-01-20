@@ -23,7 +23,7 @@ const StatementScreen = ({ route, navigation }) => {
     const fromDate = new Date(startDate).toLocaleDateString('en-IN');
     const toDate = new Date(endDate).toLocaleDateString('en-IN');
     const today = new Date().toLocaleDateString('en-IN');
-
+const adminId = user?._id || user?.id;
     // ⚡ Filtering Logic (Performs instantly as you type)
     const filteredTenants = useMemo(() => {
         return tenantBreakdown.filter(item =>
@@ -148,7 +148,7 @@ const StatementScreen = ({ route, navigation }) => {
         const res = await axios.post(
             `${API_URL}/statement/save`,
             {
-                adminId: user._id,
+                adminId: adminId,
                 tenantId: item.tenantId,
                 tenantName: item.tenantName,
                 meterId: item.meterId,
