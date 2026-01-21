@@ -80,5 +80,25 @@ router.get("/history/:adminId", async (req, res) => {
   }
 });
 
+// 🗑️ DELETE STATEMENT
+router.delete('/delete/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        // 1. Check if ID is valid
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ msg: "Invalid Statement ID" });
+        }
+        // 2. Find and Delete
+        const deleted = await Statement.findByIdAndDelete(id);
+        if (!deleted) {
+            return res.status(404).json({ msg: "Statement not found" });
+        }
+        res.json({ success: true, msg: "Deleted ✅" });
+    } catch (err) {
+        console.error("Delete Error:", err.message);
+        res.status(500).json({ msg: "Delete failed", error: err.message });
+    }
+});
+
 
 module.exports = router;
