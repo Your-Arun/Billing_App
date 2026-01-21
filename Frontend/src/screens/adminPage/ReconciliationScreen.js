@@ -24,7 +24,7 @@ const ReconciliationScreen = ({ route, navigation }) => {
 
     // --- States ---
     const [loading, setLoading] = useState(true);
-    const [rawApiData, setRawApiData] = useState(null); 
+    const [rawApiData, setRawApiData] = useState(null);
     const [disabledDgIds, setDisabledDgIds] = useState([]);
     const [disabledLossIds, setDisabledLossIds] = useState([]);
 
@@ -108,7 +108,7 @@ const ReconciliationScreen = ({ route, navigation }) => {
         };
     }, [rawApiData, disabledDgIds, disabledLossIds]);
 
- 
+
     const toggleDgCharge = (tenantId) => {
         setDisabledDgIds(prev => prev.includes(tenantId) ? prev.filter(id => id !== tenantId) : [...prev, tenantId]);
     };
@@ -121,7 +121,7 @@ const ReconciliationScreen = ({ route, navigation }) => {
         return <View style={styles.loaderContainer}><ActivityIndicator size="large" color="#333399" /></View>;
     }
 
-    const { gridUnits, gridAmount, gridFixedPrice, solarUnits, totalTenantUnitsSum, commonLoss, lossPercent,totalTenantAmountSum, calculatedTenants } = processedData || {};
+    const { gridUnits, gridAmount, gridFixedPrice, solarUnits, totalTenantUnitsSum, commonLoss, lossPercent, totalTenantAmountSum, calculatedTenants } = processedData || {};
 
 
 
@@ -149,9 +149,17 @@ const ReconciliationScreen = ({ route, navigation }) => {
                         <View><Text style={styles.lossLabel}>System Loss</Text><Text style={styles.lossValue}>{commonLoss?.toFixed(1)} kWh</Text></View>
                         <Text style={[styles.lossPercent, { color: lossPercent > 12 ? '#DC2626' : '#059669' }]}>{lossPercent}%</Text>
                     </View>
+                    <Row label="Tenant Total Amount" value={`₹ ${Math.round(totalTenantAmountSum || 0)}`} icon="account-group" color="#4F46E5" bold />
 
-
-                    <Row label="Tenant Total Amount" value={`₹ ${Math.round(totalTenantAmountSum || 0)}`}icon="account-group" color="#4F46E5" bold />
+                    <Row
+                        label="After Paying Bill Profit"
+                        value={`₹ ${Math.round(totalTenantAmountSum - gridAmount || 0)}`}
+                        icon=""
+                        color="#080957ff"
+                        bold
+                        labelStyle={{ fontSize: 30, textDecorationLine: 'underline' }}
+                        valueStyle={{ fontSize: 30, fontWeight: 'bold', textDecorationLine: 'underline' }}
+                    />
                 </View>
 
                 <Text style={styles.sectionTitle}>Tenant Invoices</Text>
@@ -195,7 +203,7 @@ const ReconciliationScreen = ({ route, navigation }) => {
                         if (!processedData) return Alert.alert("Error", "Data is still loading");
 
                         navigation.navigate('Statement', {
-                            tenantBreakdown: processedData.calculatedTenants, // useMemo से आया डेटा
+                            tenantBreakdown: processedData.calculatedTenants,
                             startDate: startDate.toISOString(),
                             endDate: endDate.toISOString(),
                             summary: {
