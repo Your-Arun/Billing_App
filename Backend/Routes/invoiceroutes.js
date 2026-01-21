@@ -4,6 +4,7 @@ const cloudinary = require("cloudinary").v2;
 const Statement = require("../Modals/Invoice");
 const puppeteer = require("puppeteer-core");
 const chromium = require("@sparticuz/chromium");
+const { default: mongoose } = require("mongoose");
 require("dotenv").config();
 
 cloudinary.config({
