@@ -24,7 +24,7 @@ const ReconciliationScreen = ({ route, navigation }) => {
 
     // --- States ---
     const [loading, setLoading] = useState(true);
-    const [rawApiData, setRawApiData] = useState(null); // API se aaya raw data store karne ke liye
+    const [rawApiData, setRawApiData] = useState(null); 
     const [disabledDgIds, setDisabledDgIds] = useState([]);
     const [disabledLossIds, setDisabledLossIds] = useState([]);
 
@@ -72,6 +72,7 @@ const ReconciliationScreen = ({ route, navigation }) => {
             ? dgRes.value.data.dgSummary.reduce((sum, d) => sum + (Number(d.totalUnits) || 0), 0) : 0;
 
         let totalTenantUnitsSum = 0;
+        let totalTenantAmountSum = 0;
         const calculatedTenants = (tenantRes.status === 'fulfilled' && Array.isArray(tenantRes.value.data))
             ? tenantRes.value.data.map(t => {
                 const diff = Number(t.closing) - Number(t.opening);
@@ -89,8 +90,8 @@ const ReconciliationScreen = ({ route, navigation }) => {
                 const dgCharge = (t.connectedDG && t.connectedDG !== "None" && !isDgDisabled) ? (units * 1) : 0;
 
                 const totalBill = amount + fixed + transLoss + dgCharge;
-                totalTenantUnitsSum += diff; // Aapke purane logic ke hisab se diff add ho raha hai
-
+                totalTenantUnitsSum += diff;
+                totalTenantAmountSum += totalBill;
                 return {
                     ...t, units, amount, fixed, transLoss, dgCharge, totalBill,
                     isDgDisabled, isLossDisabled
@@ -103,11 +104,11 @@ const ReconciliationScreen = ({ route, navigation }) => {
 
         return {
             gridUnits, gridAmount, gridFixedPrice, solarUnits, dgUnitsTotal,
-            totalTenantUnitsSum, commonLoss, lossPercent, calculatedTenants
+            totalTenantUnitsSum, commonLoss, lossPercent, totalTenantAmountSum, calculatedTenants
         };
     }, [rawApiData, disabledDgIds, disabledLossIds]);
 
-    // --- Toggle Handlers (Ab ye APIs call nahi karenge, sirf state badlenge) ---
+ 
     const toggleDgCharge = (tenantId) => {
         setDisabledDgIds(prev => prev.includes(tenantId) ? prev.filter(id => id !== tenantId) : [...prev, tenantId]);
     };
@@ -120,7 +121,7 @@ const ReconciliationScreen = ({ route, navigation }) => {
         return <View style={styles.loaderContainer}><ActivityIndicator size="large" color="#333399" /></View>;
     }
 
-    const { gridUnits, gridAmount, gridFixedPrice, solarUnits, totalTenantUnitsSum, commonLoss, lossPercent, calculatedTenants } = processedData || {};
+    const { gridUnits, gridAmount, gridFixedPrice, solarUnits, totalTenantUnitsSum, commonLoss, lossPercent,totalTenantAmountSum, calculatedTenants } = processedData || {};
 
 
 
@@ -138,7 +139,7 @@ const ReconciliationScreen = ({ route, navigation }) => {
             <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }} refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchAllData} />}>
                 <View style={styles.mainCard}>
                     <Row label="Grid Units" value={gridUnits} icon="flash" color="#333399" />
-                    <Row label="Bill Amount" value={gridAmount} icon="currency-inr" color="#333399" />
+                    <Row label="Bill Amount" value={gridAmount} icon="currency-inr" color="#df1010ff" />
                     <Row label="Fixed Charged" value={gridFixedPrice} icon="lock" color="#333399" />
                     <Row label="Solar Sum" value={solarUnits} icon="solar-power" color="#D4B012" bold />
                     <Row label="Tenant Total Units" value={totalTenantUnitsSum?.toFixed(1)} icon="account-group" color="#4F46E5" bold />
@@ -148,6 +149,9 @@ const ReconciliationScreen = ({ route, navigation }) => {
                         <View><Text style={styles.lossLabel}>System Loss</Text><Text style={styles.lossValue}>{commonLoss?.toFixed(1)} kWh</Text></View>
                         <Text style={[styles.lossPercent, { color: lossPercent > 12 ? '#DC2626' : '#059669' }]}>{lossPercent}%</Text>
                     </View>
+
+
+                    <Row label="Tenant Total Amount" value={`₹ ${Math.round(totalTenantAmountSum || 0)}`}icon="account-group" color="#4F46E5" bold />
                 </View>
 
                 <Text style={styles.sectionTitle}>Tenant Invoices</Text>
@@ -188,14 +192,12 @@ const ReconciliationScreen = ({ route, navigation }) => {
                 <TouchableOpacity
                     style={styles.btn}
                     onPress={() => {
-                        // Check करें कि डेटा लोड हो चुका है
                         if (!processedData) return Alert.alert("Error", "Data is still loading");
 
                         navigation.navigate('Statement', {
                             tenantBreakdown: processedData.calculatedTenants, // useMemo से आया डेटा
                             startDate: startDate.toISOString(),
                             endDate: endDate.toISOString(),
-                            // 'reconData' की जगह अब हम 'processedData' भेजेंगे
                             summary: {
                                 gridUnits: processedData.gridUnits,
                                 gridAmount: processedData.gridAmount,

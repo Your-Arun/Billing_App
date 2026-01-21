@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useContext, useCallback } from 'react';
+import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import {
-    View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, 
-    Modal, TextInput, Alert, Platform, StatusBar
+    View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, 
+    Modal, TextInput, Alert, FlatList, StatusBar,refreshing
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -9,6 +9,31 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
+
+const TenantRow = React.memo(({ t, onEdit }) => (
+    <View style={styles.tableRow}>
+        <View style={{ flex: 2 }}>
+            <Text style={styles.tName} numberOfLines={1}>{t.tenantName}</Text>
+            <Text style={styles.tMeter}>{t.meterId}</Text>
+            <Text style={[styles.tMeter, {color: '#666'}]}>{t.connectedDG || 'No DG'}</Text>
+        </View>
+        <View style={styles.cellCenter}>
+            <Text style={styles.tLabel}>OPENING</Text>
+            <Text style={styles.tValue}>{t.opening}</Text>
+        </View>
+        <View style={styles.cellCenter}>
+            <Text style={styles.tLabel}>CLOSING</Text>
+            <Text style={styles.tValue}>{t.closing}</Text>
+        </View>
+        <View style={styles.cellCenter}>
+            <Text style={styles.tLabel}>USED</Text>
+            <Text style={styles.spike}>{t.spike}</Text>
+        </View>
+        <TouchableOpacity onPress={() => onEdit(t)} style={styles.editBtn}>
+            <MaterialCommunityIcons name="pencil-box-outline" size={26} color="#4F46E5" />
+        </TouchableOpacity>
+    </View>
+));
 
 const ReadingsReviewScreen = ({ navigation }) => {
     const { user } = useContext(UserContext);
@@ -32,8 +57,8 @@ const ReadingsReviewScreen = ({ navigation }) => {
 
     const fetchData = useCallback(async () => {
         if (!user?.id) return;
+        setLoading(true);
         try {
-            setLoading(true);
             const params = { from: formatDateForAPI(startDate), to: formatDateForAPI(endDate) };
 
             const [billRes, solarRes, dgRes, rangeRes] = await Promise.all([
@@ -59,31 +84,54 @@ const ReadingsReviewScreen = ({ navigation }) => {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
+    const handleEdit = useCallback((t) => {
+        setSelectedTenant(t);
+        setNewReading(t.closing.toString());
+        setEditModalVisible(true);
+    }, []);
+
     const handleSaveUpdate = async () => {
         if (!newReading || isNaN(newReading)) return Alert.alert("Error", "Enter valid number");
+        setUpdating(true);
         try {
-            setUpdating(true);
             await axios.put(`${API_URL}/readings/update-reading/${selectedTenant.readingId}`, {
                 newReading: Number(newReading)
             });
-            Alert.alert("Success", "Reading Updated");
             setEditModalVisible(false);
-            fetchData(); // Refresh list
-        } catch (err) { Alert.alert("Failed", err.message); } 
-        finally { setUpdating(false); }
+            fetchData();
+        } catch (err) { 
+            Alert.alert("Failed", "Update failed"); 
+        } finally { 
+            setUpdating(false); 
+        }
     };
+
+    // Header component to be used inside FlatList
+    const ListHeader = useMemo(() => (
+        <View>
+            <View style={styles.grid}>
+                <SummaryCard label="GRID" value={billData.totalUnits} unit="kWh" icon="flash" color="#333399" />
+                <SummaryCard label="SOLAR" value={solar.unitsGenerated} unit="kWh" icon="solar-power" color="#059669" />
+                <SummaryCard label="DG UNIT" value={dg.totalUnits} unit="kWh" icon="engine" color="#DC2626" />
+            </View>
+            <Text style={styles.sectionTitle}>Tenant Verification</Text>
+        </View>
+    ), [billData, solar, dg]);
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <StatusBar barStyle="dark-content" />
             
+            {/* STATIC HEADER */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
                     <MaterialCommunityIcons name="chevron-left" size={32} color="#333399" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Review Readings</Text>
+                <View style={{width: 32}} />
             </View>
 
+            {/* DATE SELECTOR */}
             <View style={styles.dateSelector}>
                 <TouchableOpacity onPress={() => setShowPicker('from')} style={styles.dateBtn}>
                     <Text style={styles.dateLabel}>FROM</Text>
@@ -107,57 +155,30 @@ const ReadingsReviewScreen = ({ navigation }) => {
                 />
             )}
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-                <View style={styles.grid}>
-                    <SummaryCard label="GRID" value={billData.totalUnits} unit="kWh" icon="flash" color="#333399" />
-                    <SummaryCard label="SOLAR" value={solar.unitsGenerated} unit="kWh" icon="solar-power" color="#059669" />
-                    <SummaryCard label="DG UNIT" value={dg.totalUnits} unit="kWh" icon="engine" color="#DC2626" />
-                </View>
-
-                <Text style={styles.sectionTitle}>Tenant Verification</Text>
-                <View style={styles.tableCard}>
-                    {tenants.length > 0 ? tenants.map((t, i) => (
-                        <View key={i} style={styles.tableRow}>
-                            <View style={{ flex: 2 }}>
-                                <Text style={styles.tName}>{t.tenantName}</Text>
-                                <Text style={styles.tMeter}>{t.meterId}</Text>
-                                <Text style={styles.tMeter}>{t.connectedDG}</Text>
-                            </View>
-                            <View style={{ flex: 1.2, alignItems: 'center' }}>
-                                
-                                <Text style={styles.tLabel}>OPENING</Text>
-                                <Text style={styles.tValue}>{t.opening}</Text>
-                            </View>
-                            <View style={{ flex: 1.2, alignItems: 'center' }}>
-                                
-                                <Text style={styles.tLabel}>CLOSING</Text>
-                                <Text style={styles.tValue}>{t.closing}</Text>
-                            </View>
-                            <View style={{ flex: 1.2, alignItems: 'center' }}>
-                                
-                                <Text style={styles.tLabel}>USED</Text>
-                                <Text style={styles.spike}>{t.spike}</Text>
-                            </View>
-                            <TouchableOpacity onPress={() => { 
-                                setSelectedTenant(t); 
-                                setNewReading(t.closing.toString()); 
-                                setEditModalVisible(true); 
-                            }}>
-                                <MaterialCommunityIcons name="pencil-box-outline" size={28} color="#4F46E5" />
-                            </TouchableOpacity>
-                        </View>
-                    )) : <Text style={styles.emptyText}>No data for selected range</Text>}
-                </View>
-            </ScrollView>
+            {loading && !refreshing ? (
+                <View style={styles.loader}><ActivityIndicator size="large" color="#333399" /></View>
+            ) : (
+                <FlatList
+                    data={tenants}
+                    keyExtractor={(item, index) => item.tenantId || index.toString()}
+                    renderItem={({ item }) => <TenantRow t={item} onEdit={handleEdit} />}
+                    ListHeaderComponent={ListHeader}
+                    contentContainerStyle={{ paddingBottom: 120 }}
+                    initialNumToRender={10}
+                    maxToRenderPerBatch={10}
+                    windowSize={5}
+                    removeClippedSubviews={true} // Performance boost for large lists
+                />
+            )}
 
             {/* EDIT MODAL */}
-            <Modal visible={isEditModalVisible} transparent animationType="fade">
+            <Modal visible={isEditModalVisible} transparent animationType="slide">
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <Text style={styles.modalTitle}>Update Closing Reading</Text>
                         <Text style={{color: '#666', marginBottom: 15}}>{selectedTenant?.tenantName}</Text>
                         <TextInput 
-                            style={styles.input} 
+                            style={styles.modalInput} 
                             value={newReading} 
                             onChangeText={setNewReading} 
                             keyboardType="numeric" 
@@ -175,6 +196,7 @@ const ReadingsReviewScreen = ({ navigation }) => {
                 </View>
             </Modal>
 
+            {/* FOOTER */}
             <View style={styles.footer}>
                 <TouchableOpacity 
                     style={styles.submitBtn} 
@@ -191,9 +213,10 @@ const ReadingsReviewScreen = ({ navigation }) => {
     );
 };
 
+// Sub-component for Cards
 const SummaryCard = ({ label, value, unit, icon, color }) => (
     <View style={styles.sCard}>
-        <View style={[styles.iconBox, {backgroundColor: color + '15'}]}>
+        <View style={[styles.iconCircle, {backgroundColor: color + '15'}]}>
             <MaterialCommunityIcons name={icon} size={20} color={color} />
         </View>
         <Text style={styles.sLabel}>{label}</Text>
@@ -203,33 +226,36 @@ const SummaryCard = ({ label, value, unit, icon, color }) => (
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F3F4F6' },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, backgroundColor: '#FFF' },
-    headerTitle: { flex:1,fontSize: 18,alignContent:'center', alignItems: 'center',fontWeight: 'bold', color: '#111827' },
+    header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#FFF', elevation: 2 },
+    headerTitle: { flex:1, fontSize: 18, fontWeight: 'bold', color: '#111827', textAlign: 'center' },
+    backBtn: { padding: 4 },
     dateSelector: { flexDirection: 'row', backgroundColor: '#FFF', margin: 16, borderRadius: 15, padding: 12, elevation: 3 },
     dateBtn: { flex: 1, alignItems: 'center' },
     dateLabel: { fontSize: 10, color: '#999', fontWeight: 'bold', marginBottom: 2 },
     dateVal: { fontSize: 14, fontWeight: 'bold', color: '#333399' },
-    dateDivider: { width: 1, backgroundColor: '#EEE', height: '80%' },
-    grid: { flexDirection: 'row', paddingHorizontal: 12, gap: 10 },
-    sCard: { flex: 1, backgroundColor: '#FFF', padding: 15, borderRadius: 16, alignItems: 'center', elevation: 2 },
-    iconBox: { padding: 8, borderRadius: 10, marginBottom: 5 },
+    dateDivider: { width: 1, backgroundColor: '#EEE', height: '80%', alignSelf: 'center' },
+    grid: { flexDirection: 'row', paddingHorizontal: 12, gap: 10, marginTop: 5 },
+    sCard: { flex: 1, backgroundColor: '#FFF', padding: 12, borderRadius: 16, alignItems: 'center', elevation: 2 },
+    iconCircle: { padding: 8, borderRadius: 10, marginBottom: 5 },
     sLabel: { fontSize: 10, color: '#666', fontWeight: 'bold' },
     sValue: { fontSize: 16, fontWeight: 'bold' },
-    sectionTitle: { fontSize: 16, fontWeight: 'bold', marginHorizontal: 16, marginTop: 15, marginBottom: 10 },
-    tableCard: { backgroundColor: '#FFF', marginHorizontal: 16, borderRadius: 16, elevation: 2, overflow: 'hidden' },
-    tableRow: { flexDirection: 'row', padding: 16, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+    sectionTitle: { fontSize: 16, fontWeight: 'bold', marginHorizontal: 16, marginTop: 20, marginBottom: 10 },
+    tableRow: { flexDirection: 'row', padding: 16, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#F3F4F6', backgroundColor: '#FFF', marginHorizontal: 16, borderRadius: 12, marginBottom: 8, elevation: 1 },
+    cellCenter: { flex: 1.2, alignItems: 'center' },
     tName: { fontWeight: 'bold', fontSize: 14, color: '#111827' },
     tMeter: { fontSize: 11, color: '#999' },
     tLabel: { fontSize: 8, color: '#999', fontWeight: 'bold' },
-    tValue: { fontWeight: 'bold', color: '#333' },
-    spike: { fontWeight: 'bold', color: '#d32828ff' },
-    footer: { padding: 16, backgroundColor: '#FFF', borderTopWidth: 1, borderColor: '#EEE' },
+    tValue: { fontWeight: 'bold', color: '#333', fontSize: 12 },
+    spike: { fontWeight: 'bold', color: '#DC2626', fontSize: 12 },
+    editBtn: { padding: 5, marginLeft: 5 },
+    footer: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, backgroundColor: '#FFF', borderTopWidth: 1, borderColor: '#EEE' },
     submitBtn: { backgroundColor: '#333399', height: 55, borderRadius: 15, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', elevation: 4 },
     submitText: { color: '#FFF', fontWeight: 'bold', marginRight: 10 },
+    loader: { flex: 1, justifyContent: 'center' },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
     modalContent: { backgroundColor: '#FFF', borderRadius: 20, padding: 25, alignItems: 'center' },
     modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
-    input: { width: '100%', height: 60, borderWidth: 1, borderColor: '#DDD', borderRadius: 12, textAlign: 'center', fontSize: 24, fontWeight: 'bold', color: '#333399', marginBottom: 20 },
+    modalInput: { width: '100%', height: 60, borderWidth: 1, borderColor: '#DDD', borderRadius: 12, textAlign: 'center', fontSize: 24, fontWeight: 'bold', color: '#333399', marginBottom: 20 },
     mBtn: { flex: 1, height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
     emptyText: { textAlign: 'center', padding: 40, color: '#999' }
 });
