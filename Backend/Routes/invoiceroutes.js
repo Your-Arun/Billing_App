@@ -102,4 +102,33 @@ router.delete('/delete/:id', async (req, res) => {
 });
 
 
+// 📈 GET MONTHLY COMPANY SUMMARY
+router.get("/company-summary/:adminId", async (req, res) => {
+  try {
+    const summary = await Statement.aggregate([
+      { $match: { adminId: new mongoose.Types.ObjectId(req.params.adminId) } },
+      {
+        $group: {
+          _id: "$month", // महीने के हिसाब से ग्रुप करें
+          gridUnits: { $first: "$gridUnits" },
+          gridAmount: { $first: "$gridAmount" },
+          gridFixedPrice: { $first: "$gridFixedPrice" },
+          solarUnits: { $first: "$solarUnits" },
+          totalTenantUnitsSum: { $first: "$totalTenantUnitsSum" },
+          totalTenantAmountSum: { $first: "$totalTenantAmountSum" },
+          commonLoss: { $first: "$commonLoss" },
+          lossPercent: { $first: "$lossPercent" },
+          profit: { $first: "$profit" },
+          dateRange: { $first: "$dateRange" }
+        }
+      },
+      { $sort: { "_id": -1 } } // लेटेस्ट महीना सबसे ऊपर
+    ]);
+
+    res.json(summary);
+  } catch (e) {
+    res.status(500).json({ msg: "Failed to fetch company summary" });
+  }
+});
+
 module.exports = router;

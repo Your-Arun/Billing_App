@@ -93,7 +93,7 @@ const ReconciliationScreen = ({ route, navigation }) => {
                 totalTenantUnitsSum += diff;
                 totalTenantAmountSum += totalBill;
                 return {
-                    ...t, units, amount, fixed, transLoss, dgCharge, totalBill,
+                    ...t, units, amount, fixed, transLoss, dgCharge, totalBill, profit,
                     isDgDisabled, isLossDisabled
                 };
             }) : [];
@@ -101,10 +101,10 @@ const ReconciliationScreen = ({ route, navigation }) => {
         const totalInputEnergy = Number(gridUnits) - Number(solarUnits) + Number(dgUnitsTotal);
         const commonLoss = totalInputEnergy - totalTenantUnitsSum;
         const lossPercent = totalInputEnergy > 0 ? ((commonLoss / totalInputEnergy) * 100).toFixed(1) : 0;
-
+        const profit = (totalTenantAmountSum - gridAmount).toFixed(1);
         return {
             gridUnits, gridAmount, gridFixedPrice, solarUnits, dgUnitsTotal,
-            totalTenantUnitsSum, commonLoss, lossPercent, totalTenantAmountSum, calculatedTenants
+            totalTenantUnitsSum, commonLoss, lossPercent, totalTenantAmountSum, calculatedTenants, profit
         };
     }, [rawApiData, disabledDgIds, disabledLossIds]);
 
@@ -121,7 +121,7 @@ const ReconciliationScreen = ({ route, navigation }) => {
         return <View style={styles.loaderContainer}><ActivityIndicator size="large" color="#333399" /></View>;
     }
 
-    const { gridUnits, gridAmount, gridFixedPrice, solarUnits, totalTenantUnitsSum, commonLoss, lossPercent, totalTenantAmountSum, calculatedTenants } = processedData || {};
+    const { gridUnits, gridAmount, gridFixedPrice, solarUnits, totalTenantUnitsSum, commonLoss, lossPercent, totalTenantAmountSum, calculatedTenants, profit } = processedData || {};
 
 
 
@@ -155,7 +155,7 @@ const ReconciliationScreen = ({ route, navigation }) => {
                         label="After Paying Bill Profit"
                         value={`₹ ${Math.round(totalTenantAmountSum - gridAmount || 0)}`}
                         icon=""
-                        color="#080957ff"
+                        color="#00b906f4"
                         bold
                         labelStyle={{ fontSize: 30, textDecorationLine: 'underline' }}
                         valueStyle={{ fontSize: 30, fontWeight: 'bold', textDecorationLine: 'underline' }}
@@ -209,7 +209,13 @@ const ReconciliationScreen = ({ route, navigation }) => {
                             summary: {
                                 gridUnits: processedData.gridUnits,
                                 gridAmount: processedData.gridAmount,
-                                commonLoss: processedData.commonLoss
+                                gridFixedPrice: processedData.gridFixedPrice,
+                                solarUnits: processedData.solarUnits,
+                                totalTenantUnitsSum: processedData.totalTenantUnitsSum,
+                                totalTenantAmountSum: processedData.totalTenantAmountSum,
+                                commonLoss: processedData.commonLoss,
+                                lossPercent: processedData.lossPercent,
+                                profit: processedData.profit
                             }
                         });
                     }}
