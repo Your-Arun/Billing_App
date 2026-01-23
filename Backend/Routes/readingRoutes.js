@@ -287,7 +287,17 @@ router.get('/opening/:tenantId', async (req, res) => {
   }
 });
 
-
+// 🗑️ DELETE Specific Reading (History cleanup)
+router.delete('/:id', async (req, res) => {
+  try {
+    const reading = await Reading.findByIdAndDelete(req.params.id);
+    if (!reading) return res.status(404).json({ msg: "Reading not found" });
+    
+    res.json({ success: true, msg: "Record deleted successfully 🗑️" });
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+});
 
 
 module.exports = router;

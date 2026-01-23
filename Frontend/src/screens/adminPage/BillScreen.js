@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useContext, useCallback } from 'react';
-import { 
-  View, Text, StyleSheet, TextInput, TouchableOpacity, 
-  ActivityIndicator, FlatList, Alert, RefreshControl, Platform, 
-  StatusBar, Linking 
+import {
+  View, Text, StyleSheet, TextInput, TouchableOpacity,
+  ActivityIndicator, FlatList, Alert, RefreshControl, Platform,
+  StatusBar, Linking
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
@@ -10,6 +10,8 @@ import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
 const BillScreen = () => {
   const { user } = useContext(UserContext);
@@ -21,7 +23,7 @@ const BillScreen = () => {
   const [saving, setSaving] = useState(false);
   const [history, setHistory] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
-
+  const [downloadingId, setDownloadingId] = useState(null);
   const monthName = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
   const fetchHistory = useCallback(async () => {
@@ -49,7 +51,7 @@ const BillScreen = () => {
       Toast.show({ type: 'error', text1: 'Required', text2: 'Fill all 4 fields & attach PDF' });
       return;
     }
-    
+
     setSaving(true);
     try {
       const formData = new FormData();
@@ -79,22 +81,42 @@ const BillScreen = () => {
     } finally { setSaving(false); }
   };
 
-  // 👁️ VIEW LOGIC
-  const handleView = (url) => {
-    if (!url) {
-      return Toast.show({ type: 'error', text1: 'No File', text2: 'PDF link not found' });
+  const handleDownload = async (url, month, id) => {
+    if (!url) return Toast.show({ type: 'error', text1: 'No File found' });
+
+    setDownloadingId(id);
+    try {
+      const fileName = `Bill_${month.replace(/\s+/g, '_')}.pdf`;
+      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+
+      const downloadRes = await FileSystem.downloadAsync(url, fileUri);
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(downloadRes.uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: `Download Bill - ${month}`,
+          UTI: 'com.adobe.pdf',
+        });
+      } else {
+        Alert.alert("Error", "Sharing is not available on this device");
+      }
+    } catch (e) {
+      console.log(e);
+      Alert.alert("Error", "Download failed");
+    } finally {
+      setDownloadingId(null);
     }
-    // Seedha URL open karega (Chrome/Safari mein)
-    Linking.openURL(url).catch(err => Alert.alert("Error", "Couldn't open page"));
   };
 
   const handleDelete = (id) => {
     Alert.alert("Delete", "Remove this record permanently?", [
       { text: "Cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => {
+      {
+        text: "Delete", style: "destructive", onPress: async () => {
           await axios.delete(`${API_URL}/bill/delete/${id}`);
           fetchHistory();
-      }}
+        }
+      }
     ]);
   };
 
@@ -109,53 +131,50 @@ const BillScreen = () => {
       <FlatList
         data={history}
         keyExtractor={item => item._id}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {setRefreshing(true); fetchHistory(); setRefreshing(false);}} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchHistory(); setRefreshing(false); }} />}
         ListHeaderComponent={
           <View style={styles.formCard}>
             <TouchableOpacity style={[styles.uploadBox, file && styles.uploadBoxActive]} onPress={pickDocument}>
               <MaterialCommunityIcons name={file ? "file-check" : "file-upload-outline"} size={35} color={file ? "#4caf50" : "#333399"} />
-              <Text style={[styles.uploadText, file && {color:'#4caf50'}]}>{file ? file.name : "Upload Monthly Bill (PDF)"}</Text>
+              <Text style={[styles.uploadText, file && { color: '#4caf50' }]}>{file ? file.name : "Upload Monthly Bill (PDF)"}</Text>
             </TouchableOpacity>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Total Units Consumed</Text>
-              <TextInput style={styles.input} keyboardType="numeric" value={form.units} onChangeText={(t)=>setForm({...form, units:t})} placeholder="e.g. 26865" />
-              
+              <TextInput style={styles.input} keyboardType="numeric" value={form.units} onChangeText={(t) => setForm({ ...form, units: t })} placeholder="e.g. 26865" />
+
               <Text style={styles.label}>Energy Charges Amount (₹)</Text>
-              <TextInput style={styles.input} keyboardType="numeric" value={form.energy} onChangeText={(t)=>setForm({...form, energy:t})} placeholder="₹" />
-              
+              <TextInput style={styles.input} keyboardType="numeric" value={form.energy} onChangeText={(t) => setForm({ ...form, energy: t })} placeholder="₹" />
+
               <View style={styles.row}>
-                <View style={{flex:1, marginRight:10}}>
+                <View style={{ flex: 1, marginRight: 10 }}>
                   <Text style={styles.label}>Fixed Charges</Text>
-                  <TextInput style={styles.input} keyboardType="numeric" value={form.fixed} onChangeText={(t)=>setForm({...form, fixed:t})} placeholder="₹" />
+                  <TextInput style={styles.input} keyboardType="numeric" value={form.fixed} onChangeText={(t) => setForm({ ...form, fixed: t })} placeholder="₹" />
                 </View>
-                <View style={{flex:1}}>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.label}>Grand Total</Text>
-                  <TextInput style={styles.input} keyboardType="numeric" value={form.total} onChangeText={(t)=>setForm({...form, total:t})} placeholder="₹" />
+                  <TextInput style={styles.input} keyboardType="numeric" value={form.total} onChangeText={(t) => setForm({ ...form, total: t })} placeholder="₹" />
                 </View>
               </View>
             </View>
 
             <TouchableOpacity style={styles.submitBtn} onPress={handleSaveBill} disabled={saving}>
-              {saving ? <ActivityIndicator color="white" /> : <Text style={styles.submitText}>SAVE TO HISTORY</Text>}
+              {saving ? <ActivityIndicator color="white" /> : <Text style={styles.submitText}>SAVE</Text>}
             </TouchableOpacity>
           </View>
         }
         renderItem={({ item }) => (
           <View style={styles.historyCard}>
-            <View style={{flex:1}}>
+            <View style={{ flex: 1 }}>
               <Text style={styles.hMonth}>{item.month}</Text>
-              <Text style={styles.hSub}>₹{item.totalAmount} • {item.totalUnits} Units</Text>
+              <Text style={styles.hSub}>Units: {item.totalUnits} • Energy: {item.energyCharges}</Text>
+              <Text style={styles.hSub}>Fixed: {item.fixedCharges} • Bill Amount: {item.totalAmount}</Text>
             </View>
             <View style={styles.actionRow}>
-                {/* 👁️ View Button */}
-                <TouchableOpacity onPress={() => handleView(item.billUrl)} style={styles.iconBtn}>
-                    <MaterialCommunityIcons name="eye-outline" size={28} color="#333399" />
-                </TouchableOpacity>
-                {/* 🗑️ Delete Button */}
-                <TouchableOpacity onPress={() => handleDelete(item._id)} style={styles.iconBtn}>
-                    <MaterialCommunityIcons name="trash-can-outline" size={28} color="#FF5252" />
-                </TouchableOpacity>
+              {/* 🗑️ Delete Button */}
+              <TouchableOpacity onPress={() => handleDelete(item._id)} style={styles.iconBtn}>
+                <MaterialCommunityIcons name="trash-can-outline" size={28} color="#FF5252" />
+              </TouchableOpacity>
             </View>
           </View>
         )}

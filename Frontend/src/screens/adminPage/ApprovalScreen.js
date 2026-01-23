@@ -11,14 +11,13 @@ import API_URL from '../../services/apiconfig';
 
 const ApprovalScreen = () => {
   const { user } = useContext(UserContext);
-  const [data, setData] = useState([]); // Dono pending aur history ke liye
+  const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState('pending'); // 'pending' ya 'history'
+  const [activeTab, setActiveTab] = useState('pending');
 
   const adminId = user?._id || user?.id;
 
-  // 🔄 1. डेटा फेच करने का फंक्शन (Tab के हिसाब से)
   const fetchData = useCallback(async () => {
     if (!adminId) return;
     setLoading(true);
@@ -27,7 +26,6 @@ const ApprovalScreen = () => {
       const res = await axios.get(`${API_URL}/readings/${endpoint}/${adminId}`);
       setData(res.data || []);
     } catch (e) {
-      console.log("Fetch Error:", e.message);
       Toast.show({ type: 'error', text1: 'Error', text2: 'Could not load data' });
     } finally {
       setLoading(false);
@@ -37,20 +35,39 @@ const ApprovalScreen = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // ✅ 2. Approve/Reject एक्शन
   const handleAction = async (id, action) => {
     try {
       const reason = action === 'reject' ? "Photo is not clear / Wrong reading" : "";
       await axios.put(`${API_URL}/readings/${action}/${id}`, { reason });
-      
-      Toast.show({ 
-        type: 'success', 
-        text1: action === 'approve' ? 'Approved ✅' : 'Rejected ❌' 
-      });
-      fetchData(); // List refresh karein
+      Toast.show({ type: 'success', text1: action === 'approve' ? 'Approved ✅' : 'Rejected ❌' });
+      fetchData(); 
     } catch (e) {
       Alert.alert("Error", "Action failed.");
     }
+  };
+
+  // 🗑️ DELETE FUNCTION
+  const handleDelete = (id) => {
+    Alert.alert(
+      "Delete Record",
+      "Are you sure you want to remove this record",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete", 
+          style: "destructive", 
+          onPress: async () => {
+            try {
+              await axios.delete(`${API_URL}/readings/${id}`);
+              Toast.show({ type: 'success', text1: 'Deleted Successfully 🗑️' });
+              fetchData();
+            } catch (err) {
+              Alert.alert("Error", "Could not delete record.");
+            }
+          } 
+        }
+      ]
+    );
   };
 
   const renderItem = ({ item }) => (
@@ -58,8 +75,8 @@ const ApprovalScreen = () => {
       <View style={styles.cardHeader}>
         <View style={{ flex: 1 }}>
           <Text style={styles.tName}>{item.tenantId?.name || 'N/A'}</Text>
-          <Text style={styles.staffName}>Staff: {item.staffId || 'Unknown'}</Text>
-          <Text style={styles.dateText}>{new Date(item.createdAt).toLocaleDateString('en-GB')}</Text>
+          <Text style={styles.staffName}>Staff ID: {item.staffId || 'Unknown'}</Text>
+          <Text style={styles.dateText}>{new Date(item.createdAt).toLocaleDateString('en-GB')} • {new Date(item.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
         </View>
         <View style={styles.valBadge}>
            <Text style={styles.rValue}>{item.closingReading} kWh</Text>
@@ -80,16 +97,22 @@ const ApprovalScreen = () => {
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={[styles.statusBanner, { backgroundColor: item.status === 'Approved' ? '#E8F5E9' : '#FFEBEE' }]}>
-            <MaterialCommunityIcons 
-                name={item.status === 'Approved' ? 'check-circle' : 'alert-circle'} 
-                size={18} 
-                color={item.status === 'Approved' ? '#4CAF50' : '#F44336'} 
-            />
-            <Text style={[styles.statusText, { color: item.status === 'Approved' ? '#2E7D32' : '#C62828' }]}>
-                {item.status.toUpperCase()} 
-                {item.rejectionReason ? `: ${item.rejectionReason}` : ''}
-            </Text>
+        <View style={styles.historyActionRow}>
+          <View style={[styles.statusBanner, { backgroundColor: item.status === 'Approved' ? '#E8F5E9' : '#FFEBEE' }]}>
+              <MaterialCommunityIcons 
+                  name={item.status === 'Approved' ? 'check-circle' : 'alert-circle'} 
+                  size={18} 
+                  color={item.status === 'Approved' ? '#4CAF50' : '#F44336'} 
+              />
+              <Text style={[styles.statusText, { color: item.status === 'Approved' ? '#2E7D32' : '#C62828' }]}>
+                  {item.status.toUpperCase()} 
+              </Text>
+          </View>
+          
+          {/* DELETE BUTTON FOR HISTORY */}
+          <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item._id)}>
+             <MaterialCommunityIcons name="trash-can-outline" size={24} color="#FF5252" />
+          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -100,13 +123,12 @@ const ApprovalScreen = () => {
       <StatusBar barStyle="light-content" />
       <View style={styles.blueHeader}>
         <View>
-          <Text style={styles.headerTitle}>Approvals</Text>
-          <Text style={styles.headerSub}>{activeTab === 'pending' ? `${data.length} Pending Requests` : 'Recent History'}</Text>
+          <Text style={styles.headerTitle}>Review Center</Text>
+          <Text style={styles.headerSub}>{activeTab === 'pending' ? `${data.length} Pendings` : 'History Logs'}</Text>
         </View>
         <MaterialCommunityIcons name="shield-check" size={35} color="rgba(255,255,255,0.4)" />
       </View>
 
-      {/* --- Tabs Section --- */}
       <View style={styles.tabContainer}>
         <TouchableOpacity 
             style={[styles.tab, activeTab === 'pending' && styles.activeTab]} 
@@ -146,35 +168,32 @@ const ApprovalScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8F9FE' },
   blueHeader: { 
-    backgroundColor: '#333399', paddingHorizontal: 25, paddingTop: 50, paddingBottom: 25, 
+    backgroundColor: '#333399', paddingHorizontal: 25, paddingTop: 50, paddingBottom: 20, 
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
   headerTitle: { color: 'white', fontSize: 24, fontWeight: 'bold' },
   headerSub: { color: 'rgba(255,255,255,0.7)', fontSize: 13 },
-
   tabContainer: { flexDirection: 'row', backgroundColor: '#333399', paddingBottom: 10 },
   tab: { flex: 1, alignItems: 'center', paddingVertical: 10, borderBottomWidth: 3, borderBottomColor: 'transparent' },
   activeTab: { borderBottomColor: '#FFF' },
   tabText: { color: 'rgba(255,255,255,0.5)', fontWeight: 'bold', fontSize: 16 },
   activeTabText: { color: '#FFF' },
-  
-  card: { backgroundColor: 'white', borderRadius: 20, padding: 15, marginBottom: 20, elevation: 3, overflow: 'hidden' },
+  card: { backgroundColor: 'white', borderRadius: 20, padding: 15, marginBottom: 20, elevation: 3 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   tName: { fontSize: 17, fontWeight: 'bold', color: '#333' },
-  staffName: { fontSize: 11, color: '#666', marginTop: 2 },
-  dateText: { fontSize: 10, color: '#999' },
+  staffName: { fontSize: 11, color: '#666' },
+  dateText: { fontSize: 10, color: '#999', marginTop: 2 },
   valBadge: { backgroundColor: '#F0F2FF', padding: 8, borderRadius: 10 },
   rValue: { fontSize: 15, fontWeight: '900', color: '#333399' },
   img: { width: '100%', height: 200, borderRadius: 15, backgroundColor: '#f0f0f0' },
-  
   btnRow: { flexDirection: 'row', marginTop: 15 },
   rejBtn: { flex: 1, backgroundColor: '#FF5252', flexDirection: 'row', padding: 12, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
   appBtn: { flex: 1.5, backgroundColor: '#4CAF50', flexDirection: 'row', padding: 12, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   btnText: { color: 'white', fontWeight: 'bold', marginLeft: 8, fontSize: 13 },
-
-  statusBanner: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, marginTop: 15 },
-  statusText: { marginLeft: 8, fontWeight: 'bold', fontSize: 12, flex: 1 },
-
+  historyActionRow: { flexDirection: 'row', alignItems: 'center', marginTop: 15, justifyContent: 'space-between' },
+  statusBanner: { flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 12, flex: 1, marginRight: 10 },
+  statusText: { marginLeft: 8, fontWeight: 'bold', fontSize: 12 },
+  deleteBtn: { backgroundColor: '#FFF0F0', padding: 10, borderRadius: 12, borderWidth: 1, borderColor: '#FFE0E0' },
   emptyContainer: { alignItems: 'center', marginTop: 80 },
   emptyText: { textAlign: 'center', color: '#999', fontWeight: 'bold', marginTop: 10 }
 });
