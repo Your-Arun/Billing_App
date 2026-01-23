@@ -26,7 +26,11 @@ const StatementScreen = ({ route, navigation }) => {
     const today = new Date().toLocaleDateString('en-IN');
     const currentFromDate = startDate ? new Date(startDate).toLocaleDateString('en-IN') : "";
     const currentToDate = endDate ? new Date(endDate).toLocaleDateString('en-IN') : "";
-
+    const monthKeyDisplay = useMemo(() => {
+        return endDate
+            ? new Date(endDate).toLocaleString('en-US', { month: 'short', year: 'numeric' })
+            : "";
+    }, [endDate]);
     // 📄 HTML Generator Logic with RoundOff and 2 Decimals
     const createHTML = (item) => {
         const fDate = item.periodFrom ? new Date(item.periodFrom).toLocaleDateString('en-IN') : currentFromDate;
@@ -132,6 +136,25 @@ const StatementScreen = ({ route, navigation }) => {
                     onPress: async () => {
                         setIsSavingAll(true);
                         try {
+                            const totalColl = tenantBreakdown.reduce((acc, curr) => acc + curr.totalBill, 0);
+                            const profit = Math.round(totalColl - (summary?.gridAmount || 0));
+                            await axios.post(`${API_URL}/statement/save-summary`, {
+                                adminId,
+                                month: monthKeyDisplay,
+                                dateRange: `${currentFromDate} - ${currentToDate}`,
+                                gridUnits: summary?.gridUnits || 0,
+                                gridAmount: summary?.gridAmount || 0,
+                                gridFixedPrice: summary?.gridFixedPrice || 0,
+                                solarUnits: summary?.solarUnits || 0,
+                                totalTenantUnitsSum: summary?.totalTenantUnitsSum || 0,
+                                totalTenantAmountSum: Math.round(totalColl),
+                                commonLoss: summary?.commonLoss || 0,
+                                lossPercent: summary?.lossPercent || 0,
+                                profit: profit
+                            });
+
+
+
                             const savePromises = tenantBreakdown.map(item => {
                                 const html = createHTML(item);
 
@@ -143,15 +166,6 @@ const StatementScreen = ({ route, navigation }) => {
                                     opening: item.opening, closing: item.closing, multiplierCT: item.multiplierCT,
                                     ratePerUnit: item.ratePerUnit, transformerLoss: item.transformerLoss,
                                     fixed: item.fixed, transLoss: item.transLoss, dgCharge: item.dgCharge,
-                                    gridUnits: summary?.gridUnits || 0,
-                                    gridAmount: summary?.gridAmount || 0,
-                                    gridFixedPrice: summary?.gridFixedPrice || 0,
-                                    solarUnits: summary?.solarUnits || 0,
-                                    totalTenantUnitsSum: summary?.totalTenantUnitsSum || 0,
-                                    totalTenantAmountSum: summary?.totalTenantAmountSum || 0,
-                                    commonLoss: summary?.commonLoss || 0,
-                                    lossPercent: summary?.lossPercent || 0,
-                                    profit: summary?.profit || 0,
                                 });
                             });
                             await Promise.all(savePromises);

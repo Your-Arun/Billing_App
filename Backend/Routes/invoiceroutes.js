@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const cloudinary = require("cloudinary").v2;
 const Statement = require("../Modals/Invoice");
+const BusinessSummary = require("../Modals/BusinessSummary");
 const puppeteer = require("puppeteer-core");
 const chromium = require("@sparticuz/chromium");
 const { default: mongoose } = require("mongoose");
@@ -17,7 +18,7 @@ cloudinary.config({
 router.post("/save", async (req, res) => {
   let browser;
   try {
-    const { adminId, tenantId, tenantName, meterId, periodFrom, periodTo, units, totalAmount, htmlContent, opening, closing, multiplierCT, ratePerUnit, transformerLoss, fixed, transLoss, dgCharge, gridUnits, gridAmount, gridFixedPrice, solarUnits, totalTenantUnitsSum, totalTenantAmountSum, commonLoss, lossPercent, profit } = req.body;
+    const { adminId, tenantId, tenantName, meterId, periodFrom, periodTo, units, totalAmount, htmlContent, opening, closing, multiplierCT, ratePerUnit, transformerLoss, fixed, transLoss, dgCharge } = req.body;
 
     // 1️⃣ PDF generation logic
     browser = await puppeteer.launch({
@@ -56,7 +57,7 @@ router.post("/save", async (req, res) => {
       totalAmount,
       htmlContent,
       pdfUrl: uploadRes.secure_url,
-      opening, closing, multiplierCT, ratePerUnit, transformerLoss, fixed, transLoss, dgCharge, gridUnits, gridAmount, gridFixedPrice, solarUnits, totalTenantUnitsSum, totalTenantAmountSum, commonLoss, lossPercent, profit
+      opening, closing, multiplierCT, ratePerUnit, transformerLoss, fixed, transLoss, dgCharge
     });
 
     res.status(201).json({ success: true, data: saved });
@@ -67,6 +68,19 @@ router.post("/save", async (req, res) => {
   }
 });
 
+router.post("/save-summary", async (req, res) => {
+  try {
+    const { adminId, month } = req.body;
+    const summary = await BusinessSummary.findOneAndUpdate(
+      { adminId, month },
+      { $set: req.body },
+      { upsert: true, new: true }
+    );
+    res.status(200).json({ success: true, data: summary });
+  } catch (err) {
+    res.status(500).json({ msg: "Summary save failed", error: err.message });
+  }
+});
 
 router.get("/history/:adminId", async (req, res) => {
   try {

@@ -6,32 +6,22 @@ const StatementSchema = new mongoose.Schema({
 
     tenantName: String,
     meterId: String,
-
     periodFrom: Date,
     periodTo: Date,
-
-    units: Number,
-    totalAmount: Number,
-
-    htmlContent: String,
-    pdfUrl: String,
-
+    month:String,
     opening: Number,
     closing: Number,
+    units: Number,
     multiplierCT: Number,
     ratePerUnit: Number,
-    transformerLoss: Number,
     fixed: Number,
     transLoss: Number,
     dgCharge: Number,
-    gridUnits: Number,
-    gridFixedPrice: Number,
-    solarUnits: Number,
-    totalTenantUnitsSum: Number,
-    totalTenantAmountSum: Number,
-    commonLoss: Number,
-    lossPercent: Number,
-    profit: Number,
+    totalAmount: Number,
+    transformerLoss: Number,
+    pdfUrl: String,
+    htmlContent: String,
+
 
 }, { timestamps: true });
 
