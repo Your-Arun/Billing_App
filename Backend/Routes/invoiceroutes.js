@@ -17,7 +17,7 @@ cloudinary.config({
 router.post("/save", async (req, res) => {
   let browser;
   try {
-    const { adminId, tenantId, tenantName, meterId, periodFrom, periodTo, units, totalAmount, htmlContent } = req.body;
+    const { adminId, tenantId, tenantName, meterId, periodFrom, periodTo, units, totalAmount, htmlContent, opening, closing, multiplierCT, ratePerUnit, transformerLoss, fixed, transLoss, dgCharge, gridUnits, gridAmount, gridFixedPrice, solarUnits, totalTenantUnitsSum, totalTenantAmountSum, commonLoss, lossPercent, profit } = req.body;
 
     // 1️⃣ PDF generation logic
     browser = await puppeteer.launch({
@@ -56,6 +56,7 @@ router.post("/save", async (req, res) => {
       totalAmount,
       htmlContent,
       pdfUrl: uploadRes.secure_url,
+      opening, closing, multiplierCT, ratePerUnit, transformerLoss, fixed, transLoss, dgCharge, gridUnits, gridAmount, gridFixedPrice, solarUnits, totalTenantUnitsSum, totalTenantAmountSum, commonLoss, lossPercent, profit
     });
 
     res.status(201).json({ success: true, data: saved });
@@ -83,22 +84,22 @@ router.get("/history/:adminId", async (req, res) => {
 
 // 🗑️ DELETE STATEMENT
 router.delete('/delete/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        // 1. Check if ID is valid
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({ msg: "Invalid Statement ID" });
-        }
-        // 2. Find and Delete
-        const deleted = await Statement.findByIdAndDelete(id);
-        if (!deleted) {
-            return res.status(404).json({ msg: "Statement not found" });
-        }
-        res.json({ success: true, msg: "Deleted ✅" });
-    } catch (err) {
-        console.error("Delete Error:", err.message);
-        res.status(500).json({ msg: "Delete failed", error: err.message });
+  try {
+    const { id } = req.params;
+    // 1. Check if ID is valid
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ msg: "Invalid Statement ID" });
     }
+    // 2. Find and Delete
+    const deleted = await Statement.findByIdAndDelete(id);
+    if (!deleted) {
+      return res.status(404).json({ msg: "Statement not found" });
+    }
+    res.json({ success: true, msg: "Deleted ✅" });
+  } catch (err) {
+    console.error("Delete Error:", err.message);
+    res.status(500).json({ msg: "Delete failed", error: err.message });
+  }
 });
 
 
