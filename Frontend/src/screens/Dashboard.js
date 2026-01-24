@@ -9,6 +9,7 @@ import UserProfile from './adminPage/UserProfile';
 import { UserContext } from '../services/UserContext';
 import axios from 'axios';
 import API_URL from '../services/apiconfig';
+import { useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 
@@ -18,78 +19,85 @@ const Dashboard = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   
-  // States for all API Data
   const [data, setData] = useState({
-    tenants: 0,
-    pending: 0,
-    latestBill: 0,
-    latestSolar: 0,
-    latestDGUnits: 0,
-    profit: 0,
-    chartLabels: ["Jan", "Feb", "Mar"],
-    chartData: [0, 0, 0]
+    totalTenants: 0,
+    pendingCount: 0,
+    latestProfit: 0,
+    totalCollection: 0,
+    gridBill: 0,
+    solarUnits: 0,
+    dgUnits: 0,
+    lossPercent: 0,
+    chartLabels: ["-"],
+    chartData: [0]
   });
 
   const adminId = user?._id || user?.id;
 
-  const fetchEverything = useCallback(async () => {
+  const fetchDashboardData = useCallback(async () => {
     if (!adminId) return;
-    setLoading(true);
     try {
-      // 1️⃣ Parallel API Calls
-      const [tenantsRes, pendingRes, billRes, solarRes, dgRes, summaryRes] = await Promise.allSettled([
+      const [tenants, pending, solar, dg, summary] = await Promise.allSettled([
         axios.get(`${API_URL}/tenants/${adminId}`),
         axios.get(`${API_URL}/readings/pending/${adminId}`),
-        axios.get(`${API_URL}/bill/history/${adminId}`),
         axios.get(`${API_URL}/solar/history/${adminId}`),
         axios.get(`${API_URL}/dg/dgsummary/${adminId}`),
-        axios.get(`${API_URL}/statement/company-summary/${adminId}`)
+        axios.get(`${API_URL}/statement/companysummary/${adminId}`)
       ]);
 
-      // 2️⃣ Extract Values
-      const tCount = tenantsRes.status === 'fulfilled' ? tenantsRes.value.data?.length : 0;
-      const pCount = pendingRes.status === 'fulfilled' ? pendingRes.value.data?.length : 0;
-      const latestBillAmt = billRes.status === 'fulfilled' ? (billRes.value.data?.[0]?.totalAmount || 0) : 0;
-      const latestSolarGen = solarRes.status === 'fulfilled' ? (solarRes.value.data?.[0]?.unitsGenerated || 0) : 0;
-      
-      const dgData = dgRes.status === 'fulfilled' ? dgRes.value.data?.dgSummary : [];
-      const totalDGUnits = dgData?.reduce((acc, curr) => acc + (curr.totalUnits || 0), 0) || 0;
+      // 1. Process Company Summary (Business Insights)
+      const summaryList = summary.status === 'fulfilled' ? (summary.value.data || []) : [];
+      const latestMonth = summaryList[0] || {};
 
-      // 3️⃣ Company Performance (Summary)
-      const historySummary = summaryRes.status === 'fulfilled' ? summaryRes.value.data : [];
-      const currentMonthStats = historySummary[0] || {};
+      console.log(latestMonth)
       
-      // Chart Data Prep (Last 5 Months)
-      const labels = historySummary.slice(0, 5).reverse().map(s => s._id.split(' ')[0]);
-      const consumptionPoints = historySummary.slice(0, 5).reverse().map(s => s.totalTenantUnitsSum || 0);
+      // Chart Data Mapping (Last 5 Months)
+      let labels = ["-"];
+      let points = [0];
+      if (summaryList.length > 0) {
+        labels = summaryList.slice(0, 5).reverse().map(s => s.month ? String(s.month).split(' ')[0] : (s._id ? String(s._id).split(' ')[0] : "N/A"));
+        points = summaryList.slice(0, 5).reverse().map(s => Number(s.totalTenantAmountSum) || 0);
+      }
+
+      // 2. DG Units Calculation
+      const dgRaw = dg.status === 'fulfilled' ? dg.value.data : null;
+      const totalDgUnits = dgRaw?.dgSummary?.reduce((acc, curr) => acc + (Number(curr.totalUnits) || 0), 0) || 0;
+
+      // 3. Solar Logic (Get the latest entry)
+      const solarList = solar.status === 'fulfilled' ? (solar.value.data || []) : [];
+      const latestSolar = solarList[0]?.unitsGenerated || 0;
 
       setData({
-        tenants: tCount,
-        pending: pCount,
-        latestBill: latestBillAmt,
-        latestSolar: latestSolarGen,
-        latestDGUnits: totalDGUnits,
-        profit: currentMonthStats.profit || 0,
-        chartLabels: labels.length > 0 ? labels : ["No Data"],
-        chartData: consumptionPoints.length > 0 ? consumptionPoints : [0]
+        totalTenants: tenants.status === 'fulfilled' ? (tenants.value.data?.length || 0) : 0,
+        pendingCount: pending.status === 'fulfilled' ? (pending.value.data?.length || 0) : 0,
+        latestProfit: latestMonth.profit || 0,
+        totalCollection: latestMonth.totalTenantAmountSum || 0,
+        gridBill: latestMonth.gridAmount || 0,
+        solarUnits: latestSolar,
+        dgUnits: totalDgUnits,
+        lossPercent: latestMonth.lossPercent || 0,
+        chartLabels: labels,
+        chartData: points
       });
 
     } catch (e) {
-      console.log("Dashboard Error:", e);
+      console.log("Dashboard Global Error:", e);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, [adminId]);
 
-  useEffect(() => {
-    fetchEverything();
-  }, [fetchEverything]);
+   useFocusEffect(
+    useCallback(() => {
+      fetchDashboardData();
+    }, [fetchDashboardData])
+  );
 
   const navIcons = [
     { name: 'Readings', icon: 'speedometer', route: 'Readings', color: '#6366F1' },
-    { name: 'Approval', icon: 'check-decagram', route: 'Approval', color: '#10B981', badge: data.pending },
-    { name: 'Grid Bill', icon: 'lightning-bolt', route: 'Bill', color: '#F59E0B' },
+    { name: 'Approval', icon: 'check-decagram', route: 'Approval', color: '#10B981', badge: data.pendingCount },
+    { name: 'AVVNL Bill', icon: 'lightning-bolt', route: 'Bill', color: '#F59E0B' },
     { name: 'Tenants', icon: 'account-group', route: 'Tenants', color: '#3B82F6' },
     { name: 'Analyze', icon: 'scale-balance', route: 'Reconciliation', color: '#8B5CF6' },
     { name: 'Statements', icon: 'file-document-multiple', route: 'Statement', color: '#EC4899' },
@@ -104,7 +112,7 @@ const Dashboard = ({ navigation }) => {
       <StatusBar barStyle="light-content" />
       <ScrollView 
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchEverything} tintColor="#333399" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {setRefreshing(true); fetchDashboardData();}} tintColor="#333399" />}
       >
         {/* HEADER SECTION */}
         <View style={styles.header}>
@@ -114,35 +122,43 @@ const Dashboard = ({ navigation }) => {
             </TouchableOpacity>
             <View style={styles.headerInfo}>
               <Text style={styles.greeting}>Welcome Back,</Text>
-              <Text style={styles.userName}>{user?.name || "Admin"}</Text>
+              <Text style={styles.userName} numberOfLines={1}>{user?.companyName || "Admin"}</Text>
             </View>
-            <View style={styles.headerDateBox}>
-               <Text style={styles.headerDate}>{new Date().toLocaleDateString('en-IN', {day:'2-digit', month:'short'})}</Text>
+            <View style={styles.lossBadge}>
+               <Text style={styles.lossText}>{data.lossPercent}% Loss</Text>
             </View>
           </View>
 
-          {/* MAIN BUSINESS CARD */}
+          {/* PROFIT CARD */}
           <View style={styles.profitCard}>
-            <View>
-              <Text style={styles.profitLabel}>ESTIMATED PROFIT (MONTHLY)</Text>
-              <Text style={styles.profitValue}>₹ {data.profit.toLocaleString('en-IN')}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.profitLabel}>MONTHLY ESTIMATED PROFIT</Text>
+              <Text style={styles.profitValue}>₹ {Math.round(data.latestProfit).toLocaleString('en-IN')}</Text>
+              <View style={styles.profitSubRow}>
+                <Text style={styles.profitSub}>Coll: ₹{Math.round(data.totalCollection)}</Text>
+                <Text style={[styles.profitSub, {marginLeft: 10}]}>Bill: ₹{Math.round(data.gridBill)}</Text>
+              </View>
             </View>
-            <View style={styles.profitIconBox}>
-               <MaterialCommunityIcons name="trending-up" size={30} color="#10B981" />
+            <View style={[styles.profitIconBox, { backgroundColor: data.latestProfit >= 0 ? '#DCFCE7' : '#FEE2E2' }]}>
+               <MaterialCommunityIcons 
+                 name={data.latestProfit >= 0 ? "trending-up" : "trending-down"} 
+                 size={32} 
+                 color={data.latestProfit >= 0 ? "#16A34A" : "#DC2626"} 
+               />
             </View>
           </View>
         </View>
 
         <View style={styles.content}>
-          {/* QUICK STATS GRID */}
+          {/* MINI STATS */}
           <View style={styles.statsGrid}>
-            <MiniStat label="Tenants" value={data.tenants} icon="office-building" color="#3B82F6" />
-            <MiniStat label="Solar Gen" value={`${data.latestSolar}u`} icon="solar-power" color="#F59E0B" />
-            <MiniStat label="DG Load" value={`${data.latestDGUnits}u`} icon="engine" color="#EF4444" />
+            <MiniStat label="Tenants" value={data.totalTenants} icon="office-building" color="#3B82F6" />
+            <MiniStat label="Solar" value={`${data.solarUnits}u`} icon="solar-power" color="#F59E0B" />
+            <MiniStat label="DG Units" value={`${data.dgUnits}u`} icon="engine" color="#EF4444" />
           </View>
 
-          {/* ANALYTICS CHART */}
-          <Text style={styles.sectionTitle}>Consumption Trends (kWh)</Text>
+          {/* CHART */}
+          <Text style={styles.sectionTitle}>Collection Trend (₹)</Text>
           <View style={styles.chartCard}>
             <LineChart
               data={{
@@ -153,33 +169,27 @@ const Dashboard = ({ navigation }) => {
               height={180}
               chartConfig={chartConfig}
               bezier
-              style={styles.chartStyle}
+              style={{ borderRadius: 16 }}
             />
           </View>
 
-          {/* NAVIGATION GRID */}
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          {/* QUICK ACTIONS */}
+          <Text style={styles.sectionTitle}>Management Menu</Text>
           <View style={styles.navGrid}>
             {navIcons.map((item, index) => (
-              <TouchableOpacity 
-                key={index} 
-                style={styles.navCard} 
-                onPress={() => navigation.navigate(item.route)}
-              >
-                <View style={[styles.iconCircle, { backgroundColor: item.color + '15' }]}>
+              <TouchableOpacity key={index} style={styles.card} onPress={() => navigation.navigate(item.route)}>
+                <View style={[styles.iconCircle, { backgroundColor: item.color + '12' }]}>
                   <MaterialCommunityIcons name={item.icon} size={26} color={item.color} />
                 </View>
-                <Text style={styles.navText}>{item.name}</Text>
+                <Text style={styles.cardText}>{item.name}</Text>
                 {item.badge > 0 && (
-                  <View style={styles.badgeContainer}>
-                    <Text style={styles.badgeText}>{item.badge}</Text>
-                  </View>
+                  <View style={styles.badge}><Text style={styles.badgeText}>{item.badge}</Text></View>
                 )}
               </TouchableOpacity>
             ))}
           </View>
         </View>
-        <View style={{ height: 50 }} />
+        <View style={{ height: 40 }} />
       </ScrollView>
 
       <UserProfile visible={profileVisible} onClose={() => setProfileVisible(false)} />
@@ -187,7 +197,7 @@ const Dashboard = ({ navigation }) => {
   );
 };
 
-// --- Helper Components ---
+// --- Helper Component ---
 const MiniStat = ({ label, value, icon, color }) => (
   <View style={styles.miniStatCard}>
     <MaterialCommunityIcons name={icon} size={20} color={color} />
@@ -200,73 +210,43 @@ const chartConfig = {
   backgroundGradientFrom: "#FFF",
   backgroundGradientTo: "#FFF",
   decimalPlaces: 0,
-  color: (opacity = 1) => `rgba(99, 102, 241, ${opacity})`,
+  color: (opacity = 1) => `rgba(51, 51, 153, ${opacity})`,
   labelColor: (opacity = 1) => `rgba(100, 116, 139, ${opacity})`,
-  propsForDots: { r: "5", strokeWidth: "2", stroke: "#6366F1" },
-  style: { borderRadius: 16 }
+  propsForDots: { r: "5", strokeWidth: "2", stroke: "#333399" }
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { 
-    backgroundColor: '#333399', 
-    paddingHorizontal: 20, 
-    paddingTop: 20, 
-    paddingBottom: 60, 
-    borderBottomLeftRadius: 40, 
-    borderBottomRightRadius: 40 
-  },
-  headerTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 25 },
+  header: { backgroundColor: '#333399', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 60, borderBottomLeftRadius: 35, borderBottomRightRadius: 35 },
+  headerTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   headerInfo: { flex: 1, marginLeft: 15 },
-  greeting: { color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500' },
-  userName: { color: '#FFF', fontSize: 20, fontWeight: 'bold' },
-  headerDateBox: { backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
-  headerDate: { color: '#FFF', fontSize: 12, fontWeight: 'bold' },
+  greeting: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '600' },
+  userName: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
+  lossBadge: { backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
+  lossText: { color: '#FFF', fontSize: 11, fontWeight: 'bold' },
   
-  profitCard: { 
-    backgroundColor: '#FFF', 
-    borderRadius: 25, 
-    padding: 22, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between',
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    marginBottom: -40
-  },
-  profitLabel: { fontSize: 10, fontWeight: 'bold', color: '#94A3B8', letterSpacing: 1 },
-  profitValue: { fontSize: 28, fontWeight: '900', color: '#1E293B', marginTop: 5 },
-  profitIconBox: { backgroundColor: '#F0FDF4', padding: 12, borderRadius: 15 },
+  profitCard: { backgroundColor: '#FFF', borderRadius: 25, padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', elevation: 10, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, marginBottom: -45 },
+  profitLabel: { fontSize: 10, fontWeight: 'bold', color: '#94A3B8', letterSpacing: 0.5 },
+  profitValue: { fontSize: 24, fontWeight: '900', color: '#1E293B', marginVertical: 2 },
+  profitSubRow: { flexDirection: 'row', marginTop: 3 },
+  profitSub: { fontSize: 10, color: '#64748B', fontWeight: 'bold' },
+  profitIconBox: { padding: 12, borderRadius: 15 },
 
-  content: { paddingHorizontal: 20, marginTop: 50 },
+  content: { paddingHorizontal: 20, marginTop: 55 },
   statsGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 25 },
-  miniStatCard: { backgroundColor: '#FFF', width: '31%', padding: 15, borderRadius: 20, alignItems: 'center', elevation: 3, shadowColor: '#000', shadowOpacity: 0.05 },
+  miniStatCard: { backgroundColor: '#FFF', width: '31%', padding: 15, borderRadius: 20, alignItems: 'center', elevation: 2 },
   miniStatValue: { fontSize: 16, fontWeight: 'bold', color: '#1E293B', marginTop: 5 },
-  miniStatLabel: { fontSize: 10, color: '#64748B', fontWeight: '600' },
+  miniStatLabel: { fontSize: 10, color: '#94A3B8', fontWeight: 'bold' },
 
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#1E293B', marginBottom: 15, marginLeft: 5 },
-  chartCard: { backgroundColor: '#FFF', padding: 15, borderRadius: 24, elevation: 4, shadowColor: '#000', shadowOpacity: 0.1, marginBottom: 25 },
-  chartStyle: { borderRadius: 16 },
-
-  navGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  navCard: { 
-    backgroundColor: '#FFF', 
-    width: '48%', 
-    paddingVertical: 20, 
-    borderRadius: 22, 
-    alignItems: 'center', 
-    marginBottom: 15,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#F1F5F9'
-  },
-  iconCircle: { width: 52, height: 52, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
-  navText: { fontSize: 13, fontWeight: '700', color: '#334155' },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#1E293B', marginVertical: 15, marginLeft: 5 },
+  chartCard: { backgroundColor: '#FFF', padding: 15, borderRadius: 24, elevation: 3 },
   
-  badgeContainer: { position: 'absolute', top: 12, right: 15, backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10 },
+  navGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  card: { backgroundColor: '#FFF', width: '48%', paddingVertical: 22, borderRadius: 22, alignItems: 'center', marginBottom: 15, elevation: 2, borderWidth: 1, borderColor: '#F1F5F9' },
+  iconCircle: { width: 50, height: 50, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
+  cardText: { fontSize: 13, fontWeight: '700', color: '#334155' },
+  badge: { position: 'absolute', top: 10, right: 10, backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
   badgeText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' }
 });
 

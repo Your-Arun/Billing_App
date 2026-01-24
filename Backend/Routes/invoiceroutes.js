@@ -121,7 +121,13 @@ router.delete('/delete/:id', async (req, res) => {
 router.get("/company-summary/:adminId", async (req, res) => {
   try {
     const summary = await Statement.aggregate([
-      { $match: { adminId: new mongoose.Types.ObjectId(req.params.adminId) } },
+      { 
+        $match: { 
+          adminId: adminId, 
+          month: { $ne: null }, 
+          gridUnits: { $exists: true }
+        } 
+      },
       {
         $group: {
           _id: "$month", // महीने के हिसाब से ग्रुप करें
@@ -143,6 +149,18 @@ router.get("/company-summary/:adminId", async (req, res) => {
     res.json(summary);
   } catch (e) {
     res.status(500).json({ msg: "Failed to fetch company summary" });
+  }
+});
+
+router.get("/companysummary/:adminId", async (req, res) => {
+  try {
+    const summary = await BusinessSummary.find({ 
+      adminId: req.params.adminId 
+    }).sort({ createdAt: -1 });
+
+    res.json(summary);
+  } catch (e) {
+    res.status(500).json({ msg: "Fetch failed" });
   }
 });
 
