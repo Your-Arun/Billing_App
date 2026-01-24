@@ -45,13 +45,9 @@ const Dashboard = ({ navigation }) => {
         axios.get(`${API_URL}/statement/companysummary/${adminId}`)
       ]);
 
-      // 1. Process Company Summary (Business Insights)
       const summaryList = summary.status === 'fulfilled' ? (summary.value.data || []) : [];
       const latestMonth = summaryList[0] || {};
-
-      console.log(latestMonth)
       
-      // Chart Data Mapping (Last 5 Months)
       let labels = ["-"];
       let points = [0];
       if (summaryList.length > 0) {
@@ -59,11 +55,9 @@ const Dashboard = ({ navigation }) => {
         points = summaryList.slice(0, 5).reverse().map(s => Number(s.totalTenantAmountSum) || 0);
       }
 
-      // 2. DG Units Calculation
       const dgRaw = dg.status === 'fulfilled' ? dg.value.data : null;
       const totalDgUnits = dgRaw?.dgSummary?.reduce((acc, curr) => acc + (Number(curr.totalUnits) || 0), 0) || 0;
 
-      // 3. Solar Logic (Get the latest entry)
       const solarList = solar.status === 'fulfilled' ? (solar.value.data || []) : [];
       const latestSolar = solarList[0]?.unitsGenerated || 0;
 
@@ -88,19 +82,23 @@ const Dashboard = ({ navigation }) => {
     }
   }, [adminId]);
 
-   useFocusEffect(
+  useFocusEffect(
     useCallback(() => {
       fetchDashboardData();
     }, [fetchDashboardData])
   );
 
   const navIcons = [
+    
+    { name: 'Monthly', icon: 'file-document', route: 'MonthlyBilling', color: '#000' },
+    { name: 'Concilliation', icon: 'scale-balance', route: 'Reconciliation', color: '#8B5CF6' },
+    { name: 'AVVNL Bill', icon: 'lightning-bolt', route: 'Bill', color: '#F59E0B' },
     { name: 'Readings', icon: 'speedometer', route: 'Readings', color: '#6366F1' },
     { name: 'Approval', icon: 'check-decagram', route: 'Approval', color: '#10B981', badge: data.pendingCount },
-    { name: 'AVVNL Bill', icon: 'lightning-bolt', route: 'Bill', color: '#F59E0B' },
     { name: 'Tenants', icon: 'account-group', route: 'Tenants', color: '#3B82F6' },
-    { name: 'Analyze', icon: 'scale-balance', route: 'Reconciliation', color: '#8B5CF6' },
+    
     { name: 'Statements', icon: 'file-document-multiple', route: 'Statement', color: '#EC4899' },
+    
   ];
 
   if (loading && !refreshing) {
@@ -129,7 +127,6 @@ const Dashboard = ({ navigation }) => {
             </View>
           </View>
 
-          {/* PROFIT CARD */}
           <View style={styles.profitCard}>
             <View style={{ flex: 1 }}>
               <Text style={styles.profitLabel}>MONTHLY ESTIMATED PROFIT</Text>
@@ -150,12 +147,31 @@ const Dashboard = ({ navigation }) => {
         </View>
 
         <View style={styles.content}>
-          {/* MINI STATS */}
           <View style={styles.statsGrid}>
             <MiniStat label="Tenants" value={data.totalTenants} icon="office-building" color="#3B82F6" />
             <MiniStat label="Solar" value={`${data.solarUnits}u`} icon="solar-power" color="#F59E0B" />
             <MiniStat label="DG Units" value={`${data.dgUnits}u`} icon="engine" color="#EF4444" />
           </View>
+
+          {/* 🟢 SINGLE ROW MANAGEMENT MENU */}
+          <Text style={styles.sectionTitle}>Management Menu</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            contentContainerStyle={styles.horizontalMenu}
+          >
+            {navIcons.map((item, index) => (
+              <TouchableOpacity key={index} style={styles.menuCard} onPress={() => navigation.navigate(item.route)}>
+                <View style={[styles.iconCircle, { backgroundColor: item.color + '12' }]}>
+                  <MaterialCommunityIcons name={item.icon} size={24} color={item.color} />
+                </View>
+                <Text style={styles.cardText} numberOfLines={1}>{item.name}</Text>
+                {item.badge > 0 && (
+                  <View style={styles.badge}><Text style={styles.badgeText}>{item.badge}</Text></View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
 
           {/* CHART */}
           <Text style={styles.sectionTitle}>Collection Trend (₹)</Text>
@@ -165,28 +181,12 @@ const Dashboard = ({ navigation }) => {
                 labels: data.chartLabels,
                 datasets: [{ data: data.chartData }]
               }}
-              width={width - 40}
+              width={width-80}
               height={180}
               chartConfig={chartConfig}
               bezier
               style={{ borderRadius: 16 }}
             />
-          </View>
-
-          {/* QUICK ACTIONS */}
-          <Text style={styles.sectionTitle}>Management Menu</Text>
-          <View style={styles.navGrid}>
-            {navIcons.map((item, index) => (
-              <TouchableOpacity key={index} style={styles.card} onPress={() => navigation.navigate(item.route)}>
-                <View style={[styles.iconCircle, { backgroundColor: item.color + '12' }]}>
-                  <MaterialCommunityIcons name={item.icon} size={26} color={item.color} />
-                </View>
-                <Text style={styles.cardText}>{item.name}</Text>
-                {item.badge > 0 && (
-                  <View style={styles.badge}><Text style={styles.badgeText}>{item.badge}</Text></View>
-                )}
-              </TouchableOpacity>
-            ))}
           </View>
         </View>
         <View style={{ height: 40 }} />
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   profitLabel: { fontSize: 10, fontWeight: 'bold', color: '#94A3B8', letterSpacing: 0.5 },
   profitValue: { fontSize: 24, fontWeight: '900', color: '#1E293B', marginVertical: 2 },
   profitSubRow: { flexDirection: 'row', marginTop: 3 },
-  profitSub: { fontSize: 10, color: '#64748B', fontWeight: 'bold' },
+  profitSub: { fontSize: 10, color: '#16A34A', fontWeight: 'bold' },
   profitIconBox: { padding: 12, borderRadius: 15 },
 
   content: { paddingHorizontal: 20, marginTop: 55 },
@@ -239,15 +239,26 @@ const styles = StyleSheet.create({
   miniStatValue: { fontSize: 16, fontWeight: 'bold', color: '#1E293B', marginTop: 5 },
   miniStatLabel: { fontSize: 10, color: '#94A3B8', fontWeight: 'bold' },
 
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#1E293B', marginVertical: 15, marginLeft: 5 },
-  chartCard: { backgroundColor: '#FFF', padding: 15, borderRadius: 24, elevation: 3 },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#1E293B', marginVertical: 5, marginLeft: 5, },
+  chartCard: { backgroundColor: '#FFF', padding: 5, borderRadius: 24, elevation: 3 },
   
-  navGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  card: { backgroundColor: '#FFF', width: '48%', paddingVertical: 22, borderRadius: 22, alignItems: 'center', marginBottom: 15, elevation: 2, borderWidth: 1, borderColor: '#F1F5F9' },
-  iconCircle: { width: 50, height: 50, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
-  cardText: { fontSize: 13, fontWeight: '700', color: '#334155' },
-  badge: { position: 'absolute', top: 10, right: 10, backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
-  badgeText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' }
+  // 🟢 Horizontal Menu Styles
+  horizontalMenu: { paddingLeft: 5, paddingRight: 20, marginBottom:20 },
+  menuCard: { 
+    backgroundColor: '#FFF', 
+    width: 100, 
+    paddingVertical: 15, 
+    borderRadius: 20, 
+    alignItems: 'center', 
+    marginRight: 12, 
+    elevation: 5, 
+    borderWidth: 1, 
+    borderColor: '#F1F5F9' 
+  },
+  iconCircle: { width: 45, height: 45, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  cardText: { fontSize: 11, fontWeight: '700', color: '#334155', textAlign: 'center' },
+  badge: { position: 'absolute', top: 5, right: 10, backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
+  badgeText: { color: '#FFF', fontSize: 9, fontWeight: 'bold' }
 });
 
 export default Dashboard;
