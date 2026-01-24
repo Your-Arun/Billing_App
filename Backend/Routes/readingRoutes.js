@@ -305,49 +305,33 @@ router.put('/update-reading/:readingId', async (req, res) => {
         const { readingId } = req.params;
         const { newReading } = req.body;
 
-        // 1. Validation check
-        if (!mongoose.Types.ObjectId.isValid(readingId)) {
-            return res.status(400).json({ msg: "Invalid Reading ID format" });
+        // 1. ID Validation
+        if (!readingId || readingId === "null" || !mongoose.Types.ObjectId.isValid(readingId)) {
+            return res.status(400).json({ msg: "No record found to update for this date range" });
         }
 
-        if (newReading === undefined || isNaN(newReading)) {
-            return res.status(400).json({ msg: "Valid reading value is required" });
-        }
+        const updatedVal = Number(newReading);
 
-        // 2. Reading document ko dhundein
-        const reading = await Reading.findById(readingId);
-        if (!reading) {
-            return res.status(404).json({ msg: "Reading record not found" });
-        }
+        // 2. Update the Reading log
+        const reading = await Reading.findByIdAndUpdate(
+            readingId,
+            { closingReading: updatedVal, status: 'Approved' },
+            { new: true }
+        );
 
-        // 3. Purani opening reading ke basis par naya spike (difference) calculate karein
-        // Note: Agar aapke model mein 'openingReading' field hai toh use karein
-        const updatedReadingValue = Number(newReading);
-        
-        // Agar aapke schema mein 'spike' calculation backend par hota hai:
-        // const opening = reading.openingReading || 0;
-        // reading.spike = updatedReadingValue - opening;
+        if (!reading) return res.status(404).json({ msg: "Reading record not found" });
 
-        // 4. Reading update karein
-        reading.closingReading = updatedReadingValue;
-        reading.status = 'Approved'; // Update karne par status auto-approve kar sakte hain
-        await reading.save();
-
-        // 5. Tenant Profile sync karein (Tenant table mein latest closing set karein)
+        // 3. Sync with Tenant Profile (Important for Dashboard)
         await Tenant.findByIdAndUpdate(reading.tenantId, {
-            currentClosing: updatedReadingValue,
+            currentClosing: updatedVal,
             lastUpdated: new Date()
         });
 
-        res.json({ 
-            success: true, 
-            msg: "Reading updated and synced with profile ✅",
-            data: reading 
-        });
+        res.json({ success: true, msg: "Updated successfully ✅" });
 
     } catch (err) {
-        console.error("Update API Error:", err.message);
-        res.status(500).json({ msg: "Server error during update" });
+        console.error("Update Error:", err.message);
+        res.status(500).json({ msg: "Server error: " + err.message });
     }
 });
 
