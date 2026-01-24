@@ -300,7 +300,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 
-outer.put('/update-reading/:readingId', async (req, res) => {
+router.put('/update-reading/:readingId', async (req, res) => {
     try {
         const { readingId } = req.params;
         const { newReading } = req.body;
