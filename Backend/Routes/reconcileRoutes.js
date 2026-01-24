@@ -56,7 +56,6 @@ router.get('/range-summary/:adminId', async (req, res) => {
       result.push({
         tenantId: tenant._id,
         tenantName: tenant.name,
-        readingId: closingData ? closingData._id : null,
         meterId: tenant.meterId,
         connectedDG: tenant.connectedDG,
         multiplierCT: tenant.multiplierCT,

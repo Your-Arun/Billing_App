@@ -91,34 +91,21 @@ const ReadingsReviewScreen = ({ navigation }) => {
     }, []);
 
     const handleSaveUpdate = async () => {
-    // Basic validation
-    if (!newReading || isNaN(newReading)) {
-        return Alert.alert("Error", "Please enter a valid numeric value");
-    }
-
-    // Safety check: Agar range mein reading hi nahi hai toh update nahi ho sakti
-    if (!selectedTenant.readingId) {
-        return Alert.alert("Not Found", "No approved reading found in this date range to update. Please add a new reading first.");
-    }
-
-    setUpdating(true);
-    try {
-        const res = await axios.put(`${API_URL}/readings/update-reading/${selectedTenant.readingId}`, {
-            newReading: Number(newReading)
-        });
-
-        if (res.data.success) {
-            Toast.show({ type: 'success', text1: 'Updated ✅' });
+        if (!newReading || isNaN(newReading)) return Alert.alert("Error", "Enter valid number");
+        setUpdating(true);
+        try {
+            await axios.put(`${API_URL}/readings/update-reading/${selectedTenant.readingId}`, {
+                newReading: Number(newReading)
+            });
             setEditModalVisible(false);
-            fetchData(); // List refresh
+            fetchData();
+        } catch (err) { 
+            Alert.alert("Failed", "Update failed"); 
+            console.log(err)
+        } finally { 
+            setUpdating(false); 
         }
-    } catch (err) {
-        console.log("Update API Error:", err.response?.data || err.message);
-        Alert.alert("Failed", err.response?.data?.msg || "Server update failed");
-    } finally {
-        setUpdating(false);
-    }
-};
+    };
 
     // Header component to be used inside FlatList
     const ListHeader = useMemo(() => (
