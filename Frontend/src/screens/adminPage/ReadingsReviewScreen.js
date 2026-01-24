@@ -29,9 +29,9 @@ const TenantRow = React.memo(({ t, onEdit }) => (
             <Text style={styles.tLabel}>USED</Text>
             <Text style={styles.spike}>{t.spike}</Text>
         </View>
-        <TouchableOpacity onPress={() => onEdit(t)} style={styles.editBtn}>
+        {/* <TouchableOpacity onPress={() => onEdit(t)} style={styles.editBtn}>
             <MaterialCommunityIcons name="pencil-box-outline" size={26} color="#4F46E5" />
-        </TouchableOpacity>
+        </TouchableOpacity> */}
     </View>
 ));
 
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     tMeter: { fontSize: 11, color: '#999' },
     tLabel: { fontSize: 8, color: '#999', fontWeight: 'bold' },
     tValue: { fontWeight: 'bold', color: '#333', fontSize: 12 },
-    spike: { fontWeight: 'bold', color: '#DC2626', fontSize: 12 },
+    spike: { fontWeight: 'bold', color: '#DC2626', fontSize: 15 },
     editBtn: { padding: 5, marginLeft: 5 },
     footer: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, backgroundColor: '#FFF', borderTopWidth: 1, borderColor: '#EEE' },
     submitBtn: { backgroundColor: '#333399', height: 55, borderRadius: 15, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', elevation: 4 },
