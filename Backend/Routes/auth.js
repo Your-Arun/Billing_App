@@ -186,20 +186,15 @@ router.post("/forgot-password", async (req, res) => {
 
   try {
     if (!identifier)
-      return res.status(400).json({ msg: "Email or phone is required." });
+      return res.status(400).json({ msg: "Email is required." });
 
-    // 🔍 detect email or phone
-    let user;
-    if (identifier.includes("@")) {
-      user = await User.findOne({ email: identifier.toLowerCase() });
-    } else {
-      user = await User.findOne({ phone: identifier });
-    }
+    const email = identifier.trim().toLowerCase();
 
+    const user = await User.findOne({ email });
     if (!user)
-      return res.status(404).json({ msg: "User not found." });
+      return res.status(404).json({ msg: "User not found with this email." });
 
-    // ---------- STEP 1 : SEND OTP ----------
+    // ===== STEP 1 : SEND OTP =====
     if (!otp && !newPassword) {
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
       const hashedOtp = await bcrypt.hash(generatedOtp, 10);
@@ -208,25 +203,22 @@ router.post("/forgot-password", async (req, res) => {
       user.resetPasswordExpires = Date.now() + 10 * 60 * 1000;
       await user.save();
 
-      // 👉 email exists? send mail
-      if (user.email) {
-        await transporter.sendMail({
-          from: `"Property Manager" <${process.env.EMAIL_USER}>`,
-          to: user.email,
-          subject: "Password Reset OTP",
-          html: `
-            <h2>Password Reset</h2>
-            <p>Your OTP is:</p>
-            <h1>${generatedOtp}</h1>
-            <p>Valid for 10 minutes</p>
-          `,
-        });
-      }
+      await transporter.sendMail({
+        from: `"Property Manager" <${process.env.EMAIL_USER}>`,
+        to: user.email,
+        subject: "Password Reset OTP",
+        html: `
+          <h2>Password Reset</h2>
+          <p>Your 6-digit OTP:</p>
+          <h1>${generatedOtp}</h1>
+          <p>Valid for 10 minutes</p>
+        `,
+      });
 
-      return res.json({ msg: "OTP sent successfully." });
+      return res.json({ msg: "OTP sent to email." });
     }
 
-    // ---------- STEP 2 : VERIFY & RESET ----------
+    // ===== STEP 2 : VERIFY & RESET =====
     if (otp && newPassword) {
       if (!user.resetPasswordToken || user.resetPasswordExpires < Date.now())
         return res.status(400).json({ msg: "OTP expired." });
@@ -250,6 +242,7 @@ router.post("/forgot-password", async (req, res) => {
     res.status(500).json({ msg: "Server error" });
   }
 });
+
 
 
 
