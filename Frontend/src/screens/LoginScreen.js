@@ -28,6 +28,7 @@ const LoginScreen = ({ navigation }) => {
       id: res.data.user._id,
       name: res.data.user.name,
       role: res.data.user.role,
+      email: res.data.user.email,
       companyName: res.data.user.companyName,
       token: res.data.token,
       adminCode: res.data.user.adminCode || null,

@@ -17,19 +17,21 @@ export default function ForgetScreen({ navigation }) {
 
   const handleAction = async () => {
     if (step === 1) {
-      if (!email) return Toast.show({ type: 'error', text1: 'Email required' });
+      if (!email) return Toast.show({ type: 'error', text1: 'Required', text2: 'Enter your email' });
       setLoading(true);
       try {
         await axios.post(`${API_URL}/forgot-password`, { identifier: email });
-        Toast.show({ type: 'success', text1: 'OTP Sent 📧', text2: 'Check your email' });
+        Toast.show({ type: 'success', text1: 'OTP Sent 📧', text2: 'Check your inbox' });
         setStep(2);
       } catch (error) {
-        Toast.show({ type: 'error', text1: 'Error', text2: error.response?.data?.msg || 'Failed' });
+        Toast.show({ type: 'error', text1: 'Failed', text2: error.response?.data?.msg || 'User not found' });
       } finally {
         setLoading(false);
       }
     } else {
-      if (!otp || !newPassword) return Toast.show({ type: 'error', text1: 'Fill all fields' });
+      if (otp.length < 6 || !newPassword) {
+        return Toast.show({ type: 'error', text1: 'Fields Required', text2: 'Enter 6-digit OTP and New Password' });
+      }
       setLoading(true);
       try {
         await axios.post(`${API_URL}/forgot-password`, { 
@@ -37,7 +39,7 @@ export default function ForgetScreen({ navigation }) {
           otp, 
           newPassword 
         });
-        Toast.show({ type: 'success', text1: 'Success ✅', text2: 'Password Updated' });
+        Toast.show({ type: 'success', text1: 'Success ✅', text2: 'Password Updated Successfully' });
         navigation.navigate('Login');
       } catch (error) {
         Toast.show({ type: 'error', text1: 'Failed', text2: error.response?.data?.msg || 'Invalid OTP' });
@@ -50,19 +52,30 @@ export default function ForgetScreen({ navigation }) {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <StatusBar barStyle="dark-content" />
-      <TouchableOpacity style={styles.backBtn} onPress={() => step === 2 ? setStep(1) : navigation.goBack()}>
+      <TouchableOpacity 
+        style={styles.backBtn} 
+        onPress={() => step === 2 ? setStep(1) : navigation.goBack()}
+      >
         <MaterialCommunityIcons name="chevron-left" size={32} color="#333399" />
       </TouchableOpacity>
 
       <View style={styles.content}>
-        <MaterialCommunityIcons name={step === 1 ? "lock-reset" : "shield-check"} size={60} color="#333399" />
+        <MaterialCommunityIcons 
+          name={step === 1 ? "lock-reset" : "shield-check"} 
+          size={60} color="#333399" 
+        />
         <Text style={styles.title}>{step === 1 ? "Forgot Password?" : "Verify OTP"}</Text>
+        <Text style={styles.subTitle}>
+          {step === 1 
+            ? "Enter your email to receive a 6-digit verification code." 
+            : `We have sent a code to ${email}`}
+        </Text>
         
         <View style={styles.inputWrapper}>
           {step === 1 ? (
             <View style={styles.inputBox}>
               <MaterialCommunityIcons name="email-outline" size={20} color="#666" style={{marginRight: 10}} />
-              <TextInput style={styles.textInput} placeholder="Enter your email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+              <TextInput style={styles.textInput} placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
             </View>
           ) : (
             <>
@@ -72,7 +85,7 @@ export default function ForgetScreen({ navigation }) {
               </View>
               <View style={[styles.inputBox, {marginTop: 15}]}>
                 <MaterialCommunityIcons name="lock-outline" size={20} color="#666" style={{marginRight: 10}} />
-                <TextInput style={styles.textInput} placeholder="Enter new password" value={newPassword} onChangeText={setNewPassword} secureTextEntry />
+                <TextInput style={styles.textInput} placeholder="New Password" value={newPassword} onChangeText={setNewPassword} secureTextEntry />
               </View>
             </>
           )}
@@ -89,11 +102,12 @@ export default function ForgetScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flexGrow: 1, backgroundColor: '#FFF' },
   backBtn: { padding: 15, marginTop: 10 },
-  content: { paddingHorizontal: 30, alignItems: 'center', marginTop: 20 },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#1A1C3D', marginVertical: 20 },
+  content: { paddingHorizontal: 30, alignItems: 'center' },
+  title: { fontSize: 24, fontWeight: 'bold', color: '#1A1C3D', marginVertical: 10 },
+  subTitle: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 30, lineHeight: 20 },
   inputWrapper: { width: '100%' },
   inputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFF', borderRadius: 15, paddingHorizontal: 15, height: 55, borderWidth: 1, borderColor: '#EDF1FF' },
-  textInput: { flex: 1, fontSize: 16 },
+  textInput: { flex: 1, fontSize: 16, color: '#333' },
   mainBtn: { backgroundColor: '#333399', height: 55, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginTop: 25 },
   btnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
 });
