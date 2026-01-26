@@ -5,7 +5,6 @@ import { UserContext } from '../../services/UserContext';
 const UserProfile = ({ visible, onClose }) => {
   const { user, logout } = useContext(UserContext);
 
-  console.log("User Profile Data:", user);
 
   return (
     <Modal visible={visible} animationType="fade" transparent={true}>
