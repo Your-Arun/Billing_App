@@ -182,24 +182,23 @@ router.post('/login', async (req, res) => {
 // });
 
 router.post("/forgot-password", async (req, res) => {
-  const { email, otp, newPassword } = req.body;
+  const { identifier, otp, newPassword } = req.body;
 
   try {
-    if (!email)
-      return res.status(400).json({ msg: "Email is required." });
+    if (!identifier) return res.status(400).json({ msg: "Email is required." });
 
+    // Paka karein ki user identifier (email) se hi mile
+    const user = await User.findOne({ email: identifier.trim().toLowerCase() });
+    if (!user) return res.status(404).json({ msg: "Is email ke sath koi user nahi mila." });
 
-    const user = await User.findOne({ email });
-    if (!user)
-      return res.status(404).json({ msg: "User not found with this email." });
-
-    // ===== STEP 1 : SEND OTP =====
+    // ===== STEP 1 : OTP BHEJNA (Agar sirf email aaya hai) =====
     if (!otp && !newPassword) {
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      // OTP ko hash karke DB mein save karein
       const hashedOtp = await bcrypt.hash(generatedOtp, 10);
-
       user.resetPasswordToken = hashedOtp;
-      user.resetPasswordExpires = Date.now() + 10 * 60 * 1000;
+      user.resetPasswordExpires = Date.now() + 10 * 60 * 1000; // 10 min
       await user.save();
 
       await transporter.sendMail({
@@ -207,40 +206,46 @@ router.post("/forgot-password", async (req, res) => {
         to: user.email,
         subject: "Password Reset OTP",
         html: `
-          <h2>Password Reset</h2>
-          <p>Your 6-digit OTP:</p>
-          <h1>${generatedOtp}</h1>
-          <p>Valid for 10 minutes</p>
+          <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee;">
+            <h2 style="color: #333399;">Password Reset Request</h2>
+            <p>Aapka verification code niche diya gaya hai:</p>
+            <h1 style="letter-spacing: 5px; background: #f4f4f9; padding: 10px; text-align: center;">${generatedOtp}</h1>
+            <p>Yeh code 10 minute tak valid hai.</p>
+          </div>
         `,
       });
 
-      return res.json({ msg: "OTP sent to email." });
+      return res.status(200).json({ msg: "OTP bhej diya gaya hai." });
     }
 
-    // ===== STEP 2 : VERIFY & RESET =====
+    // ===== STEP 2 : VERIFY & RESET (Agar OTP aur Password dono hain) =====
     if (otp && newPassword) {
-      if (!user.resetPasswordToken || user.resetPasswordExpires < Date.now())
-        return res.status(400).json({ msg: "OTP expired." });
+      if (!user.resetPasswordToken || user.resetPasswordExpires < Date.now()) {
+        return res.status(400).json({ msg: "OTP expire ho gaya hai. Dobara bhejien." });
+      }
 
       const isValid = await bcrypt.compare(otp, user.resetPasswordToken);
-      if (!isValid)
-        return res.status(400).json({ msg: "Invalid OTP." });
+      if (!isValid) return res.status(400).json({ msg: "OTP galat hai." });
 
-      user.password = await bcrypt.hash(newPassword, 10);
+      // Naya password hash karke save karein
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(newPassword, salt);
+      
       user.resetPasswordToken = null;
       user.resetPasswordExpires = null;
       await user.save();
 
-      return res.json({ msg: "Password reset successful ✅" });
+      return res.status(200).json({ msg: "Password reset successful! ✅" });
     }
 
-    res.status(400).json({ msg: "Invalid request." });
+    res.status(400).json({ msg: "Invalid Request." });
 
   } catch (err) {
     console.error("Forgot password error:", err);
-    res.status(500).json({ msg: "Server error" });
+    res.status(500).json({ msg: "Server error. Check Nodemailer config." });
   }
 });
+
 
 
 
