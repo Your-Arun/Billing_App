@@ -195,6 +195,14 @@ router.post("/forgot-password", async (req, res) => {
       user.resetOtpExpires = new Date(Date.now() + 10 * 60 * 1000);
       await user.save();
 
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { 
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS 
+        }
+      });
+
       await transporter.sendMail({
         to: cleanEmail,
         subject: "Password Reset OTP",
