@@ -15,52 +15,63 @@ export default function ForgetScreen({ navigation }) {
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleAction = async () => {
+
+const handleAction = async () => {
+  try {
+    setLoading(true);
+
     if (step === 1) {
-      if (!email) return Toast.show({ type: 'error', text1: 'Required', text2: 'Enter your email' });
-      
-      setLoading(true);
-      try {
-        // Backend expects 'identifier'
-        const res = await axios.post(`${API_URL}/forgot-password`, { identifier: email });
-        Toast.show({ type: 'success', text1: 'OTP Sent 📧', text2: 'Check your inbox' });
-        setStep(2);
-      } catch (error) {
-        Toast.show({ 
-          type: 'error', 
-          text1: 'Failed', 
-          text2: error.response?.data?.msg || 'User not found' 
-        });
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      if (otp.length < 6 || !newPassword) {
-        return Toast.show({ type: 'error', text1: 'Error', text2: 'Enter 6-digit OTP & New Password' });
-      }
-
-      setLoading(true);
-      try {
-        const res = await axios.post(`${API_URL}/forgot-password`, { 
-          identifier: email, 
-          otp, 
-          newPassword 
-        });
-        Toast.show({ type: 'success', text1: 'Success ✅', text2: 'Password Updated' });
-        navigation.navigate('Login');
-      } catch (error) {
-        Toast.show({ 
-          type: 'error', 
-          text1: 'Failed', 
-          text2: error.response?.data?.msg || 'Invalid OTP' 
+      if (!email)
+        return Toast.show({
+          type: "error",
+          text1: "Required",
+          text2: "Enter email"
         });
 
-        console.log('Password Reset Error:', error);
-      } finally {
-        setLoading(false);
-      }
+      await axios.post(`${API_URL}/forgot-password`, { email });
+
+      Toast.show({
+        type: "success",
+        text1: "OTP Sent 📧",
+        text2: "Check your email"
+      });
+
+      setStep(2);
     }
-  };
+
+    if (step === 2) {
+      if (otp.length !== 6 || !newPassword)
+        return Toast.show({
+          type: "error",
+          text1: "Invalid",
+          text2: "Enter valid OTP & password"
+        });
+
+      await axios.post(`${API_URL}/forgot-password`, {
+        email,
+        otp,
+        newPassword
+      });
+
+      Toast.show({
+        type: "success",
+        text1: "Success",
+        text2: "Password reset successfully"
+      });
+
+      navigation.navigate("Login");
+    }
+  } catch (err) {
+    Toast.show({
+      type: "error",
+      text1: "Failed",
+      text2: err.response?.data?.message || "Something went wrong"
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <ScrollView contentContainerStyle={styles.container}>

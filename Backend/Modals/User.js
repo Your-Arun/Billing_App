@@ -9,10 +9,11 @@ const UserSchema = new mongoose.Schema({
   role: { type: String, enum: ['Admin', 'Reading Taker'], required: true },
   adminCode: { type: String, unique: true, sparse: true },
   belongsToAdmin: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  otp:{ type:String},
-  expiresAt: {type:Date},
-  resetPasswordToken:{ type:String},
-  resetPasswordExpires:{type:Date},
+  otp: { type: String },
+  expiresAt: { type: Date },
+  resetPasswordToken: { type: String },
+  resetOtp: String,
+  resetOtpExpires: Date,
 });
 
 module.exports = mongoose.model('User', UserSchema);

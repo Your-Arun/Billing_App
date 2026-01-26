@@ -11,21 +11,6 @@ const nodemailer = require('nodemailer');
 
 dotenv.config();
 
-// 📧 Render/Cloud Compatible Transporter (Port 587 is more stable)
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false, // Port 587 ke liye false
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS, // 16 digit App Password
-  },
-  tls: {
-    rejectUnauthorized: false // Cloud timeout fix
-  }
-});
-
-
 // SIGNUP
 router.post('/signup', async (req, res) => {
   try {
@@ -188,67 +173,76 @@ router.post('/login', async (req, res) => {
 // });
 
 router.post("/forgot-password", async (req, res) => {
-  const { identifier, otp, newPassword } = req.body;
+  const { email, otp, newPassword } = req.body;
 
   try {
-    if (!identifier) return res.status(400).json({ msg: "Email is required." });
+    if (!email)
+      return res.status(400).json({ message: "Email is required" });
 
-    // Paka karein ki user identifier (email) se hi mile
-    const user = await User.findOne({ email: identifier.trim().toLowerCase() });
-    if (!user) return res.status(404).json({ msg: "Is email ke sath koi user nahi mila." });
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user)
+      return res.status(404).json({ message: "User not found" });
 
-    // ===== STEP 1 : OTP BHEJNA (Agar sirf email aaya hai) =====
+    // ================= STEP 1 : SEND OTP =================
     if (!otp && !newPassword) {
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      
-      // OTP ko hash karke DB mein save karein
       const hashedOtp = await bcrypt.hash(generatedOtp, 10);
-      user.resetPasswordToken = hashedOtp;
-      user.resetPasswordExpires = Date.now() + 10 * 60 * 1000; // 10 min
+
+      user.resetOtp = hashedOtp;
+      user.resetOtpExpires = Date.now() + 10 * 60 * 1000; // 10 min
       await user.save();
+
+
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
 
       await transporter.sendMail({
         from: `"Property Manager" <${process.env.EMAIL_USER}>`,
         to: user.email,
         subject: "Password Reset OTP",
         html: `
-          <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee;">
-            <h2 style="color: #333399;">Password Reset Request</h2>
-            <p>Aapka verification code niche diya gaya hai:</p>
-            <h1 style="letter-spacing: 5px; background: #f4f4f9; padding: 10px; text-align: center;">${generatedOtp}</h1>
-            <p>Yeh code 10 minute tak valid hai.</p>
-          </div>
+          <h2>Password Reset</h2>
+          <p>Your OTP:</p>
+          <h1>${generatedOtp}</h1>
+          <p>Valid for 10 minutes</p>
         `,
       });
 
-      return res.status(200).json({ msg: "OTP bhej diya gaya hai." });
+      return res.json({ message: "OTP sent to your email" });
     }
 
-    // ===== STEP 2 : VERIFY & RESET (Agar OTP aur Password dono hain) =====
+    // ================= STEP 2 : VERIFY OTP =================
     if (otp && newPassword) {
-      if (!user.resetPasswordToken || user.resetPasswordExpires < Date.now()) {
-        return res.status(400).json({ msg: "OTP expire ho gaya hai. Dobara bhejien." });
+      if (
+        !user.resetOtp ||
+        !user.resetOtpExpires ||
+        user.resetOtpExpires < Date.now()
+      ) {
+        return res.status(400).json({ message: "OTP expired" });
       }
 
-      const isValid = await bcrypt.compare(otp, user.resetPasswordToken);
-      if (!isValid) return res.status(400).json({ msg: "OTP galat hai." });
+      const isValid = await bcrypt.compare(otp, user.resetOtp);
+      if (!isValid)
+        return res.status(400).json({ message: "Invalid OTP" });
 
-      // Naya password hash karke save karein
-      const salt = await bcrypt.genSalt(10);
-      user.password = await bcrypt.hash(newPassword, salt);
-      
-      user.resetPasswordToken = null;
-      user.resetPasswordExpires = null;
+      user.password = await bcrypt.hash(newPassword, 10);
+      user.resetOtp = null;
+      user.resetOtpExpires = null;
       await user.save();
 
-      return res.status(200).json({ msg: "Password reset successful! ✅" });
+      return res.json({ message: "Password reset successful ✅" });
     }
 
-    res.status(400).json({ msg: "Invalid Request." });
+    return res.status(400).json({ message: "Invalid request" });
 
   } catch (err) {
     console.error("Forgot password error:", err);
-    res.status(500).json({ msg: "Server error. Check Nodemailer config." });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
