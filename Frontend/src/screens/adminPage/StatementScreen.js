@@ -172,7 +172,7 @@ const StatementScreen = ({ route, navigation }) => {
                             Toast.show({ type: 'success', text1: 'All Invoices Saved! 📚' });
                             fetchHistory();
                         } catch (e) {
-                            Alert.alert("Error", "Bulk save failed.");
+                            Alert.alert("Try Agin", "Bulk save failed.");
                             console.log(e)
                         } finally {
                             setIsSavingAll(false);
