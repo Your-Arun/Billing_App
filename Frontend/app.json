@@ -5,32 +5,43 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.jpg",
-    // "scheme": "frontend",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+
     "ios": {
       "supportsTablet": true
     },
+
     "android": {
+      "package": "com.urarun0211.frontend",
+
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "",
-        "backgroundImage": "",
-        "monochromeImage": ""
+        "foregroundImage": "./assets/icon.jpg",
+        "backgroundColor": "#E6F4FE"
       },
+
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "NOTIFICATIONS"
+      ],
+
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
+
     "web": {
-      "output": "static",
-      "favicon": ""
+      "output": "static"
     },
+
     "plugins": [
       "expo-router",
+
       [
         "expo-splash-screen",
         {
-          "image": "",
+          "image": "./assets/icon.jpg",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
@@ -39,15 +50,50 @@
           }
         }
       ],
+
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow this app to access your camera"
+        }
+      ],
+
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow this app to access your photos",
+          "savePhotosPermission": "Allow this app to save photos"
+        }
+      ],
+
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.jpg",
+          "color": "#333399",
+          "sounds": ["default"]
+        }
+      ],
+
       "@react-native-community/datetimepicker"
     ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    },"splash": {
+
+    "splash": {
       "image": "./assets/icon.jpg",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2ee91b4c-ceb8-4a42-a0d4-6060a00d2ef2"
+      }
+    }
   }
 }
