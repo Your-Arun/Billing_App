@@ -11,12 +11,18 @@ const nodemailer = require('nodemailer');
 
 dotenv.config();
 
+// 📧 Render/Cloud Compatible Transporter (Port 587 is more stable)
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false, // Port 587 ke liye false
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    pass: process.env.EMAIL_PASS, // 16 digit App Password
   },
+  tls: {
+    rejectUnauthorized: false // Cloud timeout fix
+  }
 });
 
 

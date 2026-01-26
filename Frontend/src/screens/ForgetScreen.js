@@ -54,6 +54,8 @@ export default function ForgetScreen({ navigation }) {
           text1: 'Failed', 
           text2: error.response?.data?.msg || 'Invalid OTP' 
         });
+
+        console.log('Password Reset Error:', error);
       } finally {
         setLoading(false);
       }
