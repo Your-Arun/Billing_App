@@ -5,6 +5,8 @@ import { UserContext } from '../../services/UserContext';
 const UserProfile = ({ visible, onClose }) => {
   const { user, logout } = useContext(UserContext);
 
+  console.log("User Profile Data:", user);
+
   return (
     <Modal visible={visible} animationType="fade" transparent={true}>
       <Pressable style={styles.modalOverlay} onPress={onClose}>
@@ -31,6 +33,11 @@ const UserProfile = ({ visible, onClose }) => {
             <View style={styles.detailRow}>
               <Text style={styles.label}>Role:</Text>
               <Text style={styles.value}>{user?.role || "N/A"}</Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.label}>Email:</Text>
+              <Text style={styles.value}>{user?.email || "N/A"}</Text>
             </View>
 
 

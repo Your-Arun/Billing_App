@@ -85,12 +85,13 @@ router.post('/login', async (req, res) => {
     if (!isMatch) return res.status(400).json({ msg: 'Invalid phone or password' });
 
     const token = jwt.sign(
-      { id: user._id, role: user.role },
+      { id: user._id, role: user.role , },
       process.env.JWT_SECRET || 'fallback_secret',
       { expiresIn: '1d' }
     );
 
     return res.json({ token, user });
+    console.log(user);
   } catch (err) {
     console.error('LOGIN ERROR:', err);
     return res.status(500).json({ msg: 'Server error' });
