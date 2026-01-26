@@ -21,11 +21,6 @@ const transporter = nodemailer.createTransport({
 });
 
 
-
-await transporter.verify();
-console.log("SMTP ready");
-
-
 // SIGNUP
 router.post('/signup', async (req, res) => {
   try {

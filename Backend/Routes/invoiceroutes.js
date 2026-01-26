@@ -22,7 +22,9 @@ router.post("/save", async (req, res) => {
 
     // 1️⃣ PDF generation logic
     browser = await puppeteer.launch({
-      args: [...chromium.args, "--hide-scrollbars", 
+      args: [...chromium.args, "--hide-scrollbars",
+        "--disable-dev-shm-usage",
+        "--single-process",
         "--disable-web-security"],
       defaultViewport: chromium.defaultViewport,
       executablePath: await chromium.executablePath(),
@@ -122,12 +124,12 @@ router.delete('/delete/:id', async (req, res) => {
 router.get("/company-summary/:adminId", async (req, res) => {
   try {
     const summary = await Statement.aggregate([
-      { 
-        $match: { 
-          adminId: adminId, 
-          month: { $ne: null }, 
+      {
+        $match: {
+          adminId: adminId,
+          month: { $ne: null },
           gridUnits: { $exists: true }
-        } 
+        }
       },
       {
         $group: {
@@ -155,8 +157,8 @@ router.get("/company-summary/:adminId", async (req, res) => {
 
 router.get("/companysummary/:adminId", async (req, res) => {
   try {
-    const summary = await BusinessSummary.find({ 
-      adminId: req.params.adminId 
+    const summary = await BusinessSummary.find({
+      adminId: req.params.adminId
     }).sort({ createdAt: -1 });
 
     res.json(summary);
