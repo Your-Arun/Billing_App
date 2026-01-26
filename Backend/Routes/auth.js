@@ -188,7 +188,6 @@ router.post("/forgot-password", async (req, res) => {
     if (!identifier)
       return res.status(400).json({ msg: "Email is required." });
 
-    const email = identifier.trim().toLowerCase();
 
     const user = await User.findOne({ email });
     if (!user)
