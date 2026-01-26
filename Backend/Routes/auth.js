@@ -7,10 +7,8 @@ const twilio = require('twilio')
 const dotenv = require('dotenv')
 const Otp = require('../Modals/Otp');
 const crypto = require('crypto');
-import { sendOtpMail } from "../utils/sendOtpMail";
+const { sendOtpMail } = "../utils/sendOtpMail";
 dotenv.config();
-
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 // SIGNUP
 router.post('/signup', async (req, res) => {
