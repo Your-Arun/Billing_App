@@ -7,7 +7,7 @@ const twilio = require('twilio')
 const dotenv = require('dotenv')
 const Otp = require('../Modals/Otp');
 const crypto = require('crypto');
-const { sendOtpMail } = "../utils/sendOtpMail";
+const { sendOtpMail } = require("../utils/sendOtpMail");
 dotenv.config();
 
 // SIGNUP
