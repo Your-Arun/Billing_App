@@ -18,7 +18,7 @@ const Dashboard = ({ navigation }) => {
   const [profileVisible, setProfileVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
+ console.log(`Dashboard Rendered`, user);
   
   const [data, setData] = useState({
     totalTenants: 0,
