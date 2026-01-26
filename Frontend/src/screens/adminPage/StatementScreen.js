@@ -126,9 +126,10 @@ const StatementScreen = ({ route, navigation }) => {
 
     const handleSaveAll = async () => {
         if (tenantBreakdown.length === 0) return;
+
         Alert.alert(
             "Save All Invoices",
-            `Generate ${tenantBreakdown.length} invoices with Round-Off?`,
+            `Generate and save ${tenantBreakdown.length} invoices? (Sequential Mode for Stability)`,
             [
                 { text: "Cancel", style: "cancel" },
                 {
@@ -138,6 +139,8 @@ const StatementScreen = ({ route, navigation }) => {
                         try {
                             const totalColl = tenantBreakdown.reduce((acc, curr) => acc + curr.totalBill, 0);
                             const profit = Math.round(totalColl - (summary?.gridAmount || 0));
+
+                            // 📈 STEP 1: Save Summary First
                             await axios.post(`${API_URL}/statement/save-summary`, {
                                 adminId,
                                 month: monthKeyDisplay,
@@ -153,13 +156,16 @@ const StatementScreen = ({ route, navigation }) => {
                                 profit: profit
                             });
 
-
-
-                            const savePromises = tenantBreakdown.map(item => {
+                        
+                            // Sequential loop server ko crash hone se bachata hai
+                            let count = 0;
+                            for (const item of tenantBreakdown) {
                                 const html = createHTML(item);
-
                                 const roundedTotal = Math.round(item.totalBill);
-                                return axios.post(`${API_URL}/statement/save`, {
+
+                                console.log(`Saving invoice for: ${item.tenantName}...`);
+
+                                await axios.post(`${API_URL}/statement/save`, {
                                     adminId, tenantId: item.tenantId, tenantName: item.tenantName,
                                     meterId: item.meterId, periodFrom: startDate, periodTo: endDate,
                                     units: item.units, totalAmount: roundedTotal, htmlContent: html,
@@ -167,13 +173,20 @@ const StatementScreen = ({ route, navigation }) => {
                                     ratePerUnit: item.ratePerUnit, transformerLoss: item.transformerLoss,
                                     fixed: item.fixed, transLoss: item.transLoss, dgCharge: item.dgCharge,
                                 });
+
+                                count++;
+                            }
+
+                            Toast.show({
+                                type: 'success',
+                                text1: 'All Invoices Saved! 📚',
+                                text2: `Successfully saved ${count} records.`
                             });
-                            await Promise.all(savePromises);
-                            Toast.show({ type: 'success', text1: 'All Invoices Saved! 📚' });
                             fetchHistory();
                         } catch (e) {
-                            Alert.alert("Try Agin", "Bulk save failed.");
-                            console.log(e)
+                            console.log("Saving error:", e.response?.data || e.message);
+                            Alert.alert("Process Interrupted", "Some invoices might not have saved. Please check history.");
+                            fetchHistory();
                         } finally {
                             setIsSavingAll(false);
                         }

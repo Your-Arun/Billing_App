@@ -38,11 +38,11 @@ router.post('/signup', async (req, res) => {
   try {
     const { name, phone, password, role, companyName, email, adminCodeInput } = req.body;
 
-
     if (!name || !phone || !password || !role)
       return res.status(400).json({ msg: 'Missing required fields' });
 
-
+    // ✅ CLEAN EMAIL FIRST
+    const cleanEmail = email?.trim().toLowerCase();
 
     const exists = await User.findOne({ phone });
     if (exists) return res.status(400).json({ msg: 'User already exists' });
@@ -51,21 +51,22 @@ router.post('/signup', async (req, res) => {
     if (emailExists)
       return res.status(400).json({ msg: 'Email already registered' });
 
-
     let finalCompanyName = companyName;
     let belongsToAdmin = null;
     let adminCode = null;
-    const cleanEmail = email.trim().toLowerCase();
-
 
     if (role === 'Admin') {
-      if (!companyName) return res.status(400).json({ msg: 'Company name required' });
+      if (!companyName)
+        return res.status(400).json({ msg: 'Company name required' });
+
       adminCode = 'COMP' + Math.floor(100000 + Math.random() * 900000);
     }
 
     if (role === 'Reading Taker') {
       const admin = await User.findOne({ adminCode: adminCodeInput, role: 'Admin' });
-      if (!admin) return res.status(400).json({ msg: 'Invalid Admin Code' });
+      if (!admin)
+        return res.status(400).json({ msg: 'Invalid Admin Code' });
+
       finalCompanyName = admin.companyName;
       belongsToAdmin = admin._id;
     }
@@ -86,11 +87,13 @@ router.post('/signup', async (req, res) => {
     await user.save();
 
     return res.status(201).json({ msg: 'Account created', adminCode });
+
   } catch (err) {
     console.error('SIGNUP ERROR:', err);
     return res.status(500).json({ msg: 'Server error' });
   }
 });
+
 
 // LOGIN
 router.post('/login', async (req, res) => {
