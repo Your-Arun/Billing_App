@@ -23,8 +23,6 @@ router.post("/save", async (req, res) => {
     // 1️⃣ PDF generation logic
     browser = await puppeteer.launch({
       args: [...chromium.args, "--hide-scrollbars", 
-        "--disable-dev-shm-usage",
-        "--single-process",
         "--disable-web-security"],
       defaultViewport: chromium.defaultViewport,
       executablePath: await chromium.executablePath(),
