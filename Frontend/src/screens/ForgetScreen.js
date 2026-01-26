@@ -16,36 +16,22 @@ export default function ForgetScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
 
 
+// handleAction logic change
 const handleAction = async () => {
   try {
     setLoading(true);
 
     if (step === 1) {
-      if (!email)
-        return Toast.show({
-          type: "error",
-          text1: "Required",
-          text2: "Enter email"
-        });
-
-      await axios.post(`${API_URL}/forgot-password`, { email });
-
-      Toast.show({
-        type: "success",
-        text1: "OTP Sent 📧",
-        text2: "Check your email"
-      });
-
+      if (!email) return Toast.show({ type: "error", text1: "Email Required" });
+      
+      await axios.post(`${API_URL}/forgot-password`, { email }); // 👈 sending email
+      
+      Toast.show({ type: "success", text1: "OTP Sent 📧" });
       setStep(2);
-    }
-
-    if (step === 2) {
-      if (otp.length !== 6 || !newPassword)
-        return Toast.show({
-          type: "error",
-          text1: "Invalid",
-          text2: "Enter valid OTP & password"
-        });
+    } else {
+      if (otp.length < 6 || !newPassword) {
+        return Toast.show({ type: "error", text1: "Details Required" });
+      }
 
       await axios.post(`${API_URL}/forgot-password`, {
         email,
@@ -53,18 +39,13 @@ const handleAction = async () => {
         newPassword
       });
 
-      Toast.show({
-        type: "success",
-        text1: "Success",
-        text2: "Password reset successfully"
-      });
-
+      Toast.show({ type: "success", text1: "Password reset successful" });
       navigation.navigate("Login");
     }
   } catch (err) {
     Toast.show({
       type: "error",
-      text1: "Failed",
+      text1: "Error",
       text2: err.response?.data?.message || "Something went wrong"
     });
   } finally {

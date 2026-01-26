@@ -175,62 +175,59 @@ router.post("/forgot-password", async (req, res) => {
   const { email, otp, newPassword } = req.body;
 
   try {
-    if (!email)
-      return res.status(400).json({ message: "Email is required" });
+    if (!email) return res.status(400).json({ message: "Email is required" });
 
     const cleanEmail = email.trim().toLowerCase();
-
     const user = await User.findOne({ email: cleanEmail });
-    if (!user)
-      return res.status(404).json({ message: "User not found" });
+
+    if (!user) return res.status(404).json({ message: "Is email ke sath koi user nahi mila." });
 
     // ========= STEP 1: SEND OTP =========
     if (!otp && !newPassword) {
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      // OTP ko hash karke DB mein save karein
       const hashedOtp = await bcrypt.hash(generatedOtp, 10);
-
       user.resetOtp = hashedOtp;
-      user.resetOtpExpires = Date.now() + 10 * 60 * 1000;
+      user.resetOtpExpires = Date.now() + 10 * 60 * 1000; // 10 min expiry
       await user.save();
 
+      // Mail bhejein
       await sendOtpMail(user.email, generatedOtp);
 
-      return res.json({ message: "OTP sent to email ✅" });
+      return res.status(200).json({ message: "OTP bhej diya gaya hai ✅" });
     }
 
-    // ========= STEP 2: VERIFY OTP =========
+    // ========= STEP 2: VERIFY & RESET =========
     if (otp && newPassword) {
-      if (
-        !user.resetOtp ||
-        !user.resetOtpExpires ||
-        user.resetOtpExpires < Date.now()
-      ) {
-        return res.status(400).json({ message: "OTP expired" });
+      // Expiry check
+      if (!user.resetOtp || !user.resetOtpExpires || user.resetOtpExpires < Date.now()) {
+        return res.status(400).json({ message: "OTP expire ho gaya hai" });
       }
 
+      // Match check
       const isValid = await bcrypt.compare(otp, user.resetOtp);
-      if (!isValid)
-        return res.status(400).json({ message: "Invalid OTP" });
+      if (!isValid) return res.status(400).json({ message: "Invalid OTP code" });
 
-      user.password = await bcrypt.hash(newPassword, 10);
+      // Password hash karke save karein
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(newPassword, salt);
+      
+      // Clear reset fields
       user.resetOtp = null;
       user.resetOtpExpires = null;
       await user.save();
 
-      return res.json({ message: "Password reset successful 🎉" });
+      return res.status(200).json({ message: "Password reset successful 🎉" });
     }
 
-    return res.status(400).json({ message: "Invalid request" });
+    return res.status(400).json({ message: "Invalid Request" });
 
   } catch (err) {
     console.error("Forgot password error:", err);
-    return res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Email service failed. Domain verified?" });
   }
 });
-
-
-
-
 
 
 module.exports = router;
