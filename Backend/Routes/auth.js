@@ -13,24 +13,17 @@ const nodemailer = require('nodemailer');
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
+  service: "gmail",
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-  tls: {
-    rejectUnauthorized: false,
-  },
 });
 
 
 
-transporter.verify((err, success) => {
-  if (err) console.log("MAIL ERROR:", err);
-  else console.log("MAIL READY ✅");
-});
+await transporter.verify();
+console.log("SMTP ready");
 
 
 // SIGNUP
