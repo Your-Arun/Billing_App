@@ -6,34 +6,55 @@ const router = express.Router();
 const twilio = require('twilio')
 const dotenv = require('dotenv')
 const Otp = require('../Modals/Otp');
-const crypto = require('crypto'); 
+const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 
 
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
-  host: "gmail",
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS, 
+    pass: process.env.EMAIL_PASS,
+  },
+  tls: {
+    rejectUnauthorized: false,
   },
 });
+
+transporter.verify((err, success) => {
+  if (err) console.log("MAIL ERROR:", err);
+  else console.log("MAIL READY ✅");
+});
+
 
 // SIGNUP
 router.post('/signup', async (req, res) => {
   try {
-    const { name, phone, password, role, companyName, email,adminCodeInput } = req.body;
+    const { name, phone, password, role, companyName, email, adminCodeInput } = req.body;
+
 
     if (!name || !phone || !password || !role)
       return res.status(400).json({ msg: 'Missing required fields' });
 
+
+
     const exists = await User.findOne({ phone });
     if (exists) return res.status(400).json({ msg: 'User already exists' });
+
+    const emailExists = await User.findOne({ email: cleanEmail });
+    if (emailExists)
+      return res.status(400).json({ msg: 'Email already registered' });
+
 
     let finalCompanyName = companyName;
     let belongsToAdmin = null;
     let adminCode = null;
+    const cleanEmail = email.trim().toLowerCase();
+
 
     if (role === 'Admin') {
       if (!companyName) return res.status(400).json({ msg: 'Company name required' });
@@ -54,7 +75,7 @@ router.post('/signup', async (req, res) => {
       phone,
       password: hashedPassword,
       role,
-      email,
+      email: cleanEmail,
       companyName: finalCompanyName,
       adminCode,
       belongsToAdmin
@@ -82,7 +103,7 @@ router.post('/login', async (req, res) => {
     if (!isMatch) return res.status(400).json({ msg: 'Invalid phone or password' });
 
     const token = jwt.sign(
-      { id: user._id, role: user.role , },
+      { id: user._id, role: user.role, },
       process.env.JWT_SECRET || 'fallback_secret',
       { expiresIn: '1d' }
     );
@@ -182,7 +203,7 @@ router.post("/forgot-password", async (req, res) => {
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
       const hashedOtp = await bcrypt.hash(generatedOtp, 10);
 
-      user.resetPasswordToken = hashedOtp; 
+      user.resetPasswordToken = hashedOtp;
       user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins validity
       await user.save();
 
@@ -214,7 +235,7 @@ router.post("/forgot-password", async (req, res) => {
 
       const salt = await bcrypt.genSalt(10);
       user.password = await bcrypt.hash(newPassword, salt);
-      
+
       user.resetPasswordToken = null;
       user.resetPasswordExpires = null;
       await user.save();
