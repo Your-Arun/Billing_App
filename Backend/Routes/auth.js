@@ -182,10 +182,10 @@ router.post('/login', async (req, res) => {
 // });
 
 router.post("/forgot-password", async (req, res) => {
-  const { identifier, otp, newPassword } = req.body;
+  const { email, otp, newPassword } = req.body;
 
   try {
-    if (!identifier)
+    if (!email)
       return res.status(400).json({ msg: "Email is required." });
 
 

@@ -20,7 +20,7 @@ export default function ForgetScreen({ navigation }) {
       if (!email) return Toast.show({ type: 'error', text1: 'Required', text2: 'Enter your email' });
       setLoading(true);
       try {
-        await axios.post(`${API_URL}/forgot-password`, { identifier });
+        await axios.post(`${API_URL}/forgot-password`, { identifier:email });
         Toast.show({ type: 'success', text1: 'OTP Sent 📧', text2: 'Check your inbox' });
         setStep(2);
       } catch (error) {
@@ -35,7 +35,7 @@ export default function ForgetScreen({ navigation }) {
       setLoading(true);
       try {
         await axios.post(`${API_URL}/forgot-password`, { 
-          identifier: email, 
+          identifier, 
           otp, 
           newPassword 
         });
