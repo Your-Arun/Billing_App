@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { 
-  View, Text, StyleSheet, TextInput, TouchableOpacity, 
-  ActivityIndicator, StatusBar, ScrollView 
+import {
+  View, Text, StyleSheet, TextInput, TouchableOpacity,
+  ActivityIndicator, StatusBar, ScrollView
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import axios from 'axios';
@@ -9,8 +9,8 @@ import Toast from 'react-native-toast-message';
 import API_URL from '../services/apiconfig';
 
 export default function ForgetScreen({ navigation }) {
-  const [step, setStep] = useState(1); 
-  const [email, setEmail] = useState('');
+  const [step, setStep] = useState(1);
+  const [identifier, setIdentifier] = useState('');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -34,10 +34,10 @@ export default function ForgetScreen({ navigation }) {
       }
       setLoading(true);
       try {
-        await axios.post(`${API_URL}/forgot-password`, { 
-          identifier: email, 
-          otp, 
-          newPassword 
+        await axios.post(`${API_URL}/forgot-password`, {
+          identifier,
+          otp,
+          newPassword
         });
         Toast.show({ type: 'success', text1: 'Success ✅', text2: 'Password Updated Successfully' });
         navigation.navigate('Login');
@@ -52,39 +52,46 @@ export default function ForgetScreen({ navigation }) {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <StatusBar barStyle="dark-content" />
-      <TouchableOpacity 
-        style={styles.backBtn} 
+      <TouchableOpacity
+        style={styles.backBtn}
         onPress={() => step === 2 ? setStep(1) : navigation.goBack()}
       >
         <MaterialCommunityIcons name="chevron-left" size={32} color="#333399" />
       </TouchableOpacity>
 
       <View style={styles.content}>
-        <MaterialCommunityIcons 
-          name={step === 1 ? "lock-reset" : "shield-check"} 
-          size={60} color="#333399" 
+        <MaterialCommunityIcons
+          name={step === 1 ? "lock-reset" : "shield-check"}
+          size={60} color="#333399"
         />
         <Text style={styles.title}>{step === 1 ? "Forgot Password?" : "Verify OTP"}</Text>
         <Text style={styles.subTitle}>
-          {step === 1 
-            ? "Enter your email to receive a 6-digit verification code." 
+          {step === 1
+            ? "Enter your email to receive a 6-digit verification code."
             : `We have sent a code to ${email}`}
         </Text>
-        
+
         <View style={styles.inputWrapper}>
           {step === 1 ? (
             <View style={styles.inputBox}>
-              <MaterialCommunityIcons name="email-outline" size={20} color="#666" style={{marginRight: 10}} />
-              <TextInput style={styles.textInput} placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+              <MaterialCommunityIcons name="email-outline" size={20} color="#666" style={{ marginRight: 10 }} />
+              <TextInput
+                style={styles.textInput}
+                placeholder="Email or Phone Number"
+                value={identifier}
+                onChangeText={setIdentifier}
+                autoCapitalize="none"
+              />
+
             </View>
           ) : (
             <>
               <View style={styles.inputBox}>
-                <MaterialCommunityIcons name="numeric" size={20} color="#666" style={{marginRight: 10}} />
+                <MaterialCommunityIcons name="numeric" size={20} color="#666" style={{ marginRight: 10 }} />
                 <TextInput style={styles.textInput} placeholder="6-Digit OTP" value={otp} onChangeText={setOtp} keyboardType="numeric" maxLength={6} />
               </View>
-              <View style={[styles.inputBox, {marginTop: 15}]}>
-                <MaterialCommunityIcons name="lock-outline" size={20} color="#666" style={{marginRight: 10}} />
+              <View style={[styles.inputBox, { marginTop: 15 }]}>
+                <MaterialCommunityIcons name="lock-outline" size={20} color="#666" style={{ marginRight: 10 }} />
                 <TextInput style={styles.textInput} placeholder="New Password" value={newPassword} onChangeText={setNewPassword} secureTextEntry />
               </View>
             </>

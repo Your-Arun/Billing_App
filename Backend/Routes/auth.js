@@ -9,7 +9,6 @@ const Otp = require('../Modals/Otp');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 
-
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
@@ -186,63 +185,72 @@ router.post("/forgot-password", async (req, res) => {
   const { identifier, otp, newPassword } = req.body;
 
   try {
-    if (!identifier) return res.status(400).json({ msg: "Email is required." });
+    if (!identifier)
+      return res.status(400).json({ msg: "Email or phone is required." });
 
-    const user = await User.findOne({ email: identifier.toLowerCase() });
-    if (!user) return res.status(404).json({ msg: "User not found with this email." });
+    // 🔍 detect email or phone
+    let user;
+    if (identifier.includes("@")) {
+      user = await User.findOne({ email: identifier.toLowerCase() });
+    } else {
+      user = await User.findOne({ phone: identifier });
+    }
 
-    // --- STEP 1: OTP Send Logic ---
+    if (!user)
+      return res.status(404).json({ msg: "User not found." });
+
+    // ---------- STEP 1 : SEND OTP ----------
     if (!otp && !newPassword) {
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
       const hashedOtp = await bcrypt.hash(generatedOtp, 10);
 
       user.resetPasswordToken = hashedOtp;
-      user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins validity
+      user.resetPasswordExpires = Date.now() + 10 * 60 * 1000;
       await user.save();
 
-      await transporter.sendMail({
-        from: `"Property Manager" <${process.env.EMAIL_USER}>`,
-        to: user.email,
-        subject: "Password Reset Verification Code",
-        html: `
-          <div style="font-family: sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
-            <h2 style="color: #333399;">Password Reset</h2>
-            <p>Aapka 6-digit verification code niche diya gaya hai:</p>
-            <h1 style="background: #f4f4f9; padding: 15px; text-align: center; letter-spacing: 5px; color: #333;">${generatedOtp}</h1>
-            <p>Yeh code 10 minute tak valid hai.</p>
-          </div>
-        `,
-      });
-
-      return res.status(200).json({ msg: "OTP sent to your email." });
-    }
-
-    // --- STEP 2: Verify & Reset Logic ---
-    if (otp && newPassword) {
-      if (!user.resetPasswordToken || !user.resetPasswordExpires || new Date(user.resetPasswordExpires) < new Date()) {
-        return res.status(400).json({ msg: "OTP expired. Request a new one." });
+      // 👉 email exists? send mail
+      if (user.email) {
+        await transporter.sendMail({
+          from: `"Property Manager" <${process.env.EMAIL_USER}>`,
+          to: user.email,
+          subject: "Password Reset OTP",
+          html: `
+            <h2>Password Reset</h2>
+            <p>Your OTP is:</p>
+            <h1>${generatedOtp}</h1>
+            <p>Valid for 10 minutes</p>
+          `,
+        });
       }
 
-      const isOtpValid = await bcrypt.compare(otp, user.resetPasswordToken);
-      if (!isOtpValid) return res.status(400).json({ msg: "Invalid OTP code." });
+      return res.json({ msg: "OTP sent successfully." });
+    }
 
-      const salt = await bcrypt.genSalt(10);
-      user.password = await bcrypt.hash(newPassword, salt);
+    // ---------- STEP 2 : VERIFY & RESET ----------
+    if (otp && newPassword) {
+      if (!user.resetPasswordToken || user.resetPasswordExpires < Date.now())
+        return res.status(400).json({ msg: "OTP expired." });
 
+      const isValid = await bcrypt.compare(otp, user.resetPasswordToken);
+      if (!isValid)
+        return res.status(400).json({ msg: "Invalid OTP." });
+
+      user.password = await bcrypt.hash(newPassword, 10);
       user.resetPasswordToken = null;
       user.resetPasswordExpires = null;
       await user.save();
 
-      return res.status(200).json({ msg: "Password has been reset successfully! ✅" });
+      return res.json({ msg: "Password reset successful ✅" });
     }
 
-    res.status(400).json({ msg: "Invalid request data." });
+    res.status(400).json({ msg: "Invalid request." });
 
-  } catch (error) {
-    console.error("Forgot-password error:", error);
-    res.status(500).json({ msg: "Server error. Try again later." });
+  } catch (err) {
+    console.error("Forgot password error:", err);
+    res.status(500).json({ msg: "Server error" });
   }
 });
+
 
 
 
