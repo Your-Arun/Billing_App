@@ -2,9 +2,10 @@ import React, { useState, useEffect, useContext, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   ActivityIndicator, FlatList, Alert, RefreshControl, Platform,
-  StatusBar, SafeAreaView, KeyboardAvoidingView
+  StatusBar,  KeyboardAvoidingView
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import axios from 'axios';
 import Toast from 'react-native-toast-message';
@@ -127,7 +128,7 @@ const BillScreen = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       
       {/* 🟦 HEADER */}
@@ -282,7 +283,7 @@ const BillScreen = ({ navigation }) => {
           }
         />
       </KeyboardAvoidingView>
-    </View>
+    </SafeAreaView>
   );
 };
 

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, 
-  ActivityIndicator, RefreshControl, StatusBar, SafeAreaView
+  ActivityIndicator, RefreshControl, StatusBar, 
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LineChart } from "react-native-chart-kit";
 import UserProfile from './adminPage/UserProfile';
 import { UserContext } from '../services/UserContext';
@@ -106,7 +107,7 @@ const Dashboard = ({ navigation }) => {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       <ScrollView 
         showsVerticalScrollIndicator={false}
@@ -193,7 +194,7 @@ const Dashboard = ({ navigation }) => {
       </ScrollView>
 
       <UserProfile visible={profileVisible} onClose={() => setProfileVisible(false)} />
-    </View>
+    </SafeAreaView>
   );
 };
 
