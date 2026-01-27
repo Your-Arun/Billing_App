@@ -73,7 +73,7 @@ const LoginScreen = ({ navigation }) => {
 
           <TextInput
             style={styles.input}
-            placeholder="Phone Number"
+            placeholder="Phone Number" placeholderTextColor="#9E9E9E"
             value={phone}
             onChangeText={setPhone}
             keyboardType="phone-pad"
@@ -81,7 +81,7 @@ const LoginScreen = ({ navigation }) => {
 
           <TextInput
             style={styles.input}
-            placeholder="Password (Minimun 4 digit)"
+            placeholder="Password (Minimun 4 digit)" placeholderTextColor="#9E9E9E"
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -144,7 +144,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#eee',
     fontSize: 16,
-    marginBottom: 15
+    marginBottom: 15,
+    color: '#000', 
   },
   loginButton: {
     backgroundColor: '#333399',

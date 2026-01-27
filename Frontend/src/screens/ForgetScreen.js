@@ -86,6 +86,7 @@ const handleAction = async () => {
               <TextInput 
                 style={styles.textInput} 
                 placeholder="Registered Email" 
+                placeholderTextColor="#9E9E9E"
                 value={email} 
                 onChangeText={setEmail} 
                 keyboardType="email-address" 
@@ -99,6 +100,7 @@ const handleAction = async () => {
                 <TextInput 
                   style={styles.textInput} 
                   placeholder="6-Digit OTP" 
+                  placeholderTextColor="#9E9E9E"
                   value={otp} 
                   onChangeText={setOtp} 
                   keyboardType="numeric" 
@@ -110,7 +112,7 @@ const handleAction = async () => {
                 <TextInput 
                   style={styles.textInput} 
                   placeholder="New Password" 
-                  value={newPassword} 
+                  value={newPassword} placeholderTextColor="#9E9E9E"
                   onChangeText={setNewPassword} 
                   secureTextEntry 
                 />
@@ -135,7 +137,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: 'bold', color: '#1A1C3D', marginBottom: 10 },
   subTitle: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 30, lineHeight: 20 },
   inputWrapper: { width: '100%' },
-  inputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFF', borderRadius: 15, paddingHorizontal: 15, height: 55, borderWidth: 1, borderColor: '#EDF1FF' },
+  inputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFF', borderRadius: 15, paddingHorizontal: 15, height: 55, borderWidth: 1, borderColor: '#EDF1FF',
+    color: '#000',  },
   textInput: { flex: 1, fontSize: 16, color: '#333' },
   mainBtn: { backgroundColor: '#333399', height: 55, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginTop: 25 },
   btnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },

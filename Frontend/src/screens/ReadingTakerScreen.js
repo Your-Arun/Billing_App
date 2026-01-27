@@ -237,6 +237,7 @@ const ReadingTakerScreen = ({ navigation }) => {
               <TextInput
                 style={styles.mainTextInput}
                 placeholder="1420.5"
+                placeholderTextColor="#9E9E9E"
                 keyboardType="numeric"
                 value={readingValue}
                 onChangeText={setReadingValue}

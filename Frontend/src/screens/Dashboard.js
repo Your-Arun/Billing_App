@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, 
-  ActivityIndicator, RefreshControl, StatusBar, 
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions,
+  ActivityIndicator, RefreshControl, StatusBar,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,7 +19,7 @@ const Dashboard = ({ navigation }) => {
   const [profileVisible, setProfileVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  
+
   const [data, setData] = useState({
     totalTenants: 0,
     pendingCount: 0,
@@ -48,7 +48,7 @@ const Dashboard = ({ navigation }) => {
 
       const summaryList = summary.status === 'fulfilled' ? (summary.value.data || []) : [];
       const latestMonth = summaryList[0] || {};
-      
+
       let labels = ["-"];
       let points = [0];
       if (summaryList.length > 0) {
@@ -90,16 +90,16 @@ const Dashboard = ({ navigation }) => {
   );
 
   const navIcons = [
-    
+
     { name: 'Monthly', icon: 'file-document', route: 'MonthlyBilling', color: '#000' },
     { name: 'Concilliation', icon: 'scale-balance', route: 'Reconciliation', color: '#8B5CF6' },
     { name: 'AVVNL Bill', icon: 'lightning-bolt', route: 'Bill', color: '#F59E0B' },
     { name: 'Readings', icon: 'speedometer', route: 'Readings', color: '#6366F1' },
     { name: 'Approval', icon: 'check-decagram', route: 'Approval', color: '#10B981', badge: data.pendingCount },
     { name: 'Tenants', icon: 'account-group', route: 'Tenants', color: '#3B82F6' },
-    
+
     { name: 'Statements', icon: 'file-document-multiple', route: 'Statement', color: '#EC4899' },
-    
+
   ];
 
   if (loading && !refreshing) {
@@ -107,11 +107,11 @@ const Dashboard = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <ScrollView 
+      <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {setRefreshing(true); fetchDashboardData();}} tintColor="#333399" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchDashboardData(); }} tintColor="#333399" />}
       >
         {/* HEADER SECTION */}
         <View style={styles.header}>
@@ -124,7 +124,7 @@ const Dashboard = ({ navigation }) => {
               <Text style={styles.userName} numberOfLines={1}>{user?.companyName || "Admin"}</Text>
             </View>
             <View style={styles.lossBadge}>
-               <Text style={styles.lossText}>{data.lossPercent}% Loss</Text>
+              <Text style={styles.lossText}>{data.lossPercent}% Loss</Text>
             </View>
           </View>
 
@@ -134,15 +134,15 @@ const Dashboard = ({ navigation }) => {
               <Text style={styles.profitValue}>₹ {Math.round(data.latestProfit).toLocaleString('en-IN')}</Text>
               <View style={styles.profitSubRow}>
                 <Text style={styles.profitSub}>Coll: ₹{Math.round(data.totalCollection)}</Text>
-                <Text style={[styles.profitSub, {marginLeft: 10}]}>Bill: ₹{Math.round(data.gridBill)}</Text>
+                <Text style={[styles.profitSub, { marginLeft: 10 }]}>Bill: ₹{Math.round(data.gridBill)}</Text>
               </View>
             </View>
             <View style={[styles.profitIconBox, { backgroundColor: data.latestProfit >= 0 ? '#DCFCE7' : '#FEE2E2' }]}>
-               <MaterialCommunityIcons 
-                 name={data.latestProfit >= 0 ? "trending-up" : "trending-down"} 
-                 size={32} 
-                 color={data.latestProfit >= 0 ? "#16A34A" : "#DC2626"} 
-               />
+              <MaterialCommunityIcons
+                name={data.latestProfit >= 0 ? "trending-up" : "trending-down"}
+                size={32}
+                color={data.latestProfit >= 0 ? "#16A34A" : "#DC2626"}
+              />
             </View>
           </View>
         </View>
@@ -156,9 +156,9 @@ const Dashboard = ({ navigation }) => {
 
           {/* 🟢 SINGLE ROW MANAGEMENT MENU */}
           <Text style={styles.sectionTitle}>Management Menu</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false} 
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.horizontalMenu}
           >
             {navIcons.map((item, index) => (
@@ -182,7 +182,7 @@ const Dashboard = ({ navigation }) => {
                 labels: data.chartLabels,
                 datasets: [{ data: data.chartData }]
               }}
-              width={width-80}
+              width={width - 80}
               height={180}
               chartConfig={chartConfig}
               bezier
@@ -194,7 +194,7 @@ const Dashboard = ({ navigation }) => {
       </ScrollView>
 
       <UserProfile visible={profileVisible} onClose={() => setProfileVisible(false)} />
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -219,14 +219,14 @@ const chartConfig = {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { backgroundColor: '#333399', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 60, borderBottomLeftRadius: 35, borderBottomRightRadius: 35 },
+  header: { backgroundColor: '#333399', paddingHorizontal: 20, paddingTop: 60, paddingBottom: 60, borderBottomLeftRadius: 35, borderBottomRightRadius: 35 },
   headerTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   headerInfo: { flex: 1, marginLeft: 15 },
   greeting: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '600' },
   userName: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
   lossBadge: { backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
   lossText: { color: '#FFF', fontSize: 11, fontWeight: 'bold' },
-  
+
   profitCard: { backgroundColor: '#FFF', borderRadius: 25, padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', elevation: 10, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, marginBottom: -45 },
   profitLabel: { fontSize: 10, fontWeight: 'bold', color: '#94A3B8', letterSpacing: 0.5 },
   profitValue: { fontSize: 24, fontWeight: '900', color: '#1E293B', marginVertical: 2 },
@@ -242,19 +242,19 @@ const styles = StyleSheet.create({
 
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#1E293B', marginVertical: 5, marginLeft: 5, },
   chartCard: { backgroundColor: '#FFF', padding: 5, borderRadius: 24, elevation: 3 },
-  
+
   // 🟢 Horizontal Menu Styles
-  horizontalMenu: { paddingLeft: 5, paddingRight: 20, marginBottom:20 },
-  menuCard: { 
-    backgroundColor: '#FFF', 
-    width: 100, 
-    paddingVertical: 15, 
-    borderRadius: 20, 
-    alignItems: 'center', 
-    marginRight: 12, 
-    elevation: 5, 
-    borderWidth: 1, 
-    borderColor: '#F1F5F9' 
+  horizontalMenu: { paddingLeft: 5, paddingRight: 20, marginBottom: 20 },
+  menuCard: {
+    backgroundColor: '#FFF',
+    width: 100,
+    paddingVertical: 15,
+    borderRadius: 20,
+    alignItems: 'center',
+    marginRight: 12,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#F1F5F9'
   },
   iconCircle: { width: 45, height: 45, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
   cardText: { fontSize: 11, fontWeight: '700', color: '#334155', textAlign: 'center' },

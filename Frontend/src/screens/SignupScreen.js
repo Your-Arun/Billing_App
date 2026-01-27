@@ -88,13 +88,13 @@ const SignupScreen = ({ navigation }) => {
     <View style={styles.formCard}>
       <TextInput
         style={styles.input}
-        placeholder="Full Name"
+        placeholder="Full Name"placeholderTextColor="#9E9E9E"
         value={name}
         onChangeText={setName}
       />
       <TextInput
         style={styles.input}
-        placeholder="Email"
+        placeholder="Email" placeholderTextColor="#9E9E9E"
         value={email}
         onChangeText={setEmail}
       />
@@ -102,6 +102,7 @@ const SignupScreen = ({ navigation }) => {
       <TextInput
         style={styles.input}
         placeholder="Phone"
+        placeholderTextColor="#9E9E9E"
         keyboardType="phone-pad"
         value={phone}
         onChangeText={setPhone}
@@ -110,6 +111,7 @@ const SignupScreen = ({ navigation }) => {
       <TextInput
         style={styles.input}
         placeholder="Password"
+        placeholderTextColor="#9E9E9E"
         secureTextEntry
         value={password}
         onChangeText={setPassword}
@@ -134,8 +136,8 @@ const SignupScreen = ({ navigation }) => {
       {role === 'Admin' && (
         <TextInput
           style={styles.input}
-          placeholder="Company Name"
-          value={companyName}
+          placeholder="Company Name" placeholderTextColor="#9E9E9E"
+          value={companyName} 
           onChangeText={setCompanyName}
         />
       )}
@@ -143,7 +145,7 @@ const SignupScreen = ({ navigation }) => {
       {role === 'Reading Taker' && (
         <TextInput
           style={styles.input}
-          placeholder="Admin / Company Code"
+          placeholder="Admin / Company Code" placeholderTextColor="#9E9E9E"
           value={adminCodeInput}
           onChangeText={setAdminCodeInput}
           autoCapitalize="characters"
@@ -221,7 +223,7 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     padding: 14,
     borderRadius: 12,
-    marginBottom: 15
+    marginBottom: 15,color: '#000', 
   },
 
   roleRow: {

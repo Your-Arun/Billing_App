@@ -139,7 +139,7 @@ const SolarScreen = () => {
               <Text style={styles.label}>UNITS GENERATED (kWh)</Text>
               <TextInput
                 style={styles.input}
-                placeholder="0.00"
+                placeholder="0.00" placeholderTextColor="#9E9E9E"
                 keyboardType="numeric"
                 value={units}
                 onChangeText={setUnits}

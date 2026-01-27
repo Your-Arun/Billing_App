@@ -142,8 +142,10 @@ const DGScreen = () => {
 
                 <View style={styles.card}>
                     <Text style={styles.cardHeader}>Entry for {selectedDG || '...'}</Text>
-                    <TextInput style={styles.input} placeholder="Units Produced (kWh)" keyboardType="numeric" value={units} onChangeText={setUnits} />
-                    <TextInput style={styles.input} placeholder="Fuel Cost (₹)" keyboardType="numeric" value={cost} onChangeText={setCost} />
+                    <TextInput style={styles.input} placeholder="Units Produced (kWh)" 
+                    placeholderTextColor="#9E9E9E"
+                    keyboardType="numeric" value={units} onChangeText={setUnits} />
+                    <TextInput style={styles.input} placeholder="Fuel Cost (₹)" placeholderTextColor="#9E9E9E" keyboardType="numeric" value={cost} onChangeText={setCost} />
                     <TouchableOpacity style={styles.submitBtn} onPress={handleSave} disabled={loading}>
                         {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>SAVE DAILY DATA</Text>}
                     </TouchableOpacity>
@@ -179,7 +181,7 @@ const DGScreen = () => {
                 <View style={styles.overlay}>
                     <View style={styles.modalContent}>
                         <Text style={styles.modalTitle}>Register New DG</Text>
-                        <TextInput style={styles.modalInput} placeholder="e.g. DG 01" value={newDgName} onChangeText={setNewDgName} />
+                        <TextInput style={styles.modalInput} placeholder="e.g. DG 01" placeholderTextColor="#9E9E9E" value={newDgName} onChangeText={setNewDgName} />
                         <TouchableOpacity style={styles.submitBtn} onPress={async () => {
                             if(!newDgName) return;
                             try {

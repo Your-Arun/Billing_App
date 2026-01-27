@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   ActivityIndicator, FlatList, Alert, RefreshControl, Platform,
-  StatusBar,  KeyboardAvoidingView
+  StatusBar, KeyboardAvoidingView
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -128,9 +128,9 @@ const BillScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      
+
       {/* 🟦 HEADER */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
@@ -153,7 +153,7 @@ const BillScreen = ({ navigation }) => {
           contentContainerStyle={{ paddingBottom: 40 }}
           ListHeaderComponent={
             <View style={styles.mainContent}>
-              
+
               {/* 🟢 NEW ENTRY CARD */}
               <View style={styles.formCard}>
                 <View style={styles.cardHeader}>
@@ -161,15 +161,15 @@ const BillScreen = ({ navigation }) => {
                   <Text style={styles.cardTitle}>Add Record - {monthName}</Text>
                 </View>
 
-                <TouchableOpacity 
-                  style={[styles.uploadBox, file && styles.uploadBoxActive]} 
+                <TouchableOpacity
+                  style={[styles.uploadBox, file && styles.uploadBoxActive]}
                   onPress={pickDocument}
                 >
                   <View style={[styles.iconCircle, { backgroundColor: file ? '#DCFCE7' : '#F0F2FF' }]}>
-                    <MaterialCommunityIcons 
-                      name={file ? "file-check" : "file-pdf-box"} 
-                      size={30} 
-                      color={file ? "#16A34A" : "#333399"} 
+                    <MaterialCommunityIcons
+                      name={file ? "file-check" : "file-pdf-box"}
+                      size={30}
+                      color={file ? "#16A34A" : "#333399"}
                     />
                   </View>
                   <Text style={[styles.uploadText, file && { color: '#16A34A' }]}>
@@ -182,22 +182,24 @@ const BillScreen = ({ navigation }) => {
                   <View style={styles.inputRow}>
                     <View style={styles.inputBlock}>
                       <Text style={styles.inputLabel}>Units Consumed</Text>
-                      <TextInput 
-                        style={styles.textInput} 
-                        keyboardType="numeric" 
-                        value={form.units} 
-                        onChangeText={(t) => setForm({ ...form, units: t })} 
-                        placeholder="0.00" 
+                      <TextInput
+                        style={styles.textInput}
+                        keyboardType="numeric"
+                        value={form.units}
+                        onChangeText={(t) => setForm({ ...form, units: t })}
+                        placeholder="0.00"
+                        placeholderTextColor="#9E9E9E"
                       />
                     </View>
                     <View style={styles.inputBlock}>
                       <Text style={styles.inputLabel}>Energy Charges (₹)</Text>
-                      <TextInput 
-                        style={styles.textInput} 
-                        keyboardType="numeric" 
-                        value={form.energy} 
-                        onChangeText={(t) => setForm({ ...form, energy: t })} 
-                        placeholder="₹ 0.00" 
+                      <TextInput
+                        style={styles.textInput}
+                        keyboardType="numeric"
+                        value={form.energy}
+                        onChangeText={(t) => setForm({ ...form, energy: t })}
+                        placeholder="₹ 0.00"
+                        placeholderTextColor="#9E9E9E"
                       />
                     </View>
                   </View>
@@ -205,30 +207,32 @@ const BillScreen = ({ navigation }) => {
                   <View style={styles.inputRow}>
                     <View style={styles.inputBlock}>
                       <Text style={styles.inputLabel}>Fixed Charges (₹)</Text>
-                      <TextInput 
-                        style={styles.textInput} 
-                        keyboardType="numeric" 
-                        value={form.fixed} 
-                        onChangeText={(t) => setForm({ ...form, fixed: t })} 
-                        placeholder="₹ 0.00" 
+                      <TextInput
+                        style={styles.textInput}
+                        keyboardType="numeric"
+                        value={form.fixed}
+                        onChangeText={(t) => setForm({ ...form, fixed: t })}
+                        placeholder="₹ 0.00"
+                        placeholderTextColor="#9E9E9E"
                       />
                     </View>
                     <View style={styles.inputBlock}>
                       <Text style={styles.inputLabel}>Grand Total (₹)</Text>
-                      <TextInput 
-                        style={[styles.textInput, styles.totalInput]} 
-                        keyboardType="numeric" 
-                        value={form.total} 
-                        onChangeText={(t) => setForm({ ...form, total: t })} 
-                        placeholder="₹ 0.00" 
+                      <TextInput
+                        style={[styles.textInput, styles.totalInput]}
+                        keyboardType="numeric"
+                        value={form.total}
+                        onChangeText={(t) => setForm({ ...form, total: t })}
+                        placeholder="₹ 0.00"
+                        placeholderTextColor="#9E9E9E"
                       />
                     </View>
                   </View>
                 </View>
 
-                <TouchableOpacity 
-                  style={[styles.submitBtn, saving && { opacity: 0.8 }]} 
-                  onPress={handleSaveBill} 
+                <TouchableOpacity
+                  style={[styles.submitBtn, saving && { opacity: 0.8 }]}
+                  onPress={handleSaveBill}
                   disabled={saving}
                 >
                   {saving ? (
@@ -283,50 +287,45 @@ const BillScreen = ({ navigation }) => {
           }
         />
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { 
-    backgroundColor: '#333399', 
-    paddingHorizontal: 20, 
-    paddingTop: Platform.OS === 'android' ? 10 : 0, 
-    paddingBottom: 40, 
-    borderBottomLeftRadius: 35, 
-    borderBottomRightRadius: 35 ,
-    marginBottom:20
+  header: {
+    backgroundColor: '#333399',
+    paddingTop: 60, paddingBottom: 25, paddingHorizontal: 25, borderBottomLeftRadius: 35, borderBottomRightRadius: 35, elevation: 10
   },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerTitle: { color: 'white', fontSize: 20, fontWeight: 'bold' },
-  headerSub: { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginTop: 8 , margin:'auto'},
+  headerSub: { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginTop: 8, margin: 'auto' },
   refreshCircle: { backgroundColor: 'rgba(255,255,255,0.15)', padding: 8, borderRadius: 12 },
   backBtn: { padding: 4 },
 
   mainContent: { padding: 20 },
-  formCard: { 
-    backgroundColor: 'white', 
-    borderRadius: 24, 
-    padding: 20, 
-    marginTop: -30, 
-    elevation: 8, 
-    shadowColor: '#000', 
-    shadowOpacity: 0.1, 
-    shadowRadius: 10 
+  formCard: {
+    backgroundColor: 'white',
+    borderRadius: 24,
+    padding: 20,
+    marginTop: 0,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 10
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 15, gap: 8 },
   cardTitle: { fontSize: 15, fontWeight: '700', color: '#1E293B' },
 
-  uploadBox: { 
-    backgroundColor: '#F8FAFF', 
-    borderStyle: 'dashed', 
-    borderWidth: 1.5, 
-    borderColor: '#333399', 
-    borderRadius: 18, 
-    padding: 20, 
-    alignItems: 'center', 
-    marginBottom: 20 
+  uploadBox: {
+    backgroundColor: '#F8FAFF',
+    borderStyle: 'dashed',
+    borderWidth: 1.5,
+    borderColor: '#333399',
+    borderRadius: 18,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 20
   },
   uploadBoxActive: { borderColor: '#16A34A', backgroundColor: '#F0FDF4' },
   iconCircle: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
@@ -336,49 +335,49 @@ const styles = StyleSheet.create({
   inputRow: { flexDirection: 'row', gap: 12, marginBottom: 15 },
   inputBlock: { flex: 1 },
   inputLabel: { fontSize: 11, fontWeight: 'bold', color: '#64748B', marginBottom: 6, marginLeft: 4 },
-  textInput: { 
-    backgroundColor: '#F1F5F9', 
-    padding: 14, 
-    borderRadius: 14, 
-    fontSize: 15, 
-    fontWeight: '700', 
-    color: '#1E293B', 
-    borderWidth: 1, 
-    borderColor: '#E2E8F0' 
+  textInput: {
+    backgroundColor: '#F1F5F9',
+    padding: 14,
+    borderRadius: 14,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1E293B',
+    borderWidth: 1,
+    borderColor: '#E2E8F0'
   },
   totalInput: { color: '#333399', borderColor: '#CBD5E1' },
 
-  submitBtn: { 
-    backgroundColor: '#333399', 
-    paddingVertical: 16, 
-    borderRadius: 16, 
+  submitBtn: {
+    backgroundColor: '#333399',
+    paddingVertical: 16,
+    borderRadius: 16,
     flexDirection: 'row',
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    elevation: 4 
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4
   },
   submitText: { color: 'white', fontWeight: 'bold', fontSize: 15 },
 
   sectionHeading: { fontSize: 17, fontWeight: '800', color: '#1E293B', marginTop: 30, marginBottom: 15 },
-  
-  historyCard: { 
-    backgroundColor: 'white', 
-    marginHorizontal: 20, 
-    marginBottom: 12, 
-    borderRadius: 20, 
-    padding: 16, 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    elevation: 2 
+
+  historyCard: {
+    backgroundColor: 'white',
+    marginHorizontal: 20,
+    marginBottom: 12,
+    borderRadius: 20,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    elevation: 2
   },
   historyLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  monthBadge: { 
-    backgroundColor: '#333399', 
-    padding: 10, 
-    borderRadius: 15, 
-    alignItems: 'center', 
-    width: 55 
+  monthBadge: {
+    backgroundColor: '#333399',
+    padding: 10,
+    borderRadius: 15,
+    alignItems: 'center',
+    width: 55
   },
   monthText: { color: '#FFF', fontSize: 13, fontWeight: 'bold', textTransform: 'uppercase' },
   yearText: { color: 'rgba(255,255,255,0.7)', fontSize: 9, fontWeight: 'bold' },
@@ -387,12 +386,12 @@ const styles = StyleSheet.create({
   hUnits: { color: '#64748B', fontSize: 12, fontWeight: '600', marginTop: 2 },
 
   actionGroup: { flexDirection: 'row', gap: 8 },
-  actionBtn: { 
-    backgroundColor: '#F1F5F9', 
-    padding: 10, 
-    borderRadius: 14, 
-    justifyContent: 'center', 
-    alignItems: 'center' 
+  actionBtn: {
+    backgroundColor: '#F1F5F9',
+    padding: 10,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   emptyContainer: { alignItems: 'center', marginTop: 60 },
   emptyText: { textAlign: 'center', color: '#94A3B8', marginTop: 10, fontWeight: '700' }
