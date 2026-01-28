@@ -402,3 +402,6 @@ rejectText: {
 });
 
 export default ReadingTakerScreen;
+
+
+// ye kaam kr rha hai
