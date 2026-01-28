@@ -18,55 +18,60 @@ router.post('/signup', async (req, res) => {
     if (!name || !phone || !password || !role)
       return res.status(400).json({ msg: 'Missing required fields' });
 
-    // ✅ CLEAN EMAIL FIRST
     const cleanEmail = email?.trim().toLowerCase();
 
+    // 1. Check if user exists by phone
     const exists = await User.findOne({ phone });
     if (exists) return res.status(400).json({ msg: 'User already exists' });
 
-    const emailExists = await User.findOne({ email: cleanEmail });
-    if (emailExists)
-      return res.status(400).json({ msg: 'Email already registered' });
-
     let finalCompanyName = companyName;
     let belongsToAdmin = null;
-    let adminCode = null;
+    let adminCode = undefined; 
 
+    // ADMIN LOGIC
     if (role === 'Admin') {
-      if (!companyName)
-        return res.status(400).json({ msg: 'Company name required' });
-
+      if (!companyName) return res.status(400).json({ msg: 'Company name required' });
       adminCode = 'COMP' + Math.floor(100000 + Math.random() * 900000);
     }
 
+    // READING TAKER LOGIC
     if (role === 'Reading Taker') {
       const admin = await User.findOne({ adminCode: adminCodeInput, role: 'Admin' });
-      if (!admin)
-        return res.status(400).json({ msg: 'Invalid Admin Code' });
-
+      if (!admin) return res.status(400).json({ msg: 'Invalid Admin Code' });
       finalCompanyName = admin.companyName;
       belongsToAdmin = admin._id;
+      adminCode = undefined; 
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = new User({
+    // 2. Object taiyar karein
+    const userPayload = {
       name,
       phone,
       password: hashedPassword,
       role,
       email: cleanEmail,
       companyName: finalCompanyName,
-      adminCode,
       belongsToAdmin
-    });
+    };
 
+    // 3. SIRF agar Admin hai toh hi adminCode field add karein
+    if (role === 'Admin') {
+      userPayload.adminCode = adminCode;
+    }
+
+    const user = new User(userPayload);
     await user.save();
 
-    return res.status(201).json({ msg: 'Account created', adminCode });
+    return res.status(201).json({ msg: 'Account created', adminCode: user.adminCode });
 
   } catch (err) {
     console.error('SIGNUP ERROR:', err);
+    // Agar abhi bhi E11000 aa raha hai, toh niche wala message dikhega
+    if(err.code === 11000) {
+        return res.status(400).json({ msg: 'Database index error. Please drop adminCode_1 index in MongoDB.' });
+    }
     return res.status(500).json({ msg: 'Server error' });
   }
 });
