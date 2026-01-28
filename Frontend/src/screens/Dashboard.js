@@ -4,7 +4,7 @@ import {
   ActivityIndicator, RefreshControl, StatusBar,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LineChart } from "react-native-chart-kit";
 import UserProfile from './adminPage/UserProfile';
 import { UserContext } from '../services/UserContext';
@@ -35,9 +35,25 @@ const Dashboard = ({ navigation }) => {
 
   const adminId = user?._id || user?.id;
 
-  const fetchDashboardData = useCallback(async () => {
+  const loadCache = useCallback(async () => {
     if (!adminId) return;
     try {
+      const cached = await AsyncStorage.getItem(`dashboard_cache_${adminId}`);
+      if (cached) {
+        setData(JSON.parse(cached));
+        setLoading(false); 
+      }
+    } catch (e) {
+      console.log("Cache Load Error", e);
+    }
+  }, [adminId]);
+
+  const fetchDashboardData = useCallback(async () => {
+    if (!adminId) return;
+    // यहाँ setLoading(true) नहीं करेंगे ताकि बैकग्राउंड में अपडेट हो
+    try {
+      const monthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+
       const [tenants, pending, solar, dg, summary] = await Promise.allSettled([
         axios.get(`${API_URL}/tenants/${adminId}`),
         axios.get(`${API_URL}/readings/pending/${adminId}`),
@@ -58,11 +74,10 @@ const Dashboard = ({ navigation }) => {
 
       const dgRaw = dg.status === 'fulfilled' ? dg.value.data : null;
       const totalDgUnits = dgRaw?.dgSummary?.reduce((acc, curr) => acc + (Number(curr.totalUnits) || 0), 0) || 0;
-
       const solarList = solar.status === 'fulfilled' ? (solar.value.data || []) : [];
       const latestSolar = solarList[0]?.unitsGenerated || 0;
 
-      setData({
+      const updatedData = {
         totalTenants: tenants.status === 'fulfilled' ? (tenants.value.data?.length || 0) : 0,
         pendingCount: pending.status === 'fulfilled' ? (pending.value.data?.length || 0) : 0,
         latestProfit: latestMonth.profit || 0,
@@ -73,7 +88,13 @@ const Dashboard = ({ navigation }) => {
         lossPercent: latestMonth.lossPercent || 0,
         chartLabels: labels,
         chartData: points
-      });
+      };
+
+      // ✅ 2. डेटा स्टेट में सेट करें
+      setData(updatedData);
+
+      // ✅ 3. डेटा को लोकल स्टोरेज (Cache) में सेव करें
+      await AsyncStorage.setItem(`dashboard_cache_${adminId}`, JSON.stringify(updatedData));
 
     } catch (e) {
       console.log("Dashboard Global Error:", e);
@@ -82,6 +103,11 @@ const Dashboard = ({ navigation }) => {
       setRefreshing(false);
     }
   }, [adminId]);
+
+
+  useEffect(() => {
+    loadCache();
+  }, [loadCache]);
 
   useFocusEffect(
     useCallback(() => {

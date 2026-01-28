@@ -45,6 +45,8 @@ const BillScreen = ({ navigation }) => {
     setRefreshing(false);
   }, [fetchHistory]);
 
+
+  
   const pickDocument = async () => {
     try {
       let result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf' });
