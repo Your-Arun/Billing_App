@@ -9,6 +9,7 @@ import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const DGScreen = () => {
     const { user } = useContext(UserContext);
@@ -25,33 +26,62 @@ const DGScreen = () => {
     const [dailyLogs, setDailyLogs] = useState([]);
     const [isAddModal, setIsAddModal] = useState(false);
     const [newDgName, setNewDgName] = useState('');
+    const adminId = user?._id || user?.id;
 
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     const monthName = date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
+    const loadCache = useCallback(async () => {
+        if (!companyId) return;
+        try {
+            const cacheKey = `dg_cache_${companyId}_${monthKey}`;
+            const cachedData = await AsyncStorage.getItem(cacheKey);
+            if (cachedData) {
+                const parsed = JSON.parse(cachedData);
+                setDgList(parsed.dgList || []);
+                setTotals(parsed.totals || []);
+                setDailyLogs(parsed.dailyLogs || []);
+                setLoading(false); // डेटा मिल गया तो लोडर हटा दो
+            }
+        } catch (e) { console.log("Cache Load Error", e); }
+    }, [companyId, monthKey]);
+
+
     const loadAll = useCallback(async () => {
         if (!companyId) return;
-        setLoading(true);
         try {
             const [resNames, resSummary, resLogs] = await Promise.all([
                 axios.get(`${API_URL}/dg/list-names/${companyId}`),
                 axios.get(`${API_URL}/dg/monthly-summary/${companyId}?monthKey=${monthKey}`),
                 axios.get(`${API_URL}/dg/logs/${companyId}?monthKey=${monthKey}`)
             ]);
-            setDgList(resNames.data);
-            setTotals(resSummary.data || []);
-            setDailyLogs(resLogs.data || []);
-            
-            // Agar koi DG selected nahi hai toh pehla wala select karein
-            if (resNames.data.length > 0 && !selectedDG) {
-                setSelectedDG(resNames.data[0].dgName);
-            }
+
+            const freshData = {
+                dgList: resNames.data,
+                totals: resSummary.data,
+                dailyLogs: resLogs.data
+            };
+
+            setDgList(freshData.dgList);
+            setTotals(freshData.totals || []);
+            setDailyLogs(freshData.dailyLogs || []);
+
+            // ✅ 3. डेटा को लोकल स्टोरेज (Cache) में सेव करें
+            const cacheKey = `dg_cache_${companyId}_${monthKey}`;
+            await AsyncStorage.setItem(cacheKey, JSON.stringify(freshData));
+
+            if (resNames.data.length > 0 && !selectedDG) setSelectedDG(resNames.data[0].dgName);
         } catch (e) { 
             console.log("Load Error:", e.message); 
-        } finally { setLoading(false); }
+        } finally { 
+            setLoading(false); 
+            setRefreshing(false); 
+        }
     }, [companyId, monthKey, selectedDG]);
-
-    useEffect(() => { loadAll(); }, [loadAll]);
+    useEffect(() => {
+        loadCache(); 
+        loadAll(); 
+    }, [loadCache, loadAll]);
 
     const handleSave = async () => {
         if (!selectedDG || !units || !cost) return Toast.show({ type: 'error', text1: 'Fill all fields' });
@@ -111,9 +141,11 @@ const DGScreen = () => {
             }}
         ]);
     };
-
+    if (loading && dailyLogs.length === 0 && !refreshing) {
+        return <View style={styles.loader}><ActivityIndicator size="large" color="#333399" /></View>;
+    }
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
             <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={loading} onRefresh={loadAll} />}>
                 
                 <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDatePicker(true)}>
@@ -193,7 +225,7 @@ const DGScreen = () => {
                     </View>
                 </View>
             </Modal>
-        </View>
+        </SafeAreaView>
     );
 };
 
@@ -227,7 +259,8 @@ const styles = StyleSheet.create({
     overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
     modalContent: { backgroundColor: '#fff', padding: 25, borderRadius: 25, alignItems: 'center' },
     modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 20 },
-    modalInput: { width: '100%', backgroundColor: '#f5f7fa', padding: 15, borderRadius: 12, fontSize: 16, marginBottom: 20 }
+    modalInput: { width: '100%', backgroundColor: '#f5f7fa', padding: 15, borderRadius: 12, fontSize: 16, marginBottom: 20 },
+    loader: { flex: 1, justifyContent: 'center', alignItems: 'center' }
 });
 
 export default DGScreen;

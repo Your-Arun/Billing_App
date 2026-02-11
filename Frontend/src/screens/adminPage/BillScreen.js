@@ -5,7 +5,7 @@ import {
   StatusBar, KeyboardAvoidingView
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import axios from 'axios';
 import Toast from 'react-native-toast-message';
@@ -13,6 +13,7 @@ import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const BillScreen = ({ navigation }) => {
   const { user } = useContext(UserContext);
@@ -24,28 +25,43 @@ const BillScreen = ({ navigation }) => {
   const [history, setHistory] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [downloadingId, setDownloadingId] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const monthName = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+  const loadCache = useCallback(async () => {
+    if (!adminId) return;
+    try {
+      const cachedData = await AsyncStorage.getItem(`bill_cache_${adminId}`);
+      if (cachedData) {
+        setHistory(JSON.parse(cachedData));
+        setLoading(false);
+      }
+    } catch (e) {
+      console.log("Cache Load Error", e);
+    }
+  }, [adminId]);
 
   const fetchHistory = useCallback(async () => {
     if (!adminId) return;
     try {
       const res = await axios.get(`${API_URL}/bill/history/${adminId}`);
       setHistory(res.data || []);
+      await AsyncStorage.setItem(`bill_cache_${adminId}`, JSON.stringify(res.data));
     } catch (e) {
       console.log("Fetch Error");
     }
   }, [adminId]);
 
-  useEffect(() => { fetchHistory(); }, [fetchHistory]);
+  useEffect(() => {
+    loadCache();
+    fetchHistory();
+  }, [loadCache, fetchHistory]);
 
-  const onRefresh = useCallback(async () => {
+  const onRefresh = () => {
     setRefreshing(true);
-    await fetchHistory();
-    setRefreshing(false);
-  }, [fetchHistory]);
-
-
+    fetchHistory();
+  };
   
   const pickDocument = async () => {
     try {
@@ -129,8 +145,13 @@ const BillScreen = ({ navigation }) => {
     ]);
   };
 
+  if (loading && history.length === 0) {
+    return <View style={styles.loader}><ActivityIndicator size="large" color="#333399" /></View>;
+  }
+
+
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
 
       {/* 🟦 HEADER */}
@@ -289,7 +310,7 @@ const BillScreen = ({ navigation }) => {
           }
         />
       </KeyboardAvoidingView>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -396,7 +417,8 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   emptyContainer: { alignItems: 'center', marginTop: 60 },
-  emptyText: { textAlign: 'center', color: '#94A3B8', marginTop: 10, fontWeight: '700' }
+  emptyText: { textAlign: 'center', color: '#94A3B8', marginTop: 10, fontWeight: '700' },
+  loader: { flex: 1, justifyContent: 'center', alignItems: 'center' }
 });
 
 export default BillScreen;

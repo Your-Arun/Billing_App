@@ -1,7 +1,7 @@
 import React, { useState, useContext, useMemo, useEffect, useCallback } from 'react';
 import {
     View, Text, StyleSheet, FlatList, TouchableOpacity,
-    ActivityIndicator, Alert, StatusBar, TextInput, Linking, RefreshControl
+    ActivityIndicator, Alert, StatusBar, TextInput,  RefreshControl
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -12,6 +12,7 @@ import axios from 'axios';
 import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
 import Toast from 'react-native-toast-message';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const StatementScreen = ({ route, navigation }) => {
     const { user } = useContext(UserContext);
@@ -102,17 +103,40 @@ const StatementScreen = ({ route, navigation }) => {
     </html>`;
     };
 
-    const fetchHistory = useCallback(async () => {
+    const loadCache = useCallback(async () => {
         if (!adminId) return;
-        setLoadingHistory(true);
         try {
-            const res = await axios.get(`${API_URL}/statement/history/${adminId}`);
-            setHistory(res.data || []);
-        } catch (e) { console.log("History error"); }
-        finally { setLoadingHistory(false); }
-    }, [adminId]);
+          const cachedData = await AsyncStorage.getItem(`statement_history_cache_${adminId}`);
+          if (cachedData) {
+            setHistory(JSON.parse(cachedData));
+            setLoadingHistory(false); // डेटा मिल गया तो लोडर हटा दो
+          }
+        } catch (e) {
+          console.log("Cache Load Error", e);
+        }
+      }, [adminId]);
 
-    useEffect(() => { fetchHistory(); }, [fetchHistory]);
+      const fetchHistory = useCallback(async () => {
+        if (!adminId) return;
+        try {
+          const res = await axios.get(`${API_URL}/statement/history/${adminId}`);
+          const freshData = res.data || [];
+          setHistory(freshData);
+          
+          // ✅ 3. डेटा को लोकल स्टोरेज (Cache) में सेव करें
+          await AsyncStorage.setItem(`statement_history_cache_${adminId}`, JSON.stringify(freshData));
+        } catch (e) {
+          console.log("History fetch failed", e);
+        } finally {
+          setLoadingHistory(false);
+          setRefreshing(false);
+        }
+      }, [adminId]);
+
+      useEffect(() => {
+        loadCache();
+        fetchHistory();
+      }, [loadCache, fetchHistory]);
 
     const filteredCurrent = useMemo(() => tenantBreakdown.filter(t => t.tenantName.toLowerCase().includes(searchText.toLowerCase())), [searchText, tenantBreakdown]);
     const filteredHistory = useMemo(() => history.filter(h => h.tenantName.toLowerCase().includes(searchText.toLowerCase())), [searchText, history]);
@@ -256,6 +280,15 @@ const StatementScreen = ({ route, navigation }) => {
         </View>
     );
 
+
+    if (loadingHistory && history.length === 0) {
+        return (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator size="large" color="#333399" />
+            <Text style={{ marginTop: 10, color: '#666' }}>Opening History...</Text>
+          </View>
+        );
+      }
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" />

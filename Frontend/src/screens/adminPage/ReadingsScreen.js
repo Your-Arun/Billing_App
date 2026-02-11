@@ -16,7 +16,8 @@ import axios from 'axios';
 import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
 import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
+import * as Sharing from 'expo-sharing'; import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ReadingsScreen = () => {
   const { user } = useContext(UserContext);
@@ -34,69 +35,92 @@ const ReadingsScreen = () => {
 
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+
+
+  const loadCache = useCallback(async () => {
+    if (!adminId) return;
+    try {
+      const cachedData = await AsyncStorage.getItem(`readings_cache_${adminId}`);
+      if (cachedData) {
+        setLogs(JSON.parse(cachedData));
+        setLoading(false); 
+      }
+    } catch (e) {
+      console.log("Cache Load Error", e);
+    }
+  }, [adminId]);
+
+
+  const fetchLogs = useCallback(async () => {
+    if (!adminId) return;
+
+    try {
+      const res = await axios.get(`${API_URL}/readings/all/${adminId}`);
+      const freshData = res.data || [];
+      setLogs(freshData);
+
+      await AsyncStorage.setItem(`readings_cache_${adminId}`, JSON.stringify(freshData));
+    } catch (e) {
+      console.log('Fetch error:', e.response?.data || e.message);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [adminId]);
 
 
   useEffect(() => {
+    loadCache();
     fetchLogs();
-  }, [fetchLogs]);
+  }, [loadCache, fetchLogs]);
 
-  useEffect(() => {
-  if (adminId) {
+  const onRefresh = () => {
+    setRefreshing(true);
     fetchLogs();
-  }
-}, [adminId]);
+  };
 
-const fetchLogs = async () => {
-  if (!adminId) return;
+  const exportExcel = async () => {
+    setShowModal(false);
 
-  setLoading(true);
-  try {
-    const res = await axios.get(
-      `${API_URL}/readings/all/${adminId}`
-    );
-    setLogs(res.data);
-  } catch (e) {
-    console.log('Fetch error:', e.response?.data || e.message);
-  } finally {
-    setLoading(false);
-  }
-};
+    const url =
+      `${API_URL}/readings/export/${adminId}` +
+      `?from=${fromDate.toISOString()}&to=${toDate.toISOString()}`;
 
- const exportExcel = async () => {
-  setShowModal(false);
+    try {
+      if (Platform.OS === 'web') {
+        window.open(url, '_blank');
+        return;
+      }
 
-  const url =
-    `${API_URL}/readings/export/${adminId}` +
-    `?from=${fromDate.toISOString()}&to=${toDate.toISOString()}`;
+      const fileUri =
+        FileSystem.documentDirectory +
+        `Meter_Readings_${Date.now()}.xlsx`;
 
-  try {
-    // 🌐 WEB → direct download
-    if (Platform.OS === 'web') {
-      window.open(url, '_blank');
-      return;
+      const result = await FileSystem.downloadAsync(url, fileUri);
+
+      if (result.status === 200) {
+        await Sharing.shareAsync(result.uri);
+      } else {
+        console.log('Download failed');
+      }
+    } catch (e) {
+      console.log('Export error:', e);
     }
-
-    // 📱 MOBILE → file download + share
-    const fileUri =
-      FileSystem.documentDirectory +
-      `Meter_Readings_${Date.now()}.xlsx`;
-
-    const result = await FileSystem.downloadAsync(url, fileUri);
-
-    if (result.status === 200) {
-      await Sharing.shareAsync(result.uri);
-    } else {
-      console.log('Download failed');
-    }
-  } catch (e) {
-    console.log('Export error:', e);
-  }
-};
+  };
 
 
   const renderRow = ({ item }) => {
     const d = new Date(item.createdAt);
-
+    if (loading && logs.length === 0 && !refreshing) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#333399" />
+          <Text style={{ marginTop: 10, color: '#666' }}>Fetching Readings...</Text>
+        </View>
+      );
+    }
     return (
       <View style={styles.card}>
         <View style={styles.cardTop}>
@@ -122,7 +146,7 @@ const fetchLogs = async () => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* HEADER */}
       <View style={styles.header}>
         <View>
@@ -147,7 +171,7 @@ const fetchLogs = async () => {
           data={logs}
           keyExtractor={(item) => item._id}
           renderItem={renderRow}
-          refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchLogs} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         />
       )}
 
@@ -212,7 +236,7 @@ const fetchLogs = async () => {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 

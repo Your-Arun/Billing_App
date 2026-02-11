@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, 
-    Modal, TextInput, Alert, FlatList, StatusBar,refreshing
+    Modal, TextInput, Alert, FlatList, StatusBar, RefreshControl
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
+import AsyncStorage from '@react-native-async-storage/async-storage'; 
 
 const TenantRow = React.memo(({ t, onEdit }) => (
     <View style={styles.tableRow}>
@@ -42,7 +43,7 @@ const ReadingsReviewScreen = ({ navigation }) => {
     const [solar, setSolar] = useState({ unitsGenerated: 0 });
     const [dg, setDg] = useState({ totalUnits: 0, totalCost: 0 });
     const [tenants, setTenants] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
     const [endDate, setEndDate] = useState(new Date());
@@ -52,12 +53,31 @@ const ReadingsReviewScreen = ({ navigation }) => {
     const [selectedTenant, setSelectedTenant] = useState(null);
     const [newReading, setNewReading] = useState('');
     const [updating, setUpdating] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
 
     const formatDateForAPI = (date) => date.toISOString().split('T')[0];
 
+    const loadCache = useCallback(async () => {
+        if (!user?.id) return;
+        try {
+            const cached = await AsyncStorage.getItem(`review_cache_${user.id}`);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                setBillData(parsed.billData || { totalUnits: 0, totalAmount: 0 });
+                setSolar(parsed.solar || { unitsGenerated: 0 });
+                setDg(parsed.dg || { totalUnits: 0, totalCost: 0 });
+                setTenants(parsed.tenants || []);
+                setLoading(false); 
+            }
+        } catch (e) {
+            console.log("Cache Load Error", e);
+        }
+    }, [user.id]);
+
+
     const fetchData = useCallback(async () => {
         if (!user?.id) return;
-        setLoading(true);
+        // setLoading(true); // Isko band rakhein taaki flicker na ho
         try {
             const params = { from: formatDateForAPI(startDate), to: formatDateForAPI(endDate) };
 
@@ -68,21 +88,43 @@ const ReadingsReviewScreen = ({ navigation }) => {
                 axios.get(`${API_URL}/reconcile/range-summary/${user.id}`, { params })
             ]);
 
-            setBillData(billRes.data?.[0] || { totalUnits: 0, totalAmount: 0 });
-            setSolar(solarRes.data?.[0] || { unitsGenerated: 0 });
-            setDg({
+            const newBill = billRes.data?.[0] || { totalUnits: 0, totalAmount: 0 };
+            const newSolar = solarRes.data?.[0] || { unitsGenerated: 0 };
+            const newDg = {
                 totalUnits: dgRes.data?.dgSummary?.reduce((sum, d) => sum + d.totalUnits, 0) || 0,
                 totalCost: dgRes.data?.dgSummary?.reduce((sum, d) => sum + d.totalCost, 0) || 0
-            });
-            setTenants(rangeRes.data || []);
+            };
+            const newTenants = rangeRes.data || [];
+
+            setBillData(newBill);
+            setSolar(newSolar);
+            setDg(newDg);
+            setTenants(newTenants);
+
+            // ✅ 3. Naye data ko cache mein save karein
+            const cacheObj = { billData: newBill, solar: newSolar, dg: newDg, tenants: newTenants };
+            await AsyncStorage.setItem(`review_cache_${user.id}`, JSON.stringify(cacheObj));
+
         } catch (err) {
             console.log('Fetch Error:', err.message);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
     }, [user.id, startDate, endDate]);
 
-    useEffect(() => { fetchData(); }, [fetchData]);
+    useEffect(() => {
+        loadCache();
+    }, [loadCache]);
+
+    useEffect(() => {
+        fetchData(); 
+    }, [fetchData]);
+
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        fetchData();
+    }, [fetchData]);
 
     const handleEdit = useCallback((t) => {
         setSelectedTenant(t);
@@ -118,6 +160,10 @@ const ReadingsReviewScreen = ({ navigation }) => {
             <Text style={styles.sectionTitle}>Tenant Verification</Text>
         </View>
     ), [billData, solar, dg]);
+
+    if (loading && tenants.length === 0) {
+        return <View style={styles.loader}><ActivityIndicator size="large" color="#333399" /></View>;
+    }
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -168,7 +214,8 @@ const ReadingsReviewScreen = ({ navigation }) => {
                     initialNumToRender={10}
                     maxToRenderPerBatch={10}
                     windowSize={5}
-                    removeClippedSubviews={true} // Performance boost for large lists
+                    removeClippedSubviews={true} 
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#333399" />} 
                 />
             )}
 
@@ -258,7 +305,8 @@ const styles = StyleSheet.create({
     modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
     modalInput: { width: '100%', height: 60, borderWidth: 1, borderColor: '#DDD', borderRadius: 12, textAlign: 'center', fontSize: 24, fontWeight: 'bold', color: '#333399', marginBottom: 20 },
     mBtn: { flex: 1, height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-    emptyText: { textAlign: 'center', padding: 40, color: '#999' }
+    emptyText: { textAlign: 'center', padding: 40, color: '#999' },
+    loader: { flex: 1, justifyContent: 'center', alignItems: 'center' }
 });
 
 export default ReadingsReviewScreen;

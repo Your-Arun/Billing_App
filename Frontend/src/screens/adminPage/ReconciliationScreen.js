@@ -8,6 +8,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import axios from 'axios';
 import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ReconciliationScreen = ({ route, navigation }) => {
     const { user } = useContext(UserContext);
@@ -28,34 +29,62 @@ const ReconciliationScreen = ({ route, navigation }) => {
     const [disabledDgIds, setDisabledDgIds] = useState([]);
     const [disabledLossIds, setDisabledLossIds] = useState([]);
 
-    // 1. Data Fetching Logic (Sirf ek baar chalega ya refresh karne par)
-    const fetchAllData = useCallback(async () => {
-        if (!adminId) return;
-        setLoading(true);
-        try {
-            const dateParams = {
-                from: startDate.toISOString().split('T')[0],
-                to: endDate.toISOString().split('T')[0]
-            };
+  // 🟢 2. Generate Unique Cache Key based on Admin and Dates
+  const cacheKey = useMemo(() => {
+    return `recon_cache_${adminId}_${startDate.toISOString().split('T')[0]}_${endDate.toISOString().split('T')[0]}`;
+}, [adminId, startDate, endDate]);
 
-            const [billRes, solarRes, dgRes, tenantRes] = await Promise.allSettled([
-                axios.get(`${API_URL}/bill/history/${adminId}`),
-                axios.get(`${API_URL}/solar/history/${adminId}`),
-                axios.get(`${API_URL}/dg/dgsummary/${adminId}`, { params: dateParams }),
-                axios.get(`${API_URL}/reconcile/range-summary/${adminId}`, { params: dateParams })
-            ]);
 
-            setRawApiData({ billRes, solarRes, dgRes, tenantRes });
-        } catch (e) {
-            console.error("Fetch Error:", e);
-        } finally {
-            setLoading(false);
+
+const loadCache = useCallback(async () => {
+    try {
+        const saved = await AsyncStorage.getItem(cacheKey);
+        if (saved) {
+            setRawApiData(JSON.parse(saved));
+            setLoading(false); // Cache milte hi main loader band
         }
-    }, [adminId, startDate, endDate]);
+    } catch (e) {
+        console.log("Cache Load Error", e);
+    }
+}, [cacheKey]);
 
-    useEffect(() => {
-        fetchAllData();
-    }, [fetchAllData]);
+const fetchAllData = useCallback(async () => {
+    if (!adminId) return;
+    try {
+        const dateParams = {
+            from: startDate.toISOString().split('T')[0],
+            to: endDate.toISOString().split('T')[0]
+        };
+
+        const [billRes, solarRes, dgRes, tenantRes] = await Promise.allSettled([
+            axios.get(`${API_URL}/bill/history/${adminId}`),
+            axios.get(`${API_URL}/solar/history/${adminId}`),
+            axios.get(`${API_URL}/dg/dgsummary/${adminId}`, { params: dateParams }),
+            axios.get(`${API_URL}/reconcile/range-summary/${adminId}`, { params: dateParams })
+        ]);
+
+        // Clean data extract karein (sirf wahi jo zaroorat hai)
+        const freshData = {
+            billData: billRes.status === 'fulfilled' ? billRes.value.data : [],
+            solarData: solarRes.status === 'fulfilled' ? solarRes.value.data : [],
+            dgData: dgRes.status === 'fulfilled' ? dgRes.value.data : null,
+            tenantData: tenantRes.status === 'fulfilled' ? tenantRes.value.data : []
+        };
+
+        setRawApiData(freshData);
+        // Cache mein save karein
+        await AsyncStorage.setItem(cacheKey, JSON.stringify(freshData));
+    } catch (e) {
+        console.error("Fetch Error:", e);
+    } finally {
+        setLoading(false);
+    }
+}, [adminId, startDate, endDate, cacheKey]);
+
+useEffect(() => {
+    loadCache(); 
+    fetchAllData(); 
+}, [loadCache, fetchAllData]);
 
     // 2. ⚡ INSTANT CALCULATION (useMemo use karke local calculation)
     const processedData = useMemo(() => {
@@ -118,7 +147,12 @@ const ReconciliationScreen = ({ route, navigation }) => {
     };
 
     if (loading && !rawApiData) {
-        return <View style={styles.loaderContainer}><ActivityIndicator size="large" color="#333399" /></View>;
+        return (
+            <View style={styles.loaderContainer}>
+                <ActivityIndicator size="large" color="#333399" />  
+            <Text style={{marginTop: 10, color: '#666'}}>Loading Summary...</Text>
+            </View>
+        );
     }
 
     const { gridUnits, gridAmount, gridFixedPrice, solarUnits, totalTenantUnitsSum, commonLoss, lossPercent, totalTenantAmountSum, calculatedTenants, profit } = processedData || {};

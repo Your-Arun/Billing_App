@@ -10,14 +10,48 @@ import Toast from 'react-native-toast-message';
 import { UserContext } from '../services/UserContext';
 import API_URL from '../services/apiconfig';
 import UserProfile from '../screens/adminPage/UserProfile';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+
+const TenantItem = React.memo(({ item, onSelect }) => {
+  const status = item.todayStatus || 'Ready';
+  let badgeText = 'READY', badgeColor = '#4F46E5', icon = 'camera-outline', locked = false;
+
+  if (status === 'Pending') { badgeText = 'PENDING'; badgeColor = '#F59E0B'; icon = 'clock-outline'; locked = true; }
+  else if (status === 'Approved') { badgeText = 'APPROVED'; badgeColor = '#16A34A'; icon = 'check-circle-outline'; locked = true; }
+  else if (status === 'Rejected') { badgeText = 'REJECTED'; badgeColor = '#DC2626'; icon = 'alert-circle-outline'; locked = false; }
+
+  return (
+    <TouchableOpacity
+      activeOpacity={locked ? 1 : 0.8}
+      onPress={() => !locked && onSelect(item)}
+      style={styles.card}
+    >
+      <View style={[styles.leftStrip, { backgroundColor: badgeColor }]} />
+      <View style={styles.cardContent}>
+        <View style={styles.cardTop}>
+          <View style={styles.iconCircle}><MaterialCommunityIcons name={icon} size={24} color={badgeColor} /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.tenantName}>{item.name}</Text>
+            <View style={styles.badgeRow}>
+              <View style={[styles.badge, { backgroundColor: badgeColor }]}><Text style={styles.badgeText}>{badgeText}</Text></View>
+            </View>
+          </View>
+          {!locked && <MaterialCommunityIcons name="chevron-right" size={30} color="#CBD5E1" />}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 
 const ReadingTakerScreen = ({ navigation }) => {
   const { user, logout } = useContext(UserContext);
   const [profileVisible, setProfileVisible] = useState(false);
   const [tenants, setTenants] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
   const [entryModalVisible, setEntryModalVisible] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState(null);
   const [readingValue, setReadingValue] = useState('');
@@ -26,12 +60,26 @@ const ReadingTakerScreen = ({ navigation }) => {
 
   const companyId = user?.belongsToAdmin || user?.id;
 
+  const loadCache = useCallback(async () => {
+    if (!companyId) return;
+    try {
+      const cachedData = await AsyncStorage.getItem(`taker_tenants_cache_${companyId}`);
+      if (cachedData) {
+        setTenants(JSON.parse(cachedData));
+        setLoading(false); 
+      }
+    } catch (e) { console.log("Cache Load Error", e); }
+  }, [companyId]);
+
+
+
   const fetchTenants = useCallback(async () => {
     if (!companyId) return;
-    setLoading(true);
     try {
       const res = await axios.get(`${API_URL}/readings/${companyId}`);
-      setTenants(res.data);
+      const freshData = res.data || [];
+      setTenants(freshData);
+      await AsyncStorage.setItem(`taker_tenants_cache_${companyId}`, JSON.stringify(freshData));
     } catch (e) {
       console.log("Fetch Error Staff:", e.message);
     } finally {
@@ -41,10 +89,16 @@ const ReadingTakerScreen = ({ navigation }) => {
   }, [companyId]);
 
   useEffect(() => {
-    fetchTenants();
-    const unsubscribe = navigation.addListener('focus', fetchTenants);
+    loadCache(); 
+  }, [loadCache]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchTenants(); 
+    });
     return unsubscribe;
   }, [navigation, fetchTenants]);
+
 
   const takePhoto = async () => {
     let result = await ImagePicker.launchCameraAsync({ quality: 0.5 });
@@ -85,91 +139,17 @@ const ReadingTakerScreen = ({ navigation }) => {
   };
 
 
-  const renderTenantItem = ({ item }) => {
-  const status = item.todayStatus || 'Ready';
-
-  let badgeText = 'READY';
-  let badgeColor = '#4F46E5';
-  let leftStrip = '#4F46E5';
-  let icon = 'camera-outline';
-  let locked = false;
-
-  if (status === 'Pending') {
-    badgeText = 'PENDING';
-    badgeColor = '#F59E0B';
-    leftStrip = '#F59E0B';
-    icon = 'clock-outline';
-    locked = true;
-  }
-
-  if (status === 'Approved') {
-    badgeText = 'APPROVED';
-    badgeColor = '#16A34A';
-    leftStrip = '#16A34A';
-    icon = 'check-circle-outline';
-    locked = true;
-  }
-
-  if (status === 'Rejected') {
-    badgeText = 'REJECTED';
-    badgeColor = '#DC2626';
-    leftStrip = '#DC2626';
-    icon = 'alert-circle-outline';
-    locked = false;
-  }
-
-  return (
-    <TouchableOpacity
-      activeOpacity={locked ? 1 : 0.8}
-      onPress={() => {
-        if (locked) return;
-        setSelectedTenant(item);
-        setEntryModalVisible(true);
-      }}
-      style={styles.card}
-    >
-      {/* LEFT COLOR STRIP */}
-      <View style={[styles.leftStrip, { backgroundColor: leftStrip }]} />
-
-      <View style={styles.cardContent}>
-        <View style={styles.cardTop}>
-          <View style={styles.iconCircle}>
-            <MaterialCommunityIcons name={icon} size={24} color={badgeColor} />
-          </View>
-
-          <View style={{ flex: 1 }}>
-            <Text style={styles.tenantName}>{item.name}</Text>
-
-            <View style={styles.badgeRow}>
-              <View style={[styles.badge, { backgroundColor: badgeColor }]}>
-                <Text style={styles.badgeText}>{badgeText}</Text>
-              </View>
-              <Text style={styles.kwhText}>
-                {}
-              </Text>
-            </View>
-
-            {status === 'Rejected' && (
-              <Text style={styles.rejectText}>
-              </Text>
-            )}
-          </View>
-
-          {!locked && (
-            <MaterialCommunityIcons
-              name="chevron-right"
-              size={30}
-              color="#CBD5E1"
-            />
-          )}
-        </View>
+  if (loading && tenants.length === 0 && !refreshing) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#333399" />
+        <Text style={{ marginTop: 10, color: '#666' }}>Initializing App...</Text>
       </View>
-    </TouchableOpacity>
-  );
-};
+    );
+  }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* 🟢 TOP HEADER (Exactly as per Image 1) */}
       <View style={styles.blueHeader}>
         <View style={styles.headerTopRow}>
@@ -190,9 +170,15 @@ const ReadingTakerScreen = ({ navigation }) => {
 
         <FlatList
           data={tenants}
-          renderItem={renderTenantItem}
           keyExtractor={item => item._id}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchTenants(); }} />}
+          renderItem={({ item }) => (
+            <TenantItem item={item} onSelect={(t) => { setSelectedTenant(t); setEntryModalVisible(true); }} />
+          )}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchTenants(); }} tintColor="#333399" />}
+          initialNumToRender={8}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews={true}
           contentContainerStyle={{ paddingBottom: 100 }}
         />
       </View>
@@ -252,7 +238,7 @@ const ReadingTakerScreen = ({ navigation }) => {
           </ScrollView>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -402,6 +388,3 @@ rejectText: {
 });
 
 export default ReadingTakerScreen;
-
-
-// ye kaam kr rha hai

@@ -7,7 +7,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import axios from 'axios';
 import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
-import Toast from 'react-native-toast-message'; 
+import Toast from 'react-native-toast-message'; import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const TenantsScreen = ({ navigation }) => {
   const { user } = useContext(UserContext);
@@ -32,13 +33,27 @@ const TenantsScreen = ({ navigation }) => {
 
   const companyId = user?.role === 'Admin' ? user?.id : user?.belongsToAdmin;
 
+  const loadCache = useCallback(async () => {
+    if (!companyId) return;
+    try {
+      const cachedData = await AsyncStorage.getItem(`tenants_cache_${companyId}`);
+      if (cachedData) {
+        setTenants(JSON.parse(cachedData));
+        setLoading(false); // डेटा मिल गया तो लोडर हटा दो
+      }
+    } catch (e) {
+      console.log("Cache Load Error", e);
+    }
+  }, [companyId]);
+
   const fetchTenants = useCallback(async () => {
     if (!companyId) return;
     setLoading(true);
     try {
       const res = await axios.get(`${API_URL}/tenants/${companyId}`);
       setTenants(res.data);
-      
+      await AsyncStorage.setItem(`tenants_cache_${companyId}`, JSON.stringify(res.data));
+
       if (selectedTenant) {
         const freshData = res.data.find(t => t._id === selectedTenant._id);
         if (freshData) setSelectedTenant(freshData);
@@ -50,6 +65,10 @@ const TenantsScreen = ({ navigation }) => {
       setRefreshing(false); 
     }
   }, [companyId, selectedTenant]);
+
+  useEffect(() => {
+    loadCache(); // तुरंत दिखाओ
+  }, [loadCache]);
 
 const fetchDGs = useCallback(async () => {
   if (!companyId) return;
@@ -159,6 +178,15 @@ useEffect(() => {
     ]);
   };
 
+  if (loading && tenants.length === 0 && !refreshing) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#333399" />
+        <Text style={{ marginTop: 10, color: '#666' }}>Loading Properties...</Text>
+      </View>
+    );
+  }
+
   const renderTenantItem = ({ item }) => (
     <TouchableOpacity style={styles.modernCard} onPress={() => { setSelectedTenant(item); setDetailModalVisible(true); }}>
       <View style={styles.cardLeft}>
@@ -185,7 +213,7 @@ useEffect(() => {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* --- PREMIUM TOP HEADER --- */}
       <View style={styles.headerContainer}>
         <Text style={styles.headerTitle}>Property Manager</Text>
@@ -379,7 +407,7 @@ useEffect(() => {
           </ScrollView>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 

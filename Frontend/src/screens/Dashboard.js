@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions,
-  ActivityIndicator, RefreshControl, StatusBar,
+  ActivityIndicator, RefreshControl, StatusBar
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LineChart } from "react-native-chart-kit";
@@ -14,6 +15,15 @@ import { useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 
+const chartConfig = {
+  backgroundGradientFrom: "#FFF",
+  backgroundGradientTo: "#FFF",
+  decimalPlaces: 0,
+  color: (opacity = 1) => `rgba(51, 51, 153, ${opacity})`,
+  labelColor: (opacity = 1) => `rgba(100, 116, 139, ${opacity})`,
+  propsForDots: { r: "5", strokeWidth: "2", stroke: "#333399" }
+};
+
 const Dashboard = ({ navigation }) => {
   const { user } = useContext(UserContext);
   const [profileVisible, setProfileVisible] = useState(false);
@@ -21,16 +31,9 @@ const Dashboard = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
 
   const [data, setData] = useState({
-    totalTenants: 0,
-    pendingCount: 0,
-    latestProfit: 0,
-    totalCollection: 0,
-    gridBill: 0,
-    solarUnits: 0,
-    dgUnits: 0,
-    lossPercent: 0,
-    chartLabels: ["-"],
-    chartData: [0]
+    totalTenants: 0, pendingCount: 0, latestProfit: 0, totalCollection: 0,
+    gridBill: 0, solarUnits: 0, dgUnits: 0, lossPercent: 0,
+    chartLabels: ["-"], chartData: [0]
   });
 
   const adminId = user?._id || user?.id;
@@ -43,30 +46,25 @@ const Dashboard = ({ navigation }) => {
         setData(JSON.parse(cached));
         setLoading(false); 
       }
-    } catch (e) {
-      console.log("Cache Load Error", e);
-    }
+    } catch (e) { console.log("Cache Load Error", e); }
   }, [adminId]);
 
   const fetchDashboardData = useCallback(async () => {
     if (!adminId) return;
-    // यहाँ setLoading(true) नहीं करेंगे ताकि बैकग्राउंड में अपडेट हो
     try {
       const monthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
-
       const [tenants, pending, solar, dg, summary] = await Promise.allSettled([
         axios.get(`${API_URL}/tenants/${adminId}`),
         axios.get(`${API_URL}/readings/pending/${adminId}`),
         axios.get(`${API_URL}/solar/history/${adminId}`),
-        axios.get(`${API_URL}/dg/dgsummary/${adminId}`),
+        axios.get(`${API_URL}/dg/dgsummary/${adminId}`, { params: { monthKey } }), 
         axios.get(`${API_URL}/statement/companysummary/${adminId}`)
       ]);
 
       const summaryList = summary.status === 'fulfilled' ? (summary.value.data || []) : [];
       const latestMonth = summaryList[0] || {};
 
-      let labels = ["-"];
-      let points = [0];
+      let labels = ["-"], points = [0];
       if (summaryList.length > 0) {
         labels = summaryList.slice(0, 5).reverse().map(s => s.month ? String(s.month).split(' ')[0] : (s._id ? String(s._id).split(' ')[0] : "N/A"));
         points = summaryList.slice(0, 5).reverse().map(s => Number(s.totalTenantAmountSum) || 0);
@@ -75,7 +73,6 @@ const Dashboard = ({ navigation }) => {
       const dgRaw = dg.status === 'fulfilled' ? dg.value.data : null;
       const totalDgUnits = dgRaw?.dgSummary?.reduce((acc, curr) => acc + (Number(curr.totalUnits) || 0), 0) || 0;
       const solarList = solar.status === 'fulfilled' ? (solar.value.data || []) : [];
-      const latestSolar = solarList[0]?.unitsGenerated || 0;
 
       const updatedData = {
         totalTenants: tenants.status === 'fulfilled' ? (tenants.value.data?.length || 0) : 0,
@@ -83,63 +80,43 @@ const Dashboard = ({ navigation }) => {
         latestProfit: latestMonth.profit || 0,
         totalCollection: latestMonth.totalTenantAmountSum || 0,
         gridBill: latestMonth.gridAmount || 0,
-        solarUnits: latestSolar,
+        solarUnits: solarList[0]?.unitsGenerated || 0,
         dgUnits: totalDgUnits,
         lossPercent: latestMonth.lossPercent || 0,
         chartLabels: labels,
         chartData: points
       };
 
-      // ✅ 2. डेटा स्टेट में सेट करें
       setData(updatedData);
-
-      // ✅ 3. डेटा को लोकल स्टोरेज (Cache) में सेव करें
       await AsyncStorage.setItem(`dashboard_cache_${adminId}`, JSON.stringify(updatedData));
-
-    } catch (e) {
-      console.log("Dashboard Global Error:", e);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    } catch (e) { console.log("Dashboard Global Error:", e); }
+    finally { setLoading(false); setRefreshing(false); }
   }, [adminId]);
 
+  useEffect(() => { loadCache(); }, [loadCache]);
+  useFocusEffect(useCallback(() => { fetchDashboardData(); }, [fetchDashboardData]));
 
-  useEffect(() => {
-    loadCache();
-  }, [loadCache]);
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchDashboardData();
-    }, [fetchDashboardData])
-  );
-
+  // 🛠️ Management Menu Icons Configuration
   const navIcons = [
-
-    { name: 'Monthly', icon: 'file-document', route: 'MonthlyBilling', color: '#000' },
-    { name: 'Concilliation', icon: 'scale-balance', route: 'Reconciliation', color: '#8B5CF6' },
+    { name: 'Monthly', icon: 'calendar-month', route: 'MonthlyBilling', color: '#1E293B' },
+    { name: 'Analyze', icon: 'chart-box', route: 'Reconciliation', color: '#8B5CF6' },
     { name: 'AVVNL Bill', icon: 'lightning-bolt', route: 'Bill', color: '#F59E0B' },
-    { name: 'Readings', icon: 'speedometer', route: 'Readings', color: '#6366F1' },
-    { name: 'Approval', icon: 'check-decagram', route: 'Approval', color: '#10B981', badge: data.pendingCount },
-    { name: 'Tenants', icon: 'account-group', route: 'Tenants', color: '#3B82F6' },
-
-    { name: 'Statements', icon: 'file-document-multiple', route: 'Statement', color: '#EC4899' },
-
+    { name: 'Readings', icon: 'moped', route: 'Readings', color: '#6366F1' },
+    { name: 'Approval', icon: 'check-circle', route: 'Approval', color: '#10B981', badge: data.pendingCount },
+    { name: 'Tenants', icon: 'office-building', route: 'Tenants', color: '#3B82F6' },
+    { name: 'Invoices', icon: 'file-pdf-box', route: 'Statement', color: '#EC4899' },
   ];
 
-  if (loading && !refreshing) {
+  if (loading && data.totalTenants === 0 && !refreshing) {
     return <View style={styles.loader}><ActivityIndicator size="large" color="#333399" /></View>;
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <StatusBar barStyle="light-content" />
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchDashboardData(); }} tintColor="#333399" />}
-      >
-        {/* HEADER SECTION */}
+
+      {/* 🟢 FIXED HEADER */}
+      <View style={styles.fixedHeader}>
         <View style={styles.header}>
           <View style={styles.headerTop}>
             <TouchableOpacity onPress={() => setProfileVisible(true)}>
@@ -156,7 +133,7 @@ const Dashboard = ({ navigation }) => {
 
           <View style={styles.profitCard}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.profitLabel}>MONTHLY ESTIMATED PROFIT</Text>
+              <Text style={styles.profitLabel}>ESTIMATED PROFIT</Text>
               <Text style={styles.profitValue}>₹ {Math.round(data.latestProfit).toLocaleString('en-IN')}</Text>
               <View style={styles.profitSubRow}>
                 <Text style={styles.profitSub}>Coll: ₹{Math.round(data.totalCollection)}</Text>
@@ -165,13 +142,21 @@ const Dashboard = ({ navigation }) => {
             </View>
             <View style={[styles.profitIconBox, { backgroundColor: data.latestProfit >= 0 ? '#DCFCE7' : '#FEE2E2' }]}>
               <MaterialCommunityIcons
-                name={data.latestProfit >= 0 ? "trending-up" : "trending-down"}
+                name={data.latestProfit >= 0 ? "arrow-up-bold" : "arrow-down-bold"}
                 size={32}
                 color={data.latestProfit >= 0 ? "#16A34A" : "#DC2626"}
               />
             </View>
           </View>
         </View>
+      </View>
+
+      {/* 🟢 SCROLLABLE CONTENT */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchDashboardData(); }} tintColor="#333399" />}
+      >
+        <View style={styles.scrollSpacer} />
 
         <View style={styles.content}>
           <View style={styles.statsGrid}>
@@ -180,17 +165,21 @@ const Dashboard = ({ navigation }) => {
             <MiniStat label="DG Units" value={`${data.dgUnits}u`} icon="engine" color="#EF4444" />
           </View>
 
-          {/* 🟢 SINGLE ROW MANAGEMENT MENU */}
           <Text style={styles.sectionTitle}>Management Menu</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
             contentContainerStyle={styles.horizontalMenu}
           >
             {navIcons.map((item, index) => (
-              <TouchableOpacity key={index} style={styles.menuCard} onPress={() => navigation.navigate(item.route)}>
-                <View style={[styles.iconCircle, { backgroundColor: item.color + '12' }]}>
-                  <MaterialCommunityIcons name={item.icon} size={24} color={item.color} />
+              <TouchableOpacity 
+                key={index} 
+                style={styles.menuCard} 
+                onPress={() => navigation.navigate(item.route)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.iconCircle, { backgroundColor: item.color + '15' }]}>
+                  <MaterialCommunityIcons name={item.icon} size={28} color={item.color} />
                 </View>
                 <Text style={styles.cardText} numberOfLines={1}>{item.name}</Text>
                 {item.badge > 0 && (
@@ -200,15 +189,11 @@ const Dashboard = ({ navigation }) => {
             ))}
           </ScrollView>
 
-          {/* CHART */}
           <Text style={styles.sectionTitle}>Collection Trend (₹)</Text>
           <View style={styles.chartCard}>
             <LineChart
-              data={{
-                labels: data.chartLabels,
-                datasets: [{ data: data.chartData }]
-              }}
-              width={width - 80}
+              data={{ labels: data.chartLabels, datasets: [{ data: data.chartData }] }}
+              width={width - 40}
               height={180}
               chartConfig={chartConfig}
               bezier
@@ -220,11 +205,10 @@ const Dashboard = ({ navigation }) => {
       </ScrollView>
 
       <UserProfile visible={profileVisible} onClose={() => setProfileVisible(false)} />
-    </View>
+    </SafeAreaView>
   );
 };
 
-// --- Helper Component ---
 const MiniStat = ({ label, value, icon, color }) => (
   <View style={styles.miniStatCard}>
     <MaterialCommunityIcons name={icon} size={20} color={color} />
@@ -233,61 +217,72 @@ const MiniStat = ({ label, value, icon, color }) => (
   </View>
 );
 
-const chartConfig = {
-  backgroundGradientFrom: "#FFF",
-  backgroundGradientTo: "#FFF",
-  decimalPlaces: 0,
-  color: (opacity = 1) => `rgba(51, 51, 153, ${opacity})`,
-  labelColor: (opacity = 1) => `rgba(100, 116, 139, ${opacity})`,
-  propsForDots: { r: "5", strokeWidth: "2", stroke: "#333399" }
-};
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { backgroundColor: '#333399', paddingHorizontal: 20, paddingTop: 60, paddingBottom: 60, borderBottomLeftRadius: 35, borderBottomRightRadius: 35 },
+  fixedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100 },
+  header: { backgroundColor: '#333399', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 60, borderBottomLeftRadius: 35, borderBottomRightRadius: 35, elevation: 10 },
+  scrollSpacer: { height: 230 },
   headerTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   headerInfo: { flex: 1, marginLeft: 15 },
-  greeting: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '600' },
+  greeting: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
   userName: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
   lossBadge: { backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
   lossText: { color: '#FFF', fontSize: 11, fontWeight: 'bold' },
-
-  profitCard: { backgroundColor: '#FFF', borderRadius: 25, padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', elevation: 10, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, marginBottom: -45 },
-  profitLabel: { fontSize: 10, fontWeight: 'bold', color: '#94A3B8', letterSpacing: 0.5 },
-  profitValue: { fontSize: 24, fontWeight: '900', color: '#1E293B', marginVertical: 2 },
+  profitCard: { backgroundColor: '#FFF', borderRadius: 25, padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', elevation: 10, marginBottom: -45 },
+  profitLabel: { fontSize: 10, fontWeight: 'bold', color: '#94A3B8' },
+  profitValue: { fontSize: 24, fontWeight: '900', color: '#1E293B' },
   profitSubRow: { flexDirection: 'row', marginTop: 3 },
   profitSub: { fontSize: 10, color: '#16A34A', fontWeight: 'bold' },
   profitIconBox: { padding: 12, borderRadius: 15 },
-
-  content: { paddingHorizontal: 20, marginTop: 55 },
+  content: { paddingHorizontal: 20, marginTop: 10 },
   statsGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 25 },
   miniStatCard: { backgroundColor: '#FFF', width: '31%', padding: 15, borderRadius: 20, alignItems: 'center', elevation: 2 },
   miniStatValue: { fontSize: 16, fontWeight: 'bold', color: '#1E293B', marginTop: 5 },
   miniStatLabel: { fontSize: 10, color: '#94A3B8', fontWeight: 'bold' },
-
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#1E293B', marginVertical: 5, marginLeft: 5, },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#1E293B', marginVertical: 15, marginLeft: 5 },
   chartCard: { backgroundColor: '#FFF', padding: 5, borderRadius: 24, elevation: 3 },
-
-  // 🟢 Horizontal Menu Styles
-  horizontalMenu: { paddingLeft: 5, paddingRight: 20, marginBottom: 20 },
+  
+  // 🟢 Premium Horizontal Menu Styles
+  horizontalMenu: { paddingLeft: 5, paddingRight: 20, paddingVertical: 10 },
   menuCard: {
     backgroundColor: '#FFF',
-    width: 100,
-    paddingVertical: 15,
-    borderRadius: 20,
+    width: 95,
+    height: 110,
+    borderRadius: 25,
     alignItems: 'center',
-    marginRight: 12,
+    justifyContent: 'center',
+    marginRight: 15,
+    // Modern shadow
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
     elevation: 5,
     borderWidth: 1,
     borderColor: '#F1F5F9'
   },
-  iconCircle: { width: 45, height: 45, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
-  cardText: { fontSize: 11, fontWeight: '700', color: '#334155', textAlign: 'center' },
-  badge: { position: 'absolute', top: 5, right: 10, backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
-  badgeText: { color: '#FFF', fontSize: 9, fontWeight: 'bold' }
+  iconCircle: { 
+    width: 54, 
+    height: 54, 
+    borderRadius: 18, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginBottom: 8 
+  },
+  cardText: { fontSize: 11, fontWeight: '800', color: '#334155', textAlign: 'center' },
+  badge: { 
+    position: 'absolute', 
+    top: -5, 
+    right: -5, 
+    backgroundColor: '#EF4444', 
+    paddingHorizontal: 7, 
+    paddingVertical: 3, 
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#FFF'
+  },
+  badgeText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' }
 });
 
 export default Dashboard;
-
-//comp581680

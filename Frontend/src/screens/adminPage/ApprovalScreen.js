@@ -8,15 +8,31 @@ import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ApprovalScreen = () => {
   const { user } = useContext(UserContext);
   const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('pending');
 
   const adminId = user?._id || user?.id;
+
+  const loadCache = useCallback(async () => {
+    if (!adminId) return;
+    try {
+      const cacheKey = `approval_${activeTab}_cache_${adminId}`;
+      const cachedData = await AsyncStorage.getItem(cacheKey);
+      if (cachedData) {
+        setData(JSON.parse(cachedData));
+        setLoading(false); // अगर कैश मिला, तो लोडर बंद करें
+      }
+    } catch (e) {
+      console.log("Cache Load Error:", e);
+    }
+  }, [adminId, activeTab]);
 
   const fetchData = useCallback(async () => {
     if (!adminId) return;
@@ -25,6 +41,7 @@ const ApprovalScreen = () => {
       const endpoint = activeTab === 'pending' ? 'pending' : 'history-all';
       const res = await axios.get(`${API_URL}/readings/${endpoint}/${adminId}`);
       setData(res.data || []);
+      await AsyncStorage.setItem(cacheKey, JSON.stringify(res.data));
     } catch (e) {
       Toast.show({ type: 'error', text1: 'Error', text2: 'Could not load data' });
     } finally {
@@ -33,7 +50,10 @@ const ApprovalScreen = () => {
     }
   }, [adminId, activeTab]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    loadCache(); 
+    fetchData();
+  }, [activeTab, adminId]);
 
   const handleAction = async (id, action) => {
     try {
@@ -118,8 +138,17 @@ const ApprovalScreen = () => {
     </View>
   );
 
+
+  if (loading && data.length === 0 && !refreshing) {
+    return (
+      <View style={styles.loadingBox}>
+        <ActivityIndicator size="large" color="#333399" />
+        <Text style={{marginTop: 10, color: '#666'}}>Loading Records...</Text>
+      </View>
+    );
+  }
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       <View style={styles.blueHeader}>
         <View>
@@ -161,7 +190,7 @@ const ApprovalScreen = () => {
           }
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -195,7 +224,8 @@ const styles = StyleSheet.create({
   statusText: { marginLeft: 8, fontWeight: 'bold', fontSize: 12 },
   deleteBtn: { backgroundColor: '#FFF0F0', padding: 10, borderRadius: 12, borderWidth: 1, borderColor: '#FFE0E0' },
   emptyContainer: { alignItems: 'center', marginTop: 80 },
-  emptyText: { textAlign: 'center', color: '#999', fontWeight: 'bold', marginTop: 10 }
+  emptyText: { textAlign: 'center', color: '#999', fontWeight: 'bold', marginTop: 10 },
+  loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center' }
 });
 
 export default ApprovalScreen;

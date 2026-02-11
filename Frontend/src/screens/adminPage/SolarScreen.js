@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, 
-  ActivityIndicator, FlatList, StatusBar, SafeAreaView
+  ActivityIndicator, FlatList, StatusBar, 
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -9,6 +9,8 @@ import axios from 'axios';
 import Toast from 'react-native-toast-message'; // 🟢 Toast logic
 import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const SolarScreen = () => {
   const { user } = useContext(UserContext);
@@ -20,13 +22,39 @@ const SolarScreen = () => {
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState([]);
 
+  const loadCache = useCallback(async () => {
+    if (!companyId) return;
+    try {
+      const cachedData = await AsyncStorage.getItem(`solar_cache_${companyId}`);
+      if (cachedData) {
+        setHistory(JSON.parse(cachedData));
+        setLoading(false); 
+      }
+    } catch (e) {
+      console.log("Cache Load Error", e);
+    }
+  }, [companyId]);
+
   const fetchHistory = useCallback(async () => {
     if (!companyId) return;
     try {
       const res = await axios.get(`${API_URL}/solar/history/${companyId}`);
-      setHistory(res.data || []);
-    } catch (err) { console.log('History error:', err.message); }
+      const freshData = res.data || [];
+      setHistory(freshData);
+      
+      await AsyncStorage.setItem(`solar_cache_${companyId}`, JSON.stringify(freshData));
+    } catch (err) {
+      console.log('History error:', err.message);
+    } finally {
+      setLoading(false);
+    }
   }, [companyId]);
+
+  useEffect(() => {
+    loadCache();
+    fetchHistory();
+  }, [loadCache, fetchHistory]);
+
 
   const fetchSolarForDate = useCallback(async () => {
     if (!companyId) return;
@@ -40,8 +68,7 @@ const SolarScreen = () => {
 
   useEffect(() => {
     fetchSolarForDate();
-    fetchHistory();
-  }, [fetchSolarForDate, fetchHistory]);
+  }, [fetchSolarForDate]);
 
   // 🟢 SAVE ENTRY - ALERT REPLACED WITH TOAST
   const handleSave = async () => {
@@ -100,9 +127,15 @@ const SolarScreen = () => {
       });
     }
   };
-
+  if (loading && history.length === 0) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#333399" />
+      </View>
+    );
+  }
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       
       {/* HEADER */}
@@ -176,7 +209,7 @@ const SolarScreen = () => {
         ListEmptyComponent={<Text style={styles.empty}>No logs found for this period.</Text>}
         contentContainerStyle={{ paddingBottom: 50 }}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
