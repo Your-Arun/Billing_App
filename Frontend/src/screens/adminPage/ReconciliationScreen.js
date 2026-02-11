@@ -24,118 +24,120 @@ const ReconciliationScreen = ({ route, navigation }) => {
     const adminId = user?._id || user?.id;
 
     // --- States ---
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(true); // Pehle true rakhein cache check ke liye
     const [rawApiData, setRawApiData] = useState(null);
     const [disabledDgIds, setDisabledDgIds] = useState([]);
     const [disabledLossIds, setDisabledLossIds] = useState([]);
 
-  // 🟢 2. Generate Unique Cache Key based on Admin and Dates
-  const cacheKey = useMemo(() => {
-    return `recon_cache_${adminId}_${startDate.toISOString().split('T')[0]}_${endDate.toISOString().split('T')[0]}`;
-}, [adminId, startDate, endDate]);
+    // 🟢 1. Unique Cache Key
+    const cacheKey = useMemo(() => {
+        return `recon_cache_${adminId}_${startDate.toISOString().split('T')[0]}_${endDate.toISOString().split('T')[0]}`;
+    }, [adminId, startDate, endDate]);
 
-
-
-const loadCache = useCallback(async () => {
-    try {
-        const saved = await AsyncStorage.getItem(cacheKey);
-        if (saved) {
-            setRawApiData(JSON.parse(saved));
-            setLoading(false); // Cache milte hi main loader band
+    // 🟢 2. Load Cache (Instant Display)
+    const loadCache = useCallback(async () => {
+        if (!adminId) return;
+        try {
+            const saved = await AsyncStorage.getItem(cacheKey);
+            if (saved) {
+                setRawApiData(JSON.parse(saved));
+                setLoading(false); // Cache milte hi main loader band
+            }
+        } catch (e) {
+            console.log("Cache Load Error", e);
         }
-    } catch (e) {
-        console.log("Cache Load Error", e);
-    }
-}, [cacheKey]);
+    }, [cacheKey, adminId]);
 
-const fetchAllData = useCallback(async () => {
-    if (!adminId) return;
-    try {
-        const dateParams = {
-            from: startDate.toISOString().split('T')[0],
-            to: endDate.toISOString().split('T')[0]
-        };
+    // 🔄 3. Fetch Fresh Data from Server
+    const fetchAllData = useCallback(async () => {
+        if (!adminId) return;
+        try {
+            const dateParams = {
+                from: startDate.toISOString().split('T')[0],
+                to: endDate.toISOString().split('T')[0]
+            };
 
-        const [billRes, solarRes, dgRes, tenantRes] = await Promise.allSettled([
-            axios.get(`${API_URL}/bill/history/${adminId}`),
-            axios.get(`${API_URL}/solar/history/${adminId}`),
-            axios.get(`${API_URL}/dg/dgsummary/${adminId}`, { params: dateParams }),
-            axios.get(`${API_URL}/reconcile/range-summary/${adminId}`, { params: dateParams })
-        ]);
+            const [billRes, solarRes, dgRes, tenantRes] = await Promise.allSettled([
+                axios.get(`${API_URL}/bill/history/${adminId}`),
+                axios.get(`${API_URL}/solar/history/${adminId}`),
+                axios.get(`${API_URL}/dg/dgsummary/${adminId}`, { params: dateParams }),
+                axios.get(`${API_URL}/reconcile/range-summary/${adminId}`, { params: dateParams })
+            ]);
 
-        // Clean data extract karein (sirf wahi jo zaroorat hai)
-        const freshData = {
-            billData: billRes.status === 'fulfilled' ? billRes.value.data : [],
-            solarData: solarRes.status === 'fulfilled' ? solarRes.value.data : [],
-            dgData: dgRes.status === 'fulfilled' ? dgRes.value.data : null,
-            tenantData: tenantRes.status === 'fulfilled' ? tenantRes.value.data : []
-        };
+            const freshData = {
+                billData: billRes.status === 'fulfilled' ? billRes.value.data : [],
+                solarData: solarRes.status === 'fulfilled' ? solarRes.value.data : [],
+                dgData: dgRes.status === 'fulfilled' ? dgRes.value.data : null,
+                tenantData: tenantRes.status === 'fulfilled' ? tenantRes.value.data : []
+            };
 
-        setRawApiData(freshData);
-        // Cache mein save karein
-        await AsyncStorage.setItem(cacheKey, JSON.stringify(freshData));
-    } catch (e) {
-        console.error("Fetch Error:", e);
-    } finally {
-        setLoading(false);
-    }
-}, [adminId, startDate, endDate, cacheKey]);
+            setRawApiData(freshData);
+            // Cache update karein
+            await AsyncStorage.setItem(cacheKey, JSON.stringify(freshData));
+        } catch (e) {
+            console.error("Fetch Error:", e);
+        } finally {
+            setLoading(false);
+        }
+    }, [adminId, startDate, endDate, cacheKey]);
 
-useEffect(() => {
-    loadCache(); 
-    fetchAllData(); 
-}, [loadCache, fetchAllData]);
+    useEffect(() => {
+        loadCache(); 
+        fetchAllData(); 
+    }, [loadCache, fetchAllData]);
 
-    // 2. ⚡ INSTANT CALCULATION (useMemo use karke local calculation)
+    // ⚡ 4. INSTANT CALCULATION (useMemo ensures no lag)
     const processedData = useMemo(() => {
         if (!rawApiData) return null;
 
-        const { billRes, solarRes, dgRes, tenantRes } = rawApiData;
+        const { billData, solarData, dgData, tenantData } = rawApiData;
 
         // Extract Summary Values
-        const gridUnits = billRes.status === 'fulfilled' ? (billRes.value.data?.[0]?.totalUnits || 0) : 0;
-        const gridAmount = billRes.status === 'fulfilled' ? (billRes.value.data?.[0]?.totalAmount || 0) : 0;
-        const gridFixedPrice = billRes.status === 'fulfilled' ? (billRes.value.data?.[0]?.fixedCharges || 0) : 0;
-        const solarUnits = solarRes.status === 'fulfilled' ? (solarRes.value.data?.[0]?.unitsGenerated || 0) : 0;
-        const dgUnitsTotal = dgRes.status === 'fulfilled' && dgRes.value.data?.dgSummary
-            ? dgRes.value.data.dgSummary.reduce((sum, d) => sum + (Number(d.totalUnits) || 0), 0) : 0;
+        const gridUnits = billData?.[0]?.totalUnits || 0;
+        const gridAmount = billData?.[0]?.totalAmount || 0;
+        const gridFixedPrice = billData?.[0]?.fixedCharges || 0;
+        const solarUnits = solarData?.[0]?.unitsGenerated || 0;
+        const dgUnitsTotal = dgData?.dgSummary?.reduce((sum, d) => sum + (Number(d.totalUnits) || 0), 0) || 0;
 
         let totalTenantUnitsSum = 0;
         let totalTenantAmountSum = 0;
-        const calculatedTenants = (tenantRes.status === 'fulfilled' && Array.isArray(tenantRes.value.data))
-            ? tenantRes.value.data.map(t => {
-                const diff = Number(t.closing) - Number(t.opening);
-                const ct = Number(t.multiplierCT || 1);
-                const units = diff * ct;
-                const rate = Number(t.ratePerUnit || 10.2);
-                const amount = units * rate;
-                const fixed = Number(t.fixedCharge || 0);
 
-                // Toggle Logic Check
-                const isLossDisabled = disabledLossIds.includes(t.tenantId);
-                const isDgDisabled = disabledDgIds.includes(t.tenantId);
+        const calculatedTenants = Array.isArray(tenantData) ? tenantData.map(t => {
+            const diff = Number(t.closing || 0) - Number(t.opening || 0);
+            const ct = Number(t.multiplierCT || 1);
+            const units = diff * ct; // Actual Consumption
+            const rate = Number(t.ratePerUnit || 10.2);
+            const amount = units * rate;
+            const fixed = Number(t.fixedCharge || 0);
 
-                const transLoss = isLossDisabled ? 0 : (amount + fixed) * (Number(t.transformerLoss || 0) / 100);
-                const dgCharge = (t.connectedDG && t.connectedDG !== "None" && !isDgDisabled) ? (units * 1) : 0;
+            // Toggle logic for Loss & DG
+            const isLossDisabled = disabledLossIds.includes(t.tenantId);
+            const isDgDisabled = disabledDgIds.includes(t.tenantId);
 
-                const totalBill = amount + fixed + transLoss + dgCharge;
-                totalTenantUnitsSum += diff;
-                totalTenantAmountSum += totalBill;
-                return {
-                    ...t, units, amount, fixed, transLoss, dgCharge, totalBill, profit,
-                    isDgDisabled, isLossDisabled
-                };
-            }) : [];
+            const transLoss = isLossDisabled ? 0 : (amount + fixed) * (Number(t.transformerLoss || 0) / 100);
+            const dgCharge = (t.connectedDG && t.connectedDG !== "None" && !isDgDisabled) ? (units * 1) : 0;
 
-        const totalInputEnergy = Number(gridUnits) - Number(solarUnits) + Number(dgUnitsTotal);
+            const totalBill = amount + fixed + transLoss + dgCharge;
+
+            totalTenantUnitsSum += units; // ✅ Correction: Summing real units, not just diff
+            totalTenantAmountSum += totalBill;
+
+            return {
+                ...t, units, diff, amount, fixed, transLoss, dgCharge, totalBill,
+                isDgDisabled, isLossDisabled
+            };
+        }) : [];
+
+        const totalInputEnergy = Number(gridUnits) + Number(dgUnitsTotal); // Energy in
         const commonLoss = totalInputEnergy - totalTenantUnitsSum;
         const lossPercent = totalInputEnergy > 0 ? ((commonLoss / totalInputEnergy) * 100).toFixed(1) : 0;
         const profit = (totalTenantAmountSum - gridAmount).toFixed(1);
+
         return {
             gridUnits, gridAmount, gridFixedPrice, solarUnits, dgUnitsTotal,
             totalTenantUnitsSum, commonLoss, lossPercent, totalTenantAmountSum, calculatedTenants, profit
         };
-    }, [rawApiData, disabledDgIds, disabledLossIds]);
+    }, [rawApiData, disabledDgIds, disabledLossIds, gridAmount]);
 
 
     const toggleDgCharge = (tenantId) => {
@@ -146,22 +148,21 @@ useEffect(() => {
         setDisabledLossIds(prev => prev.includes(tenantId) ? prev.filter(id => id !== tenantId) : [...prev, tenantId]);
     };
 
+    // 🟢 UI CONDITION: Cache milte hi loading spinner hat jayega
     if (loading && !rawApiData) {
         return (
             <View style={styles.loaderContainer}>
                 <ActivityIndicator size="large" color="#333399" />  
-            <Text style={{marginTop: 10, color: '#666'}}>Loading Summary...</Text>
+                <Text style={{marginTop: 10, color: '#666'}}>Syncing Summary...</Text>
             </View>
         );
     }
 
-    const { gridUnits, gridAmount, gridFixedPrice, solarUnits, totalTenantUnitsSum, commonLoss, lossPercent, totalTenantAmountSum, calculatedTenants, profit } = processedData || {};
-
-
+    const { gridUnits, gridAmount, gridFixedPrice, solarUnits, totalTenantUnitsSum, commonLoss, lossPercent, totalTenantAmountSum, calculatedTenants, profit: calculatedProfit } = processedData || {};
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <StatusBar barStyle="light-content" />
+            <StatusBar barStyle="dark-content" />
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}><MaterialCommunityIcons name="arrow-left" size={26} color="#FFF" /></TouchableOpacity>
                 <View style={{ marginLeft: 15 }}>
@@ -170,33 +171,32 @@ useEffect(() => {
                 </View>
             </View>
 
-            <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }} refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchAllData} />}>
+            <ScrollView 
+                contentContainerStyle={{ padding: 16, paddingBottom: 100 }} 
+                refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchAllData} tintColor="#333399" />}
+            >
                 <View style={styles.mainCard}>
                     <Row label="Grid Units" value={gridUnits} icon="flash" color="#333399" />
-                    <Row label="Bill Amount" value={gridAmount} icon="currency-inr" color="#df1010ff" />
+                    <Row label="Bill Amount" value={gridAmount} icon="currency-inr" color="#df1010" />
                     <Row label="Fixed Charged" value={gridFixedPrice} icon="lock" color="#333399" />
-                    <Row label="Solar Sum" value={solarUnits} icon="solar-power" color="#D4B012" bold />
-                    <Row label="Tenant Total Units" value={totalTenantUnitsSum?.toFixed(1)} icon="account-group" color="#4F46E5" bold />
+                    <Row label="Solar Credit" value={solarUnits} icon="solar-power" color="#D4B012" bold />
+                    <Row label="User Unit Sum" value={totalTenantUnitsSum?.toFixed(1)} icon="account-group" color="#4F46E5" bold />
 
                     <View style={styles.darkDivider} />
                     <View style={styles.lossRow}>
-                        <View><Text style={styles.lossLabel}>System Loss</Text><Text style={styles.lossValue}>{commonLoss?.toFixed(1)} kWh</Text></View>
+                        <View><Text style={styles.lossLabel}>System Loss (Common)</Text><Text style={styles.lossValue}>{commonLoss?.toFixed(1)} kWh</Text></View>
                         <Text style={[styles.lossPercent, { color: lossPercent > 12 ? '#DC2626' : '#059669' }]}>{lossPercent}%</Text>
                     </View>
-                    <Row label="Tenant Total Amount" value={`₹ ${Math.round(totalTenantAmountSum || 0)}`} icon="account-group" color="#4F46E5" bold />
+                    
+                    <Row label="Collection Sum" value={`₹ ${Math.round(totalTenantAmountSum || 0)}`} icon="cash-multiple" color="#4F46E5" bold />
 
-                    <Row
-                        label="After Paying Bill Profit"
-                        value={`₹ ${Math.round(totalTenantAmountSum - gridAmount || 0)}`}
-                        icon=""
-                        color="#00b906f4"
-                        bold
-                        labelStyle={{ fontSize: 30, textDecorationLine: 'underline' }}
-                        valueStyle={{ fontSize: 30, fontWeight: 'bold', textDecorationLine: 'underline' }}
-                    />
+                    <View style={styles.profitBox}>
+                        <Text style={styles.profitLabelText}>MONTHLY PROFIT</Text>
+                        <Text style={styles.profitValueText}>₹ {Math.round(totalTenantAmountSum - gridAmount || 0)}</Text>
+                    </View>
                 </View>
 
-                <Text style={styles.sectionTitle}>Tenant Invoices</Text>
+                <Text style={styles.sectionTitle}>Tenant-wise Breakdown</Text>
 
                 {calculatedTenants?.map((item, index) => (
                     <View key={index} style={styles.tenantCard}>
@@ -235,7 +235,6 @@ useEffect(() => {
                     style={styles.btn}
                     onPress={() => {
                         if (!processedData) return Alert.alert("Error", "Data is still loading");
-
                         navigation.navigate('Statement', {
                             tenantBreakdown: processedData.calculatedTenants,
                             startDate: startDate.toISOString(),
@@ -255,14 +254,13 @@ useEffect(() => {
                     }}
                 >
                     <Text style={styles.btnText}>GENERATE FINAL INVOICES</Text>
-
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
     );
 };
 
-// --- Helper Components & Styles remain same as your code ---
+// ... Helper Components (Row, DetailItem, PriceItem)
 const Row = ({ label, value, color = '#111827', icon, bold }) => (
     <View style={styles.row}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -316,6 +314,9 @@ const styles = StyleSheet.create({
     lossLabel: { fontSize: 11, color: '#999', fontWeight: 'bold' },
     lossValue: { fontSize: 18, fontWeight: '900', color: '#333' },
     lossPercent: { fontSize: 18, fontWeight: 'bold' },
+    profitBox: { backgroundColor: '#F0FDF4', padding: 15, borderRadius: 15, alignItems: 'center', marginTop: 10, borderWidth: 1, borderColor: '#DCFCE7' },
+    profitLabelText: { fontSize: 10, fontWeight: 'bold', color: '#16A34A', letterSpacing: 1 },
+    profitValueText: { fontSize: 24, fontWeight: '900', color: '#16A34A', marginTop: 4 }
 });
 
 export default ReconciliationScreen;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { 
     View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, 
-    ActivityIndicator, Modal, RefreshControl, Alert 
+    ActivityIndicator, Modal, RefreshControl, Alert, StatusBar
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -10,12 +10,14 @@ import Toast from 'react-native-toast-message';
 import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // 🟢 Fix 1: Import added
 
 const DGScreen = () => {
     const { user } = useContext(UserContext);
     const companyId = user?._id || user?.id;
 
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true); // 🟢 Start as true
+    const [refreshing, setRefreshing] = useState(false); // 🟢 Fix 2: State added
     const [dgList, setDgList] = useState([]);
     const [selectedDG, setSelectedDG] = useState('');
     const [date, setDate] = useState(new Date());
@@ -26,11 +28,11 @@ const DGScreen = () => {
     const [dailyLogs, setDailyLogs] = useState([]);
     const [isAddModal, setIsAddModal] = useState(false);
     const [newDgName, setNewDgName] = useState('');
-    const adminId = user?._id || user?.id;
 
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     const monthName = date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
+    // 🔄 1. Load from Cache (Fast Start)
     const loadCache = useCallback(async () => {
         if (!companyId) return;
         try {
@@ -41,12 +43,13 @@ const DGScreen = () => {
                 setDgList(parsed.dgList || []);
                 setTotals(parsed.totals || []);
                 setDailyLogs(parsed.dailyLogs || []);
-                setLoading(false); // डेटा मिल गया तो लोडर हटा दो
+                setLoading(false); 
             }
         } catch (e) { console.log("Cache Load Error", e); }
     }, [companyId, monthKey]);
 
 
+    // 🌐 2. Load from Server
     const loadAll = useCallback(async () => {
         if (!companyId) return;
         try {
@@ -66,11 +69,13 @@ const DGScreen = () => {
             setTotals(freshData.totals || []);
             setDailyLogs(freshData.dailyLogs || []);
 
-            // ✅ 3. डेटा को लोकल स्टोरेज (Cache) में सेव करें
+            // Save to Cache
             const cacheKey = `dg_cache_${companyId}_${monthKey}`;
             await AsyncStorage.setItem(cacheKey, JSON.stringify(freshData));
 
-            if (resNames.data.length > 0 && !selectedDG) setSelectedDG(resNames.data[0].dgName);
+            if (resNames.data.length > 0 && !selectedDG) {
+                setSelectedDG(resNames.data[0].dgName);
+            }
         } catch (e) { 
             console.log("Load Error:", e.message); 
         } finally { 
@@ -78,10 +83,16 @@ const DGScreen = () => {
             setRefreshing(false); 
         }
     }, [companyId, monthKey, selectedDG]);
+
     useEffect(() => {
         loadCache(); 
         loadAll(); 
     }, [loadCache, loadAll]);
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        loadAll();
+    };
 
     const handleSave = async () => {
         if (!selectedDG || !units || !cost) return Toast.show({ type: 'error', text1: 'Fill all fields' });
@@ -102,52 +113,53 @@ const DGScreen = () => {
         } finally { setLoading(false); }
     };
 
-    // 🗑️ DELETE DAILY LOG entry logic
     const handleDeleteLog = (id) => {
-        Alert.alert("Delete Entry", "Are you sure you want to delete this log?", [
+        Alert.alert("Delete Entry", "Remove this daily log?", [
             { text: "Cancel", style: "cancel" },
             { text: "Delete", style: "destructive", onPress: async () => {
                 try {
-                    // API Call: Backend route se match hona chahiye
                     const res = await axios.delete(`${API_URL}/dg/delete-log/${id}`);
                     if (res.data.success) {
                         Toast.show({ type: 'success', text1: 'Deleted 🗑️' });
-                        loadAll(); // List refresh karein
+                        loadAll();
                     }
-                } catch (err) { 
-                    console.log("Delete Log Error:", err.response?.data || err.message);
-                    Toast.show({ type: 'error', text1: 'Delete failed' }); 
-                }
+                } catch (err) { Toast.show({ type: 'error', text1: 'Delete failed' }); }
             }}
         ]);
     };
 
-    // 🗑️ DELETE ENTIRE DG SET logic
     const handleDeleteDGSet = (id, name) => {
-        Alert.alert("Delete DG Set", `This will delete ${name} and ALL its history. Proceed?`, [
+        Alert.alert("Delete DG Set", `Delete ${name} and all its logs?`, [
             { text: "Cancel", style: "cancel" },
             { text: "Delete Everything", style: "destructive", onPress: async () => {
                 try {
                     const res = await axios.delete(`${API_URL}/dg/delete-set/${id}`);
                     if (res.data.success) {
                         Toast.show({ type: 'success', text1: `${name} removed` });
-                        setSelectedDG(''); // Selection clear karein
+                        setSelectedDG(''); 
                         loadAll();
                     }
-                } catch (err) { 
-                    console.log("Delete Set Error:", err.response?.data || err.message);
-                    Toast.show({ type: 'error', text1: 'Could not remove set' }); 
-                }
+                } catch (err) { Toast.show({ type: 'error', text1: 'Delete failed' }); }
             }}
         ]);
     };
+
     if (loading && dailyLogs.length === 0 && !refreshing) {
-        return <View style={styles.loader}><ActivityIndicator size="large" color="#333399" /></View>;
+        return (
+            <View style={styles.loader}>
+                <ActivityIndicator size="large" color="#333399" />
+                <Text style={{marginTop: 10, color: '#666'}}>Syncing DG Data...</Text>
+            </View>
+        );
     }
+
     return (
-        <SafeAreaView style={styles.container}>
-            <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={loading} onRefresh={loadAll} />}>
-                
+        <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
+            <StatusBar barStyle="dark-content" />
+            <ScrollView 
+                showsVerticalScrollIndicator={false} 
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#333399" />}
+            >
                 <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDatePicker(true)}>
                     <MaterialCommunityIcons name="calendar" size={22} color="#fff" />
                     <Text style={styles.dateText}>{date.toDateString()}</Text>
@@ -155,8 +167,10 @@ const DGScreen = () => {
                 {showDatePicker && (<DateTimePicker value={date} mode="date" onChange={(e, d) => { setShowDatePicker(false); if (d) setDate(d); }} />)}
 
                 <View style={styles.headerRow}>
-                    <Text style={styles.sectionLabel}>Select DG Unit (Long press to delete)</Text>
-                    <TouchableOpacity onPress={() => setIsAddModal(true)} style={styles.addBtn}><Text style={styles.addBtnText}>+ Add New</Text></TouchableOpacity>
+                    <Text style={styles.sectionLabel}>SELECT DG UNIT (LONG PRESS TO DELETE)</Text>
+                    <TouchableOpacity onPress={() => setIsAddModal(true)} style={styles.addBtn}>
+                        <Text style={styles.addBtnText}>+ Add New</Text>
+                    </TouchableOpacity>
                 </View>
 
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillRow}>
@@ -173,11 +187,23 @@ const DGScreen = () => {
                 </ScrollView>
 
                 <View style={styles.card}>
-                    <Text style={styles.cardHeader}>Entry for {selectedDG || '...'}</Text>
-                    <TextInput style={styles.input} placeholder="Units Produced (kWh)" 
-                    placeholderTextColor="#9E9E9E"
-                    keyboardType="numeric" value={units} onChangeText={setUnits} />
-                    <TextInput style={styles.input} placeholder="Fuel Cost (₹)" placeholderTextColor="#9E9E9E" keyboardType="numeric" value={cost} onChangeText={setCost} />
+                    <Text style={styles.cardHeader}>ENTRY FOR {selectedDG.toUpperCase() || '...'}</Text>
+                    <TextInput 
+                        style={styles.input} 
+                        placeholder="Units Produced (kWh)" 
+                        placeholderTextColor="#9E9E9E"
+                        keyboardType="numeric" 
+                        value={units} 
+                        onChangeText={setUnits} 
+                    />
+                    <TextInput 
+                        style={styles.input} 
+                        placeholder="Fuel Cost (₹)" 
+                        placeholderTextColor="#9E9E9E" 
+                        keyboardType="numeric" 
+                        value={cost} 
+                        onChangeText={setCost} 
+                    />
                     <TouchableOpacity style={styles.submitBtn} onPress={handleSave} disabled={loading}>
                         {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>SAVE DAILY DATA</Text>}
                     </TouchableOpacity>
@@ -185,7 +211,7 @@ const DGScreen = () => {
 
                 <Text style={styles.sectionTitle}>Daily Logs ({monthName})</Text>
                 {dailyLogs.length === 0 ? (
-                    <View style={styles.emptyBox}><Text style={styles.emptyText}>No logs found.</Text></View>
+                    <View style={styles.emptyBox}><Text style={styles.emptyText}>No logs found for this period.</Text></View>
                 ) : (
                     dailyLogs.map((log, index) => (
                         <View key={index} style={styles.historyCard}>
@@ -208,7 +234,6 @@ const DGScreen = () => {
                 <View style={{height: 100}} />
             </ScrollView>
 
-            {/* Register Modal */}
             <Modal visible={isAddModal} transparent animationType="fade">
                 <View style={styles.overlay}>
                     <View style={styles.modalContent}>
@@ -231,7 +256,7 @@ const DGScreen = () => {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f8f9fd', paddingHorizontal: 20 },
-    dateBtn: { backgroundColor: '#333399', flexDirection: 'row', padding: 15, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 30 },
+    dateBtn: { backgroundColor: '#333399', flexDirection: 'row', padding: 15, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 10 },
     dateText: { color: '#fff', fontWeight: 'bold', marginLeft: 10 },
     headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 25 },
     sectionLabel: { fontSize: 10, fontWeight: 'bold', color: '#AAA' },
@@ -241,7 +266,7 @@ const styles = StyleSheet.create({
     pill: { backgroundColor: '#fff', paddingHorizontal: 15, paddingVertical: 10, borderRadius: 12, marginRight: 10, elevation: 2, borderWidth: 1, borderColor: '#eee' },
     pillActive: { backgroundColor: '#333399', borderColor: '#333399' },
     card: { backgroundColor: '#fff', padding: 20, borderRadius: 20, elevation: 3 },
-    cardHeader: { fontSize: 12, fontWeight: 'bold', color: '#AAA', marginBottom: 15, textAlign: 'center' },
+    cardHeader: { fontSize: 10, fontWeight: 'bold', color: '#AAA', marginBottom: 15, textAlign: 'center' },
     input: { height: 50, backgroundColor: '#f9f9f9', borderRadius: 10, paddingHorizontal: 15, marginBottom: 12, borderBottomWidth: 1, borderColor: '#eee', color: '#000' },
     submitBtn: { backgroundColor: '#333399', padding: 18, borderRadius: 15, alignItems: 'center' },
     submitBtnText: { color: '#fff', fontWeight: 'bold' },

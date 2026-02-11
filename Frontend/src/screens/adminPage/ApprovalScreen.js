@@ -1,54 +1,59 @@
-import React, { useState, useEffect, useContext, useCallback } from 'react';
+import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import { 
   View, Text, StyleSheet, FlatList, TouchableOpacity, 
   Image, ActivityIndicator, Alert, RefreshControl, StatusBar 
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ApprovalScreen = () => {
   const { user } = useContext(UserContext);
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('pending');
 
   const adminId = user?._id || user?.id;
 
+  const cacheKey = `approval_${activeTab}_cache_${adminId}`;
+
   const loadCache = useCallback(async () => {
     if (!adminId) return;
     try {
-      const cacheKey = `approval_${activeTab}_cache_${adminId}`;
       const cachedData = await AsyncStorage.getItem(cacheKey);
       if (cachedData) {
         setData(JSON.parse(cachedData));
-        setLoading(false); // अगर कैश मिला, तो लोडर बंद करें
+        setLoading(false); 
       }
     } catch (e) {
       console.log("Cache Load Error:", e);
     }
-  }, [adminId, activeTab]);
+  }, [adminId, cacheKey]);
 
   const fetchData = useCallback(async () => {
     if (!adminId) return;
-    setLoading(true);
+    
+    if (data.length === 0) setLoading(true);
+
     try {
       const endpoint = activeTab === 'pending' ? 'pending' : 'history-all';
       const res = await axios.get(`${API_URL}/readings/${endpoint}/${adminId}`);
-      setData(res.data || []);
-      await AsyncStorage.setItem(cacheKey, JSON.stringify(res.data));
+      const freshData = res.data || [];
+      
+      setData(freshData);
+      await AsyncStorage.setItem(cacheKey, JSON.stringify(freshData));
     } catch (e) {
-      Toast.show({ type: 'error', text1: 'Error', text2: 'Could not load data' });
+      console.log("Fetch Error Approval:", e.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [adminId, activeTab]);
+  }, [adminId, activeTab, cacheKey, data.length]);
 
   useEffect(() => {
     loadCache(); 
@@ -66,28 +71,17 @@ const ApprovalScreen = () => {
     }
   };
 
-  // 🗑️ DELETE FUNCTION
   const handleDelete = (id) => {
-    Alert.alert(
-      "Delete Record",
-      "Are you sure you want to remove this record",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive", 
-          onPress: async () => {
-            try {
-              await axios.delete(`${API_URL}/readings/${id}`);
-              Toast.show({ type: 'success', text1: 'Deleted Successfully 🗑️' });
-              fetchData();
-            } catch (err) {
-              Alert.alert("Error", "Could not delete record.");
-            }
-          } 
-        }
-      ]
-    );
+    Alert.alert("Delete Record", "Remove this record?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: async () => {
+          try {
+            await axios.delete(`${API_URL}/readings/${id}`);
+            Toast.show({ type: 'success', text1: 'Deleted 🗑️' });
+            fetchData();
+          } catch (err) { Alert.alert("Error", "Could not delete"); }
+      }}
+    ]);
   };
 
   const renderItem = ({ item }) => (
@@ -95,8 +89,8 @@ const ApprovalScreen = () => {
       <View style={styles.cardHeader}>
         <View style={{ flex: 1 }}>
           <Text style={styles.tName}>{item.tenantId?.name || 'N/A'}</Text>
-          <Text style={styles.staffName}>Staff ID: {item.staffId || 'Unknown'}</Text>
-          <Text style={styles.dateText}>{new Date(item.createdAt).toLocaleDateString('en-GB')} • {new Date(item.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
+          <Text style={styles.staffName}>Staff: {item.staffId || 'Unknown'}</Text>
+          <Text style={styles.dateText}>{new Date(item.createdAt).toLocaleDateString('en-GB')}</Text>
         </View>
         <View style={styles.valBadge}>
            <Text style={styles.rValue}>{item.closingReading} kWh</Text>
@@ -119,17 +113,9 @@ const ApprovalScreen = () => {
       ) : (
         <View style={styles.historyActionRow}>
           <View style={[styles.statusBanner, { backgroundColor: item.status === 'Approved' ? '#E8F5E9' : '#FFEBEE' }]}>
-              <MaterialCommunityIcons 
-                  name={item.status === 'Approved' ? 'check-circle' : 'alert-circle'} 
-                  size={18} 
-                  color={item.status === 'Approved' ? '#4CAF50' : '#F44336'} 
-              />
-              <Text style={[styles.statusText, { color: item.status === 'Approved' ? '#2E7D32' : '#C62828' }]}>
-                  {item.status.toUpperCase()} 
-              </Text>
+              <MaterialCommunityIcons name={item.status === 'Approved' ? 'check-circle' : 'alert-circle'} size={18} color={item.status === 'Approved' ? '#4CAF50' : '#F44336'} />
+              <Text style={[styles.statusText, { color: item.status === 'Approved' ? '#2E7D32' : '#C62828' }]}>{item.status.toUpperCase()}</Text>
           </View>
-          
-          {/* DELETE BUTTON FOR HISTORY */}
           <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item._id)}>
              <MaterialCommunityIcons name="trash-can-outline" size={24} color="#FF5252" />
           </TouchableOpacity>
@@ -138,18 +124,18 @@ const ApprovalScreen = () => {
     </View>
   );
 
-
   if (loading && data.length === 0 && !refreshing) {
     return (
       <View style={styles.loadingBox}>
         <ActivityIndicator size="large" color="#333399" />
-        <Text style={{marginTop: 10, color: '#666'}}>Loading Records...</Text>
+        <Text style={{marginTop: 10, color: '#666'}}>Opening Center...</Text>
       </View>
     );
   }
+
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" />
       <View style={styles.blueHeader}>
         <View>
           <Text style={styles.headerTitle}>Review Center</Text>
@@ -159,47 +145,33 @@ const ApprovalScreen = () => {
       </View>
 
       <View style={styles.tabContainer}>
-        <TouchableOpacity 
-            style={[styles.tab, activeTab === 'pending' && styles.activeTab]} 
-            onPress={() => setActiveTab('pending')}
-        >
+        <TouchableOpacity style={[styles.tab, activeTab === 'pending' && styles.activeTab]} onPress={() => setActiveTab('pending')}>
           <Text style={[styles.tabText, activeTab === 'pending' && styles.activeTabText]}>Pending</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
-            style={[styles.tab, activeTab === 'history' && styles.activeTab]} 
-            onPress={() => setActiveTab('history')}
-        >
+        <TouchableOpacity style={[styles.tab, activeTab === 'history' && styles.activeTab]} onPress={() => setActiveTab('history')}>
           <Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]}>History</Text>
         </TouchableOpacity>
       </View>
-
-      {loading && !refreshing ? (
-        <ActivityIndicator size="large" color="#333399" style={{ marginTop: 50 }} />
-      ) : (
-        <FlatList 
-          data={data} 
-          keyExtractor={item => item._id}
-          renderItem={renderItem}
-          contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} />}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <MaterialCommunityIcons name="folder-open-outline" size={60} color="#CCC" />
-              <Text style={styles.emptyText}>No records found.</Text>
-            </View>
-          }
-        />
-      )}
+      <FlatList 
+        data={data} 
+        keyExtractor={item => item._id}
+        renderItem={renderItem}
+        contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} tintColor="#333399" />}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <MaterialCommunityIcons name="folder-open-outline" size={60} color="#CCC" />
+            <Text style={styles.emptyText}>No records found.</Text>
+          </View>
+        }
+      />
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8F9FE' },
-  blueHeader: { 
-    backgroundColor: '#333399', paddingHorizontal: 25, paddingTop: 50, paddingBottom: 20, 
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-  },
+  blueHeader: { backgroundColor: '#333399', paddingHorizontal: 25, paddingVertical: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerTitle: { color: 'white', fontSize: 24, fontWeight: 'bold' },
   headerSub: { color: 'rgba(255,255,255,0.7)', fontSize: 13 },
   tabContainer: { flexDirection: 'row', backgroundColor: '#333399', paddingBottom: 10 },
@@ -222,7 +194,7 @@ const styles = StyleSheet.create({
   historyActionRow: { flexDirection: 'row', alignItems: 'center', marginTop: 15, justifyContent: 'space-between' },
   statusBanner: { flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 12, flex: 1, marginRight: 10 },
   statusText: { marginLeft: 8, fontWeight: 'bold', fontSize: 12 },
-  deleteBtn: { backgroundColor: '#FFF0F0', padding: 10, borderRadius: 12, borderWidth: 1, borderColor: '#FFE0E0' },
+  deleteBtn: { backgroundColor: '#FFF0F0', padding: 10, borderRadius: 12 },
   emptyContainer: { alignItems: 'center', marginTop: 80 },
   emptyText: { textAlign: 'center', color: '#999', fontWeight: 'bold', marginTop: 10 },
   loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center' }

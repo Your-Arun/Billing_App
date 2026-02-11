@@ -48,26 +48,32 @@ const TenantsScreen = ({ navigation }) => {
 
   const fetchTenants = useCallback(async () => {
     if (!companyId) return;
-    setLoading(true);
+  
+    if (tenants.length === 0) {
+      setLoading(true);
+    }
+  
     try {
       const res = await axios.get(`${API_URL}/tenants/${companyId}`);
       setTenants(res.data);
       await AsyncStorage.setItem(`tenants_cache_${companyId}`, JSON.stringify(res.data));
-
+      
       if (selectedTenant) {
         const freshData = res.data.find(t => t._id === selectedTenant._id);
         if (freshData) setSelectedTenant(freshData);
       }
     } catch (e) { 
-      Toast.show({ type: 'error', text1: 'Connection Error', text2: 'Could not fetch list' });
+      if (tenants.length === 0) {
+        Toast.show({ type: 'error', text1: 'Connection Error', text2: 'Could not fetch list' });
+      }
     } finally { 
       setLoading(false); 
       setRefreshing(false); 
     }
-  }, [companyId, selectedTenant]);
+  }, [companyId, selectedTenant, tenants.length]); 
 
   useEffect(() => {
-    loadCache(); // तुरंत दिखाओ
+    loadCache();
   }, [loadCache]);
 
 const fetchDGs = useCallback(async () => {
@@ -163,7 +169,6 @@ useEffect(() => {
       { text: "Cancel" },
       { text: "Delete", style: "destructive", onPress: async () => {
           try {
-            console.log("Deleting Tenant ID:", id);
             const res = await axios.delete(`${API_URL}/tenants/${id}`);
             if (res.data) {
                 setDetailModalVisible(false);

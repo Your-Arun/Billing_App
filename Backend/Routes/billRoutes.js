@@ -6,6 +6,11 @@ const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const Bill = require('../Modals/Bill');
 const mongoose = require('mongoose');
 
+const pdfParse = require('pdf-parse');
+
+const storageMemory = multer.memoryStorage();
+const uploadMemory = multer({ storage: storageMemory });
+
 // Cloudinary Config
 cloudinary.config({
   cloud_name: process.env.cloud_name,
@@ -20,71 +25,45 @@ const storage = new CloudinaryStorage({
 });
 const upload = multer({ storage: storage });
 
-// Storage for Extraction (Memory)
-// const storageMemory = multer.memoryStorage();
-// const uploadMemory = multer({ storage: storageMemory });
+
+router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ msg: "File missing" });
+
+    const data = await pdfParse(req.file.buffer);
+    
+    // 1. Poore text ko saaf karein: Comma hatayein, New lines ko space banayein
+    let cleanText = data.text.replace(/,/g, '').replace(/\n/g, ' ').replace(/\s+/g, ' ');
+
+    // 🛠️ SMART SEARCH: Keyword ke baad aane wali numeric value dhundhna
+    const findNumericValue = (keyword) => {
+      // Yeh dhoondhega: Keyword -> 1 to 50 characters (kuch bhi) -> Number (123.45)
+      const regex = new RegExp(`${keyword}.{1,50}?\\b(\\d+\\.\\d+|\\d+)\\b`, 'i');
+      const match = cleanText.match(regex);
+      return (match && match[1]) ? match[1] : "0.00";
+    };
+
+    // AVVNL Bill Specific Keywords
+    const extractedData = {
+      units: findNumericValue("Net Billed Units"),
+      energy: findNumericValue("Energy Charges"),
+      fixed: findNumericValue("Fixed Charges"),
+      total: findNumericValue("Total Amount (S.No 11 to 17)") 
+    };
+
+    // Backup if Total Point 18 fails
+    if (extractedData.total === "0.00") {
+      extractedData.total = findNumericValue("Net Payable Amount");
+    }
+
+    res.json(extractedData);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: "Failed to read PDF format" });
+  }
+});
 
 
-// router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
-//   try {
-//     if (!req.file) return res.status(400).json({ msg: "No file uploaded" });
-
-//     let extractedText = "";
-
-//     // 1️⃣ अगर फाइल PDF है
-//     if (req.file.mimetype === 'application/pdf') {
-//       const data = await pdfParse(req.file.buffer);
-//       extractedText = data.text;
-//     } 
-//     // 2️⃣ अगर फाइल फोटो (Image) है - असली "Scan" यहीं होगा
-//     else {
-//       const result = await Tesseract.recognize(req.file.buffer, 'eng');
-//       extractedText = result.data.text;
-//     }
-
-//     // 🛠️ टेक्स्ट को साफ़ करें (कोमा हटाएं और सब एक लाइन में करें)
-//     let cleanText = extractedText.replace(/,/g, '').replace(/\n/g, ' ');
-
-//     // 🛠️ Smart Extraction Function
-//     const findValue = (keyword) => {
-//       // कीवर्ड के बाद 1 से 60 कैरेक्टर के अंदर जो भी नंबर मिले उसे उठा लो
-//       const regex = new RegExp(`${keyword}[\\s\\S]{1,60}?([\\d.]+)`, 'i');
-//       const match = cleanText.match(regex);
-//       return (match && match[1] && parseFloat(match[1]) > 0) ? match[1] : "0.00";
-//     };
-
-//     // 🔍 AVVNL स्पेसिफिक डेटा निकालें
-//     const results = {
-//       units: findValue("Net Billed Units"),
-//       energy: findValue("Energy Charges"),
-//       fixed: findValue("Fixed Charges"),
-//       duty: findValue("Electricity Duty"),
-//       wcc: findValue("Water Conservation"),
-//       uc: findValue("Urban Cess"),
-//       tcs: findValue("Tax collected at source"),
-//     };
-
-//     // 🧮 Taxes का जोड़ (Duty + WCC + UC + TCS)
-//     const totalTaxes = (
-//       parseFloat(results.duty) +
-//       parseFloat(results.wcc) +
-//       parseFloat(results.uc) +
-//       parseFloat(results.tcs)
-//     ).toFixed(2);
-
-//     res.json({
-//       units: results.units,
-//       energy: results.energy,
-//       fixed: results.fixed,
-//       taxes: totalTaxes,
-//       msg: "Scan Successful! ✅"
-//     });
-
-//   } catch (err) {
-//     console.error("OCR Error:", err.message);
-//     res.status(500).json({ msg: "Failed to scan image. Please enter manually." });
-//   }
-// });
 
 // 💾 SAVE RECORD ROUTE (Now un-commented and fixed)
 router.post('/add', upload.single('billFile'), async (req, res) => {
@@ -109,30 +88,6 @@ router.post('/add', upload.single('billFile'), async (req, res) => {
     }
 });
 
-
-// BAAKI ROUTES (Add/Delete/History)
-// router.post('/add', upload.single('billFile'), async (req, res) => {
-//     try {
-//       const { adminId, month, totalUnits, energyCharges, fixedCharges, taxes } = req.body;
-//       const total = Number(energyCharges) + Number(fixedCharges) + Number(taxes);
-  
-//       const newBill = new Bill({
-//         adminId: new mongoose.Types.ObjectId(adminId),
-//         month,
-//         totalUnits: Number(totalUnits),
-//         energyCharges: Number(energyCharges),
-//         fixedCharges: Number(fixedCharges),
-//         taxes: Number(taxes),
-//         totalAmount: total.toFixed(2),
-//         billUrl: req.file ? req.file.path : "" 
-//       });
-  
-//       await newBill.save();
-//       res.status(201).json(newBill);
-//     } catch (err) {
-//       res.status(400).json({ msg: err.message });
-//     }
-// });
 
 router.get('/history/:adminId', async (req, res) => {
     try {
