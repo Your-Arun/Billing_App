@@ -11,6 +11,7 @@ import TenantsScreen from '../screens/adminPage/TenantsScreen';
 
 import { UserContext } from '../services/UserContext';
 import API_URL from '../services/apiconfig';
+import { Platform } from 'react-native';
 
 const Tab = createBottomTabNavigator();
 
