@@ -28,41 +28,64 @@ const upload = multer({ storage: storage });
 
 router.post('/extract', uploadMemory.single('billFile'), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ msg: "File missing" });
+    if (!req.file) return res.status(400).json({ msg: "No file uploaded" });
 
-    const data = await pdfParse(req.file.buffer);
-    
-    // 1. Poore text ko saaf karein: Comma hatayein, New lines ko space banayein
-    let cleanText = data.text.replace(/,/g, '').replace(/\n/g, ' ').replace(/\s+/g, ' ');
+    const dataBuffer = req.file.buffer;
+    const data = await pdfParse(dataBuffer);
+    const text = data.text;
 
-    // 🛠️ SMART SEARCH: Keyword ke baad aane wali numeric value dhundhna
-    const findNumericValue = (keyword) => {
-      // Yeh dhoondhega: Keyword -> 1 to 50 characters (kuch bhi) -> Number (123.45)
-      const regex = new RegExp(`${keyword}.{1,50}?\\b(\\d+\\.\\d+|\\d+)\\b`, 'i');
-      const match = cleanText.match(regex);
-      return (match && match[1]) ? match[1] : "0.00";
+    // 🛠️ Helper: पूरी संख्या को बिना किसी डिजिट को छोड़े निकालना
+    const getVal = (keyword) => {
+      // यह Regex कीवर्ड ढूंढेगा, फिर बीच के गैप को पार करेगा, 
+      // और फिर पूरी संख्या (चाहे कितनी भी बड़ी हो) को पकड़ेगा।
+      const regex = new RegExp(`${keyword}[\\s\\S]*?(\\d[\\d,.]*\\.\\d{2})`, 'i');
+      const match = text.match(regex);
+      
+      if (match && match[1]) {
+        // कोमा हटाएं और शुद्ध नंबर दें
+        return match[1].replace(/,/g, '').trim();
+      }
+      return "0.00";
     };
 
-    // AVVNL Bill Specific Keywords
-    const extractedData = {
-      units: findNumericValue("Net Billed Units"),
-      energy: findNumericValue("Energy Charges"),
-      fixed: findNumericValue("Fixed Charges"),
-      total: findNumericValue("Total Amount (S.No 11 to 17)") 
+    // 🔍 सटीक मैपिंग (AVVNL बिल के हिसाब से)
+    const points = {
+      // Net Billed Units के लिए अलग पैटर्न (क्योंकि इसमें .00 नहीं हो सकता)
+      units: (text.match(/Net\s+Billed\s+Units\s+([\d,.]+)/i)?.[1] || "0.00").replace(/,/g, ''),
+      
+      p1_energy: getVal("Energy Charges"),
+      p2_fixed: getVal("Fixed Charges"),
+      p3_fuel: getVal("Fuel Surcharge"),
+      p4_demand: getVal("Demand surcharge"),
+      p12_duty: getVal("Electricity Duty"),
+      p13_wcc: getVal("Water Conservation Cess"),
+      p14_uc: getVal("Urban Cess"),
+      p16_tcs: getVal("Tax collected at source"),
+      p18_total: getVal("Total Amount \\(S\\.No 11 to 17\\)")
     };
 
-    // Backup if Total Point 18 fails
-    if (extractedData.total === "0.00") {
-      extractedData.total = findNumericValue("Net Payable Amount");
-    }
+    // 🧮 Taxes का जोड़ (12+13+14+16)
+    const taxesCalc = (
+      parseFloat(points.p12_duty || 0) +
+      parseFloat(points.p13_wcc || 0) +
+      parseFloat(points.p14_uc || 0) +
+      parseFloat(points.p16_tcs || 0)
+    ).toFixed(2);
 
-    res.json(extractedData);
+    res.json({
+      units: points.units,
+      energy: points.p1_energy,
+      fixed: points.p2_fixed,
+      taxes: taxesCalc,
+      total: points.p18_total,
+      all_points: points // फॉर वेरिफिकेशन
+    });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: "Failed to read PDF format" });
+    console.error("Extraction Error:", err.message);
+    res.status(500).json({ msg: "PDF extraction failed" });
   }
 });
-
 
 
 // 💾 SAVE RECORD ROUTE (Now un-commented and fixed)

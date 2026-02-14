@@ -19,14 +19,11 @@ const TabNavigator = () => {
   const [pendingCount, setPendingCount] = useState(null);
 
   const adminId = user?._id || user?.id;
-
-  // Pending Count fetch करने का फंक्शन
   const fetchPendingCount = async () => {
     if (!adminId) return;
     try {
       const res = await axios.get(`${API_URL}/readings/pending/${adminId}`);
       const count = res.data?.length;
-      // अगर count 0 है तो badge नहीं दिखाएंगे (null रखेंगे)
       setPendingCount(count > 0 ? count : null);
     } catch (e) {
       console.log("Badge Fetch Error:", e.message);
@@ -35,8 +32,6 @@ const TabNavigator = () => {
 
   useEffect(() => {
     fetchPendingCount();
-    
-    // हर 10 सेकंड में ऑटो-अपडेट करने के लिए (Optional)
     const interval = setInterval(fetchPendingCount, 10000);
     return () => clearInterval(interval);
   }, [adminId]);
@@ -47,13 +42,22 @@ const TabNavigator = () => {
         headerShown: false, 
         tabBarActiveTintColor: '#333399',
         tabBarInactiveTintColor: 'gray',
+        tabBarHideOnKeyboard: true, 
         tabBarStyle: { 
-          height: 60, 
-          paddingBottom: 8,
-          borderTopLeftRadius: 20,
-          borderTopRightRadius: 20,
+          paddingBottom: Platform.OS === 'ios' ? 25 : 10, 
+          paddingTop: 10,
+          height: Platform.OS === 'ios' ? 85 : 70, 
+          borderTopLeftRadius: 25,
+          borderTopRightRadius: 25,
           backgroundColor: '#fff',
-          elevation: 10
+          elevation: 20,
+          position: 'absolute', 
+          borderTopWidth: 0,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: 'bold',
+          marginBottom: 5,
         },
         tabBarIcon: ({ color, size }) => {
           let iconName;
