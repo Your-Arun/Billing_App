@@ -75,12 +75,11 @@ const TabNavigator = () => {
       <Tab.Screen name="Home" component={Dashboard} />
       <Tab.Screen name="Readings" component={ReadingsScreen} />
       
-      {/* Approval Tab में Badge जोड़ा गया है */}
       <Tab.Screen 
         name="Approval" 
         component={ApprovalScreen} 
         options={{
-          tabBarBadge: pendingCount, // यहाँ count दिखेगा
+          tabBarBadge: pendingCount, 
           tabBarBadgeStyle: { backgroundColor: '#FF5252', color: 'white' }
         }}
       />

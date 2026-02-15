@@ -151,7 +151,6 @@ const Dashboard = ({ navigation }) => {
         </View>
       </View>
 
-      {/* 🟢 SCROLLABLE CONTENT */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchDashboardData(); }} tintColor="#333399" />}
@@ -243,7 +242,6 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#1E293B', marginVertical: 15, marginLeft: 5 },
   chartCard: { backgroundColor: '#FFF', padding: 5, borderRadius: 24, elevation: 3 },
   
-  // 🟢 Premium Horizontal Menu Styles
   horizontalMenu: { paddingLeft: 5, paddingRight: 20, paddingVertical: 10 },
   menuCard: {
     backgroundColor: '#FFF',
