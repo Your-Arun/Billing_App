@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions,
-  ActivityIndicator, RefreshControl, StatusBar
+  ActivityIndicator, RefreshControl, StatusBar, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -16,12 +16,22 @@ import { useFocusEffect } from '@react-navigation/native';
 const { width } = Dimensions.get('window');
 
 const chartConfig = {
+  backgroundColor: "#FFF",
   backgroundGradientFrom: "#FFF",
   backgroundGradientTo: "#FFF",
   decimalPlaces: 0,
-  color: (opacity = 1) => `rgba(51, 51, 153, ${opacity})`,
+  color: (opacity = 1) => `rgba(51, 51, 153, ${opacity})`, 
   labelColor: (opacity = 1) => `rgba(100, 116, 139, ${opacity})`,
-  propsForDots: { r: "5", strokeWidth: "2", stroke: "#333399" }
+  style: { borderRadius: 20 },
+  propsForDots: { r: "5", strokeWidth: "2", stroke: "#333399" },
+  propsForLabels: { fontSize: 10, fontWeight: '600' },
+  fillShadowGradient: "#333399",
+  fillShadowGradientOpacity: 0.1,
+  useShadowColorFromDataset: false,
+  propsForBackgroundLines: {
+    strokeDasharray: "", // सॉलिड लाइन्स
+    stroke: "#F1F5F9",   // बहुत हल्की ग्रिड लाइन्स
+  }
 };
 
 const Dashboard = ({ navigation }) => {
@@ -96,7 +106,6 @@ const Dashboard = ({ navigation }) => {
   useEffect(() => { loadCache(); }, [loadCache]);
   useFocusEffect(useCallback(() => { fetchDashboardData(); }, [fetchDashboardData]));
 
-  // 🛠️ Management Menu Icons Configuration
   const navIcons = [
     { name: 'Monthly', icon: 'calendar-month', route: 'MonthlyBilling', color: '#1E293B' },
     { name: 'Analyze', icon: 'chart-box', route: 'Reconciliation', color: '#8B5CF6' },
@@ -115,7 +124,6 @@ const Dashboard = ({ navigation }) => {
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <StatusBar barStyle="light-content" />
 
-      {/* 🟢 FIXED HEADER */}
       <View style={styles.fixedHeader}>
         <View style={styles.header}>
           <View style={styles.headerTop}>
@@ -153,6 +161,7 @@ const Dashboard = ({ navigation }) => {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchDashboardData(); }} tintColor="#333399" />}
       >
         <View style={styles.scrollSpacer} />
@@ -169,6 +178,7 @@ const Dashboard = ({ navigation }) => {
             horizontal 
             showsHorizontalScrollIndicator={false} 
             contentContainerStyle={styles.horizontalMenu}
+            decelerationRate="fast"
           >
             {navIcons.map((item, index) => (
               <TouchableOpacity 
@@ -192,15 +202,18 @@ const Dashboard = ({ navigation }) => {
           <View style={styles.chartCard}>
             <LineChart
               data={{ labels: data.chartLabels, datasets: [{ data: data.chartData }] }}
-              width={width - 40}
+              width={width - 50} 
               height={180}
               chartConfig={chartConfig}
               bezier
-              style={{ borderRadius: 16 }}
+              style={styles.chartStyle}
+              withVerticalLines={false} 
+              yAxisLabel="₹"
+              fromZero={true}
             />
           </View>
         </View>
-        <View style={{ height: 40 }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
 
       <UserProfile visible={profileVisible} onClose={() => setProfileVisible(false)} />
@@ -234,13 +247,30 @@ const styles = StyleSheet.create({
   profitSubRow: { flexDirection: 'row', marginTop: 3 },
   profitSub: { fontSize: 10, color: '#16A34A', fontWeight: 'bold' },
   profitIconBox: { padding: 12, borderRadius: 15 },
-  content: { paddingHorizontal: 20, marginTop: 10 },
+  content: { paddingHorizontal: 20, marginTop: 1 },
   statsGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 25 },
   miniStatCard: { backgroundColor: '#FFF', width: '31%', padding: 15, borderRadius: 20, alignItems: 'center', elevation: 2 },
   miniStatValue: { fontSize: 16, fontWeight: 'bold', color: '#1E293B', marginTop: 5 },
   miniStatLabel: { fontSize: 10, color: '#94A3B8', fontWeight: 'bold' },
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#1E293B', marginVertical: 15, marginLeft: 5 },
-  chartCard: { backgroundColor: '#FFF', padding: 5, borderRadius: 24, elevation: 3 },
+  
+  chartCard: { 
+    backgroundColor: '#FFF', 
+    borderRadius: 24, 
+    paddingRight: 10,
+    paddingLeft: 10,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    alignItems: 'center',
+    overflow: 'hidden'
+  },
+  chartStyle: {
+    marginVertical: 8,
+    borderRadius: 16,
+    paddingRight: 45
+  },
   
   horizontalMenu: { paddingLeft: 5, paddingRight: 20, paddingVertical: 10 },
   menuCard: {
@@ -251,7 +281,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 15,
-    // Modern shadow
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,

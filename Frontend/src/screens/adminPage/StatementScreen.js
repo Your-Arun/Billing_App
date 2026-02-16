@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import axios from 'axios';
 import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
     tName: { fontSize: 15, fontWeight: 'bold', color: '#1A1C3D' },
     hName: { fontSize: 15, fontWeight: 'bold', color: '#1F2937' },
     tSub: { fontSize: 12, color: '#6B7280', marginTop: 4 },
-    dateTag: { backgroundColor: '#bbbecdff', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, marginLeft: 8 },
+    dateTag: { backgroundColor: '#bbbecdff', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, marginLeft: 8, marginRight:100 },
     dateTagText: { fontSize: 9, fontWeight: 'bold', color: '#333399' },
     actionRow: { flexDirection: 'row', gap: 5 },
     iconBtn: { padding: 10, borderRadius: 12, backgroundColor: '#F0F2FF' },

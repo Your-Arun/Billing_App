@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
   headerTitle: { color: 'white', fontSize: 20, fontWeight: 'bold' },
   headerSub: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 5, alignItems: 'center', alignContent: 'center', textAlign: 'center' },
   mainContent: { padding: 20 },
-  formCard: { backgroundColor: 'white', borderRadius: 20, padding: 15, marginTop: -30, elevation: 5 },
+  formCard: { backgroundColor: 'white', borderRadius: 20, padding: 15, marginTop: -10, elevation: 5 },
   uploadBox: { backgroundColor: '#F0F2FF', borderStyle: 'dashed', borderWidth: 1.5, borderColor: '#333399', borderRadius: 15, padding: 20, alignItems: 'center', marginBottom: 15 },
   uploadBoxActive: { borderColor: '#16A34A', backgroundColor: '#F0FDF4' },
   uploadText: { color: '#333399', fontWeight: 'bold', fontSize: 12, marginTop: 8 },
