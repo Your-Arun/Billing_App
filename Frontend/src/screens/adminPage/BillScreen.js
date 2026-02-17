@@ -12,7 +12,7 @@ import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
 const BillScreen = ({ navigation }) => {
@@ -30,7 +30,6 @@ const BillScreen = ({ navigation }) => {
 
   const monthName = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
-  // 🔄 1. Load Cache
   const loadCache = useCallback(async () => {
     if (!adminId) return;
     try {
@@ -42,7 +41,6 @@ const BillScreen = ({ navigation }) => {
     } catch (e) { console.log("Cache Error", e); }
   }, [adminId]);
 
-  // 🌐 2. Fetch History
   const fetchHistory = useCallback(async () => {
     if (!adminId) return;
     try {
@@ -56,7 +54,6 @@ const BillScreen = ({ navigation }) => {
 
   useEffect(() => { loadCache(); fetchHistory(); }, [loadCache, fetchHistory]);
 
-  // 🪄 3. Auto Extract
   const handleAutoExtract = async (selectedFile) => {
     setExtracting(true);
     try {
@@ -93,7 +90,6 @@ const BillScreen = ({ navigation }) => {
     } catch (err) { console.log("Picker Error"); }
   };
 
-  // 💾 4. Save Logic
   const handleSaveBill = async () => {
     if (!form.units || !form.total || !file) {
       return Toast.show({ type: 'error', text1: 'Missing Fields' });
@@ -123,19 +119,6 @@ const BillScreen = ({ navigation }) => {
     finally { setSaving(false); }
   };
 
-  // 📥 5. Download Logic
-  const handleDownload = async (url, month, id) => {
-    if (!url) return;
-    setDownloadingId(id);
-    try {
-      const fileName = `Bill_${month.replace(/\s+/g, '_')}.pdf`;
-      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
-      const downloadRes = await FileSystem.downloadAsync(url, fileUri);
-      await Sharing.shareAsync(downloadRes.uri);
-    } finally { setDownloadingId(null); }
-  };
-
-  // 🗑️ 6. DELETE Logic
   const handleDelete = (id) => {
     Alert.alert("Delete Record", "Permanently remove this bill?", [
       { text: "Cancel", style: "cancel" },
@@ -161,7 +144,7 @@ const BillScreen = ({ navigation }) => {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <TouchableOpacity onPress={() => navigation.goBack()}><MaterialCommunityIcons name="chevron-left" size={32} color="#FFF" /></TouchableOpacity>
-          <Text style={styles.headerTitle}>Main Grid Bill</Text>
+          <Text style={styles.headerTitle}>Grid Billing</Text>
           <TouchableOpacity onPress={() => { setRefreshing(true); fetchHistory(); }}><MaterialCommunityIcons name="refresh" size={24} color="#FFF" /></TouchableOpacity>
         </View>
         <Text style={styles.headerSub}>Verify & sync monthly source records</Text>
@@ -176,19 +159,59 @@ const BillScreen = ({ navigation }) => {
             <View style={styles.mainContent}>
               <View style={styles.formCard}>
                 <TouchableOpacity style={[styles.uploadBox, file && styles.uploadBoxActive]} onPress={pickDocument} disabled={extracting}>
-                  {extracting ? <ActivityIndicator size="large" color="#333399" /> :
+                  {extracting ? <ActivityIndicator color="#333399" /> :
                     <><MaterialCommunityIcons name={file ? "file-check" : "file-pdf-box"} size={35} color={file ? "#16A34A" : "#333399"} />
                       <Text style={[styles.uploadText, file && { color: '#16A34A' }]}>{file ? file.name : "Select Official Bill PDF"}</Text></>}
                 </TouchableOpacity>
 
                 <View style={styles.inputContainer}>
                   <View style={styles.row}>
-                    <View style={styles.inputBlock}><Text style={styles.label}>Units</Text><TextInput style={styles.input} keyboardType="numeric" value={form.units} onChangeText={(t) => setForm({ ...form, units: t })} placeholder="0.00" /></View>
-                    <View style={styles.inputBlock}><Text style={styles.label}>Energy (₹)</Text><TextInput style={styles.input} keyboardType="numeric" value={form.energy} onChangeText={(t) => setForm({ ...form, energy: t })} placeholder="₹" /></View>
+                    <View style={styles.inputBlock}>
+                        <Text style={styles.label}>Units</Text>
+                        <TextInput 
+                            style={styles.input} 
+                            keyboardType="numeric" 
+                            value={form.units} 
+                            onChangeText={(t) => setForm({ ...form, units: t })} 
+                            placeholder="0.00" 
+                            placeholderTextColor="#9E9E9E" // 🟢 Fixed: Gray color for APK
+                        />
+                    </View>
+                    <View style={styles.inputBlock}>
+                        <Text style={styles.label}>Energy (₹)</Text>
+                        <TextInput 
+                            style={styles.input} 
+                            keyboardType="numeric" 
+                            value={form.energy} 
+                            onChangeText={(t) => setForm({ ...form, energy: t })} 
+                            placeholder="₹ 0.00" 
+                            placeholderTextColor="#9E9E9E" // 🟢 Fixed
+                        />
+                    </View>
                   </View>
                   <View style={styles.row}>
-                    <View style={styles.inputBlock}><Text style={styles.label}>Fixed (₹)</Text><TextInput style={styles.input} keyboardType="numeric" value={form.fixed} onChangeText={(t) => setForm({ ...form, fixed: t })} placeholder="₹" /></View>
-                    <View style={styles.inputBlock}><Text style={styles.label}>Total (₹)</Text><TextInput style={[styles.input, styles.boldInput]} keyboardType="numeric" value={form.total} onChangeText={(t) => setForm({ ...form, total: t })} placeholder="₹" /></View>
+                    <View style={styles.inputBlock}>
+                        <Text style={styles.label}>Fixed (₹)</Text>
+                        <TextInput 
+                            style={styles.input} 
+                            keyboardType="numeric" 
+                            value={form.fixed} 
+                            onChangeText={(t) => setForm({ ...form, fixed: t })} 
+                            placeholder="₹ 0.00" 
+                            placeholderTextColor="#9E9E9E" // 🟢 Fixed
+                        />
+                    </View>
+                    <View style={styles.inputBlock}>
+                        <Text style={styles.label}>Total (₹)</Text>
+                        <TextInput 
+                            style={[styles.input, styles.boldInput]} 
+                            keyboardType="numeric" 
+                            value={form.total} 
+                            onChangeText={(t) => setForm({ ...form, total: t })} 
+                            placeholder="₹ 0.00" 
+                            placeholderTextColor="#9E9E9E" // 🟢 Fixed
+                        />
+                    </View>
                   </View>
                 </View>
 
@@ -210,9 +233,6 @@ const BillScreen = ({ navigation }) => {
                 <Text style={styles.hUnits}>{item.totalUnits} Units</Text>
               </View>
               <View style={styles.actionRow}>
-                {/* <TouchableOpacity onPress={() => handleDownload(item.billUrl, item.month, item._id)} style={styles.iconBtn}>
-                  {downloadingId === item._id ? <ActivityIndicator size="small" color="#16A34A" /> : <MaterialCommunityIcons name="download-outline" size={24} color="#16A34A" />}
-                </TouchableOpacity> */}
                 <TouchableOpacity onPress={() => handleDelete(item._id)} style={styles.iconBtn}>
                   <MaterialCommunityIcons name="trash-can-outline" size={24} color="#EF4444" />
                 </TouchableOpacity>
@@ -231,7 +251,7 @@ const styles = StyleSheet.create({
   header: { backgroundColor: '#333399', padding: 20, paddingBottom: 40, borderBottomLeftRadius: 30, borderBottomRightRadius: 30 },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerTitle: { color: 'white', fontSize: 20, fontWeight: 'bold' },
-  headerSub: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 5, alignItems: 'center', alignContent: 'center', textAlign: 'center' },
+  headerSub: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 5, textAlign: 'center' },
   mainContent: { padding: 20 },
   formCard: { backgroundColor: 'white', borderRadius: 20, padding: 15, marginTop: -10, elevation: 5 },
   uploadBox: { backgroundColor: '#F0F2FF', borderStyle: 'dashed', borderWidth: 1.5, borderColor: '#333399', borderRadius: 15, padding: 20, alignItems: 'center', marginBottom: 15 },
@@ -240,7 +260,14 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 10, marginBottom: 10 },
   inputBlock: { flex: 1 },
   label: { fontSize: 11, fontWeight: 'bold', color: '#94A3B8', marginBottom: 4 },
-  input: { backgroundColor: '#F1F5F9', padding: 10, borderRadius: 10, fontWeight: 'bold', color: '#333' },
+  input: { 
+    backgroundColor: '#F1F5F9', 
+    padding: 10, 
+    borderRadius: 10, 
+    fontWeight: 'bold', 
+    color: '#000000', // 🟢 Fixed: Force Black color for typed text
+    height: 45
+  },
   boldInput: { color: '#333399', borderBottomWidth: 1, borderBottomColor: '#333399' },
   submitBtn: { backgroundColor: '#333399', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 10 },
   submitText: { color: 'white', fontWeight: 'bold' },
@@ -249,7 +276,7 @@ const styles = StyleSheet.create({
   monthBadge: { backgroundColor: '#333399', padding: 8, borderRadius: 12, width: 50, alignItems: 'center' },
   mText: { color: '#FFF', fontSize: 11, fontWeight: 'bold', textTransform: 'uppercase' },
   yText: { color: 'rgba(255,255,255,0.6)', fontSize: 8, fontWeight: 'bold' },
-  hAmt: { fontSize: 15, fontWeight: 'bold' },
+  hAmt: { fontSize: 15, fontWeight: 'bold', color: '#000' },
   hUnits: { fontSize: 11, color: '#64748B' },
   actionRow: { flexDirection: 'row', gap: 10 },
   iconBtn: { padding: 5 },

@@ -6,6 +6,11 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
+    "androidStatusBar": {
+      "barStyle": "light-content",
+      "backgroundColor": "#333399",
+      "translucent": false
+    },
     "android": {
       "package": "com.urarun0211.frontend",
       "adaptiveIcon": {

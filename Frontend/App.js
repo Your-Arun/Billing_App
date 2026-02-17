@@ -6,11 +6,17 @@ import AppNavigator from './src/navigation/AppNavigator';
 import Toast from 'react-native-toast-message';
 import { UserProvider } from './src/services/UserContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StatusBar, View, Platform } from 'react-native'; 
 
 function App() {
   return (
     <>
       <SafeAreaProvider>
+      <StatusBar 
+        barStyle="light-content"
+        backgroundColor="#333399"
+        translucent={false}    
+      />
         <UserProvider>
           <NavigationContainer>
             <AppNavigator />

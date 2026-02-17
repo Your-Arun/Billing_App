@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
-  ActivityIndicator, Modal, RefreshControl, Platform, StatusBar
+  ActivityIndicator, Modal, RefreshControl, Platform, StatusBar, TextInput
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -11,24 +11,21 @@ import API_URL from '../../services/apiconfig';
 import * as FileSystem from 'expo-file-system'; 
 import * as Sharing from 'expo-sharing'; 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ReadingsScreen = () => {
   const { user } = useContext(UserContext);
   const adminId = user?._id || user?.id;
 
   const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true); // 🟢 Start with true
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showModal, setShowModal] = useState(false);
 
-  // Date states for Export
   const [fromDate, setFromDate] = useState(new Date());
   const [toDate, setToDate] = useState(new Date());
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker] = useState(false);
 
-  // 🔄 1. Load Cache (Instant Data)
   const loadCache = useCallback(async () => {
     if (!adminId) return;
     try {
@@ -37,19 +34,15 @@ const ReadingsScreen = () => {
         setLogs(JSON.parse(cachedData));
         setLoading(false); 
       }
-    } catch (e) {
-      console.log("Cache Load Error", e);
-    }
+    } catch (e) { console.log("Cache Load Error", e); }
   }, [adminId]);
 
-  // 🌐 2. Fetch from Server
   const fetchLogs = useCallback(async () => {
     if (!adminId) return;
     try {
       const res = await axios.get(`${API_URL}/readings/all/${adminId}`);
       const freshData = res.data || [];
       setLogs(freshData);
-      // Cache update karein
       await AsyncStorage.setItem(`readings_cache_${adminId}`, JSON.stringify(freshData));
     } catch (e) {
       console.log('Fetch error:', e.message);
@@ -72,155 +65,181 @@ const ReadingsScreen = () => {
   const exportExcel = async () => {
     setShowModal(false);
     const url = `${API_URL}/readings/export/${adminId}?from=${fromDate.toISOString()}&to=${toDate.toISOString()}`;
-
     try {
       if (Platform.OS === 'web') {
         window.open(url, '_blank');
         return;
       }
-
-      const fileUri = `${FileSystem.documentDirectory}Meter_Readings_${Date.now()}.xlsx`;
+      const fileUri = `${FileSystem.cacheDirectory}Readings_${Date.now()}.xlsx`;
       const result = await FileSystem.downloadAsync(url, fileUri);
-
-      if (result.status === 200) {
-        await Sharing.shareAsync(result.uri);
-      }
-    } catch (e) {
-      console.log('Export error:', e);
-    }
+      if (result.status === 200) await Sharing.shareAsync(result.uri);
+    } catch (e) { console.log('Export error:', e); }
   };
 
   const renderRow = ({ item }) => {
     const d = new Date(item.createdAt);
     return (
       <View style={styles.card}>
-        <View style={styles.cardTop}>
-          <Text style={styles.tenant}>{item.tenantId?.name || 'Deleted Tenant'}</Text>
-          <Text style={styles.date}>
-            {d.toLocaleDateString('en-GB')} · {d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
-        </View>
-        <View style={styles.cardBottom}>
-          <View>
-            <Text style={styles.reading}>{item.closingReading} kWh</Text>
-            <Text style={styles.staff}>Entered by {item.staffId || 'Admin'}</Text>
+        <View style={styles.cardAccent} />
+        <View style={styles.cardMain}>
+          <View style={styles.cardHeader}>
+            <View style={styles.tenantInfo}>
+              <MaterialCommunityIcons name="storefront-outline" size={18} color="#333399" />
+              <Text style={styles.tenantName}>{item.tenantId?.name || 'Unknown'}</Text>
+            </View>
+            <View style={styles.dateBadge}>
+              <Text style={styles.dateText}>{d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</Text>
+            </View>
           </View>
-          <MaterialCommunityIcons name="flash" size={26} color="#4F46E5" />
+          <View style={styles.readingContainer}>
+            <View>
+              <Text style={styles.readingValue}>{item.closingReading}</Text>
+              <Text style={styles.unitText}>kWh Total Reading</Text>
+            </View>
+            <View style={styles.staffPill}>
+              <MaterialCommunityIcons name="account-hard-hat" size={12} color="#64748B" />
+              <Text style={styles.staffText}>{item.staffId || 'Admin'}</Text>
+            </View>
+          </View>
+          <View style={styles.timeRow}>
+             <MaterialCommunityIcons name="clock-outline" size={12} color="#94A3B8" />
+             <Text style={styles.timeText}>{d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+             <View style={styles.dot} />
+             <Text style={styles.meterText}>Meter: {item.tenantId?.meterId || 'N/A'}</Text>
+          </View>
         </View>
       </View>
     );
   };
 
-  // 🟢 FIXED: Loading indicator moved here (Main return se pehle)
   if (loading && logs.length === 0 && !refreshing) {
     return (
-      <View style={styles.loaderContainer}>
+      <View style={styles.center}>
         <ActivityIndicator size="large" color="#333399" />
-        <Text style={{ marginTop: 10, color: '#666' }}>Fetching Readings...</Text>
+        <Text style={styles.loadingText}>Loading history...</Text>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
-      <StatusBar barStyle="light-content" />
+    <View style={styles.container}>
+      {/* 🔴 STATUS BAR FIX */}
+      <StatusBar barStyle="light-content" backgroundColor="#333399" translucent={false} />
       
-      {/* HEADER */}
+      {/* 🟦 HEADER WITH MANUAL PADDING */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Meter Readings</Text>
-          <Text style={styles.subtitle}>{logs.length} Records found</Text>
+          <Text style={styles.title}>History Log</Text>
+          <Text style={styles.subtitle}>{logs.length} Records collected</Text>
         </View>
 
         <TouchableOpacity style={styles.excelBtn} onPress={() => setShowModal(true)}>
-          <MaterialCommunityIcons name="microsoft-excel" size={22} color="#1D6F42" />
+          <MaterialCommunityIcons name="file-excel-outline" size={20} color="#FFF" />
           <Text style={styles.excelText}>Export</Text>
         </TouchableOpacity>
       </View>
 
-      {/* LIST */}
       <FlatList
         data={logs}
         keyExtractor={(item) => item._id}
         renderItem={renderRow}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFF" />}
-        contentContainerStyle={{ paddingBottom: 20 }}
-        ListEmptyComponent={<Text style={styles.emptyText}>No readings found.</Text>}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#333399" />}
+        contentContainerStyle={{ padding: 16, paddingBottom: 50 }}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.center}>
+            <MaterialCommunityIcons name="database-off-outline" size={50} color="#CBD5E1" />
+            <Text style={styles.emptyText}>No readings found.</Text>
+          </View>
+        }
       />
 
-      {/* EXPORT MODAL */}
       <Modal visible={showModal} transparent animationType="slide">
-        <View style={styles.sheetBg}>
-          <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>Export Excel Report</Text>
-
-            <TouchableOpacity style={styles.dateBtn} onPress={() => setShowFromPicker(true)}>
-              <MaterialCommunityIcons name="calendar" size={20} color="#666" />
-              <Text style={{flex: 1}}>From: {fromDate.toDateString()}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.dateBtn} onPress={() => setShowToPicker(true)}>
-              <MaterialCommunityIcons name="calendar" size={20} color="#666" />
-              <Text style={{flex: 1}}>To: {toDate.toDateString()}</Text>
-            </TouchableOpacity>
-
+        <View style={styles.modalOverlay}>
+          <View style={styles.bottomSheet}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Export Excel Report</Text>
+              <TouchableOpacity onPress={() => setShowModal(false)}>
+                <MaterialCommunityIcons name="close-circle" size={24} color="#CBD5E1" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.datePickerGroup}>
+              <TouchableOpacity style={styles.dateInput} onPress={() => setShowFromPicker(true)}>
+                <Text style={styles.dateLabel}>FROM DATE</Text>
+                <Text style={styles.dateVal}>{fromDate.toLocaleDateString()}</Text>
+              </TouchableOpacity>
+              <MaterialCommunityIcons name="arrow-right" size={20} color="#CBD5E1" />
+              <TouchableOpacity style={styles.dateInput} onPress={() => setShowToPicker(true)}>
+                <Text style={styles.dateLabel}>TO DATE</Text>
+                <Text style={styles.dateVal}>{toDate.toLocaleDateString()}</Text>
+              </TouchableOpacity>
+            </View>
             {showFromPicker && (
-              <DateTimePicker
-                value={fromDate}
-                mode="date"
-                onChange={(e, d) => { setShowFromPicker(false); if (d) setFromDate(d); }}
-              />
+              <DateTimePicker value={fromDate} mode="date" onChange={(e, d) => { setShowFromPicker(false); if (d) setFromDate(d); }} />
             )}
-
             {showToPicker && (
-              <DateTimePicker
-                value={toDate}
-                mode="date"
-                onChange={(e, d) => { setShowToPicker(false); if (d) setToDate(d); }}
-              />
+              <DateTimePicker value={toDate} mode="date" onChange={(e, d) => { setShowToPicker(false); if (d) setToDate(d); }} />
             )}
-
             <TouchableOpacity style={styles.downloadBtn} onPress={exportExcel}>
-              <MaterialCommunityIcons name="download" size={20} color="white" />
-              <Text style={styles.downloadText}>GENERATE EXCEL</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => setShowModal(false)} style={{padding: 15}}>
-              <Text style={{ textAlign: 'center', color: '#EF4444', fontWeight: 'bold' }}>Cancel</Text>
+              <MaterialCommunityIcons name="microsoft-excel" size={22} color="white" />
+              <Text style={styles.downloadText}>DOWNLOAD REPORT</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F4F6FF' },
-  loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F4F6FF' },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {
-    paddingTop: 20, paddingBottom: 25, paddingHorizontal: 20, backgroundColor: '#333399',
-    borderBottomLeftRadius: 30, borderBottomRightRadius: 30, flexDirection: 'row',
-    justifyContent: 'space-between', alignItems: 'center', elevation: 5
+    // 🟢 Manual Padding Logic: Android ke liye StatusBar height adjust karein
+    paddingTop: Platform.OS === 'android' ? 15 : 50, 
+    paddingHorizontal: 20, 
+    paddingBottom: 25, 
+    backgroundColor: '#333399',
+    borderBottomLeftRadius: 30, 
+    borderBottomRightRadius: 30, 
+    flexDirection: 'row',
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    elevation: 10
   },
-  title: { color: 'white', fontSize: 22, fontWeight: '700' },
-  subtitle: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 4 },
-  excelBtn: { flexDirection: 'row', backgroundColor: '#ECFDF5', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 12, alignItems: 'center', gap: 6 },
-  excelText: { color: '#1D6F42', fontWeight: '600' },
-  card: { backgroundColor: 'white', marginHorizontal: 15, marginVertical: 8, padding: 16, borderRadius: 18, elevation: 3 },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between' },
-  tenant: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  date: { fontSize: 11, color: '#6B7280' },
-  cardBottom: { marginTop: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  reading: { fontSize: 20, fontWeight: '800', color: '#4F46E5' },
-  staff: { fontSize: 11, color: '#6B7280', marginTop: 2 },
-  sheetBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: 'white', padding: 25, borderTopLeftRadius: 30, borderTopRightRadius: 30 },
-  sheetTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 20, color: '#1E293B' },
-  dateBtn: { flexDirection: 'row', gap: 12, alignItems: 'center', padding: 16, backgroundColor: '#F1F5F9', borderRadius: 15, marginBottom: 12 },
-  downloadBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10, backgroundColor: '#333399', padding: 18, borderRadius: 15, marginTop: 10 },
+  title: { color: 'white', fontSize: 22, fontWeight: '800' },
+  subtitle: { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 2 },
+  excelBtn: { flexDirection: 'row', backgroundColor: '#16A34A', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 15, alignItems: 'center', gap: 8 },
+  excelText: { color: 'white', fontWeight: 'bold', fontSize: 13 },
+  card: { backgroundColor: 'white', borderRadius: 20, marginBottom: 15, flexDirection: 'row', elevation: 3, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, overflow: 'hidden' },
+  cardAccent: { width: 5, backgroundColor: '#333399' },
+  cardMain: { flex: 1, padding: 16 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  tenantInfo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tenantName: { fontSize: 16, fontWeight: '700', color: '#1E293B' },
+  dateBadge: { backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  dateText: { fontSize: 11, fontWeight: '700', color: '#64748B' },
+  readingContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginVertical: 8 },
+  readingValue: { fontSize: 26, fontWeight: '900', color: '#333399' },
+  unitText: { fontSize: 12, color: '#94A3B8', fontWeight: '600' },
+  staffPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20, gap: 5, borderWidth: 1, borderColor: '#E2E8F0' },
+  staffText: { fontSize: 10, fontWeight: 'bold', color: '#64748B' },
+  timeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
+  timeText: { fontSize: 11, color: '#94A3B8', marginLeft: 5 },
+  dot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#CBD5E1', marginHorizontal: 8 },
+  meterText: { fontSize: 11, color: '#94A3B8', fontWeight: '500' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  bottomSheet: { backgroundColor: 'white', padding: 25, borderTopLeftRadius: 35, borderTopRightRadius: 35 },
+  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },
+  sheetTitle: { fontSize: 18, fontWeight: 'bold', color: '#1E293B' },
+  datePickerGroup: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 25 },
+  dateInput: { flex: 1, backgroundColor: '#F1F5F9', padding: 12, borderRadius: 15, alignItems: 'center' },
+  dateLabel: { fontSize: 9, color: '#94A3B8', fontWeight: 'bold', marginBottom: 4 },
+  dateVal: { fontSize: 14, fontWeight: 'bold', color: '#1E293B' },
+  downloadBtn: { backgroundColor: '#333399', padding: 20, borderRadius: 20, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
   downloadText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
-  emptyText: { textAlign: 'center', marginTop: 50, color: '#94A3B8', fontWeight: 'bold' }
+  loadingText: { marginTop: 10, color: '#64748B', fontWeight: '600' },
+  emptyText: { marginTop: 15, color: '#94A3B8', fontWeight: '600' }
 });
 
 export default ReadingsScreen;
