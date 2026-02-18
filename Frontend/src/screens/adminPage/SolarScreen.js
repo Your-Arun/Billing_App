@@ -4,10 +4,11 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  FlatList,
+  StyleSheet, 
+  ActivityIndicator, 
+  FlatList, 
   StatusBar,
+  Platform
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -16,19 +17,18 @@ import Toast from 'react-native-toast-message';
 import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
-const SolarScreen = () => {
+const SolarScreen = ({ navigation }) => {
   const { user } = useContext(UserContext);
   const companyId = user?.role === 'Admin' ? user?.id || user?._id : user?.belongsToAdmin;
 
   const [units, setUnits] = useState('');
   const [date, setDate] = useState(new Date());
   const [showDate, setShowDate] = useState(false);
-  const [loading, setLoading] = useState(true); // 🟢 Pehle se true rakhein
+  const [loading, setLoading] = useState(true); 
   const [history, setHistory] = useState([]);
 
-  // 🔄 1. Cache Loading
+  // 🔄 1. Load Cache
   const loadCache = useCallback(async () => {
     if (!companyId) return;
     try {
@@ -42,7 +42,7 @@ const SolarScreen = () => {
     }
   }, [companyId]);
 
-  // 🌐 2. API Fetching
+  // 🌐 2. Fetch API
   const fetchHistory = useCallback(async () => {
     if (!companyId) return;
     try {
@@ -81,7 +81,7 @@ const SolarScreen = () => {
 
   const handleSave = async () => {
     if (!units || isNaN(units) || Number(units) <= 0) {
-      return Toast.show({ type: 'error', text1: 'Invalid Input ❌' });
+      return Toast.show({ type: 'error', text1: 'Invalid Input ❌', text2: 'Enter valid units' });
     }
 
     setLoading(true);
@@ -113,24 +113,19 @@ const SolarScreen = () => {
     }
   };
 
-  // 🟢 FIXED: Loading Component (String must be in <Text>)
   if (loading && history.length === 0) {
     return (
-      <View style={styles.loaderContainer}>
+      <View style={styles.centerLoader}>
         <ActivityIndicator size="large" color="#333399" />
-        <Text style={{ marginTop: 10, color: '#666' }}>Loading Data...</Text>
+        <Text style={{ marginTop: 10, color: '#666' }}>Syncing Data...</Text>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Solar Generation</Text>
-        <Text style={styles.headerSub}>Efficient Renewable Tracking</Text>
-      </View>
+    <View style={styles.container}>
+      {/* 🔴 Fixed Status Bar for APK visibility */}
+      <StatusBar barStyle="light-content" backgroundColor="#333399" translucent={true} />
 
       <FlatList
         data={history}
@@ -141,7 +136,7 @@ const SolarScreen = () => {
             <View style={styles.card}>
               <Text style={styles.label}>SELECT LOG DATE</Text>
               <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDate(true)}>
-                <MaterialCommunityIcons name="calendar-search" size={22} color="#333399" />
+                <MaterialCommunityIcons name="calendar-clock" size={22} color="#333399" />
                 <Text style={styles.dateText}>{date.toDateString()}</Text>
               </TouchableOpacity>
             </View>
@@ -165,9 +160,7 @@ const SolarScreen = () => {
                 onChangeText={setUnits}
               />
               <TouchableOpacity style={styles.btn} onPress={handleSave} disabled={loading}>
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
+                {loading ? <ActivityIndicator color="#fff" /> : (
                   <View style={styles.btnContent}>
                     <Text style={styles.btnText}>CONFIRM & SAVE</Text>
                     <MaterialCommunityIcons name="check-decagram" size={20} color="#FFF" style={{ marginLeft: 10 }} />
@@ -176,7 +169,7 @@ const SolarScreen = () => {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.historyTitle}>Recent History</Text>
+            <Text style={styles.historyTitle}>Recent Logs</Text>
           </View>
         }
         renderItem={({ item }) => (
@@ -195,33 +188,49 @@ const SolarScreen = () => {
             </TouchableOpacity>
           </View>
         )}
-        ListEmptyComponent={<Text style={styles.empty}>No logs found for this period.</Text>}
+        ListEmptyComponent={<Text style={styles.empty}>No records found.</Text>}
         contentContainerStyle={{ paddingBottom: 50 }}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F6FF' },
-  loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F6FF' },
-  header: { backgroundColor: '#333399', paddingHorizontal: 20, paddingTop: 15, paddingBottom: 35, borderBottomLeftRadius: 35, borderBottomRightRadius: 35, alignItems: 'center', elevation: 10 },
-  headerTitle: { color: '#FFF', fontSize: 24, fontWeight: '900' },
-  headerSub: { color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 4 },
-  card: { backgroundColor: 'white', borderRadius: 24, padding: 20, marginBottom: 20, elevation: 4, marginTop: 20 },
-  label: { fontSize: 11, fontWeight: 'bold', color: '#9CA3AF', marginBottom: 12, letterSpacing: 1.5, textAlign: 'center' },
-  dateBtn: { backgroundColor: '#F0F3FF', padding: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E0E7FF' },
+  centerLoader: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F6FF' },
+  header: { 
+    backgroundColor: '#333399', 
+    paddingHorizontal: 20, 
+    // Android StatusBar.currentHeight fix
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 10 : 60, 
+    paddingBottom: 30, 
+    borderBottomLeftRadius: 35, 
+    borderBottomRightRadius: 35, 
+    elevation: 10 
+  },
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerTitle: { color: '#FFF', fontSize: 20, fontWeight: 'bold' },
+  headerSub: { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 8, textAlign: 'center' },
+  
+  card: { backgroundColor: 'white', borderRadius: 24, padding: 20, marginBottom: 18, elevation: 4, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, marginTop: 20 },
+  label: { fontSize: 11, fontWeight: 'bold', color: '#9CA3AF', marginBottom: 12, letterSpacing: 1, textAlign: 'center' },
+  
+  dateBtn: { backgroundColor: '#F0F3FF', padding: 15, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E0E7FF' },
   dateText: { fontSize: 16, fontWeight: 'bold', color: '#333399', marginLeft: 10 },
-  input: { backgroundColor: '#F9FAFF', padding: 18, borderRadius: 18, fontSize: 28, textAlign: 'center', fontWeight: 'bold', borderWidth: 1, borderColor: '#EDF1FF', marginBottom: 18, color: '#1F2937' },
-  btn: { backgroundColor: '#333399', padding: 20, borderRadius: 18, alignItems: 'center' },
+  
+  input: { backgroundColor: '#F9FAFF', padding: 16, borderRadius: 16, fontSize: 24, textAlign: 'center', fontWeight: 'bold', borderWidth: 1, borderColor: '#EDF1FF', marginBottom: 18, color: '#1F2937' },
+  
+  btn: { backgroundColor: '#333399', padding: 18, borderRadius: 16, alignItems: 'center', elevation: 5 },
   btnContent: { flexDirection: 'row', alignItems: 'center' },
-  btnText: { color: 'white', fontWeight: '900', fontSize: 16 },
-  historyTitle: { fontSize: 18, fontWeight: '900', color: '#1A1C3D', marginVertical: 15, marginLeft: 20 },
-  historyCard: { backgroundColor: 'white', marginHorizontal: 18, marginBottom: 12, borderRadius: 22, padding: 18, flexDirection: 'row', alignItems: 'center', elevation: 2 },
+  btnText: { color: 'white', fontWeight: 'bold', fontSize: 15 },
+
+  historyTitle: { fontSize: 17, fontWeight: 'bold', color: '#1A1C3D', marginVertical: 15, marginLeft: 5 },
+  historyCard: { backgroundColor: 'white', marginHorizontal: 18, marginBottom: 12, borderRadius: 20, padding: 16, flexDirection: 'row', alignItems: 'center', elevation: 2 },
   iconCircle: { backgroundColor: '#FFF9C4', padding: 10, borderRadius: 14 },
   historyDate: { fontWeight: 'bold', color: '#6B7280', fontSize: 13 },
-  historyUnit: { fontSize: 18, fontWeight: '900', color: '#111827', marginTop: 3 },
-  deleteBtn: { backgroundColor: '#FFEBEE', padding: 10, borderRadius: 14 },
+  historyUnit: { fontSize: 16, fontWeight: 'bold', color: '#111827', marginTop: 2 },
+  
+  deleteBtn: { backgroundColor: '#FFEBEE', padding: 8, borderRadius: 12 },
   empty: { textAlign: 'center', color: '#9CA3AF', marginTop: 40, fontWeight: 'bold' }
 });
 

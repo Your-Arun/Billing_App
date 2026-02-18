@@ -146,8 +146,9 @@ const ReadingsReviewScreen = ({ navigation }) => {
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <StatusBar barStyle="dark-content" />
+        <SafeAreaView style={styles.container}>
+                 <StatusBar barStyle="light-content" backgroundColor="#333399" translucent={false} />
+
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}><MaterialCommunityIcons name="chevron-left" size={32} color="#333399" /></TouchableOpacity>
                 <Text style={styles.headerTitle}>Review Readings</Text>

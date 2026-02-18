@@ -16,22 +16,12 @@ import { useFocusEffect } from '@react-navigation/native';
 const { width } = Dimensions.get('window');
 
 const chartConfig = {
-  backgroundColor: "#FFF",
   backgroundGradientFrom: "#FFF",
   backgroundGradientTo: "#FFF",
   decimalPlaces: 0,
   color: (opacity = 1) => `rgba(51, 51, 153, ${opacity})`, 
   labelColor: (opacity = 1) => `rgba(100, 116, 139, ${opacity})`,
-  style: { borderRadius: 20 },
-  propsForDots: { r: "5", strokeWidth: "2", stroke: "#333399" },
-  propsForLabels: { fontSize: 10, fontWeight: '600' },
-  fillShadowGradient: "#333399",
-  fillShadowGradientOpacity: 0.1,
-  useShadowColorFromDataset: false,
-  propsForBackgroundLines: {
-    strokeDasharray: "", // सॉलिड लाइन्स
-    stroke: "#F1F5F9",   // बहुत हल्की ग्रिड लाइन्स
-  }
+  propsForDots: { r: "5", strokeWidth: "2", stroke: "#333399" }
 };
 
 const Dashboard = ({ navigation }) => {
@@ -117,12 +107,16 @@ const Dashboard = ({ navigation }) => {
   ];
 
   if (loading && data.totalTenants === 0 && !refreshing) {
-    return <View style={styles.loader}><ActivityIndicator size="large" color="#333399" /></View>;
+    return (
+      <View style={styles.loader}>
+        <ActivityIndicator size="large" color="#333399" />
+      </View>
+    );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView style={styles.safeContainer} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="light-content" backgroundColor="#333399" translucent={false} />
 
       <View style={styles.fixedHeader}>
         <View style={styles.header}>
@@ -159,62 +153,59 @@ const Dashboard = ({ navigation }) => {
         </View>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        scrollEventThrottle={16}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchDashboardData(); }} tintColor="#333399" />}
-      >
-        <View style={styles.scrollSpacer} />
+      <View style={styles.scrollContainer}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchDashboardData(); }} tintColor="#333399" />}
+        >
+          <View style={styles.scrollSpacer} />
 
-        <View style={styles.content}>
-          <View style={styles.statsGrid}>
-            <MiniStat label="Tenants" value={data.totalTenants} icon="office-building" color="#3B82F6" />
-            <MiniStat label="Solar" value={`${data.solarUnits}u`} icon="solar-power" color="#F59E0B" />
-            <MiniStat label="DG Units" value={`${data.dgUnits}u`} icon="engine" color="#EF4444" />
+          <View style={styles.content}>
+            <View style={styles.statsGrid}>
+              <MiniStat label="Tenants" value={data.totalTenants} icon="office-building" color="#3B82F6" />
+              <MiniStat label="Solar" value={`${data.solarUnits}u`} icon="solar-power" color="#F59E0B" />
+              <MiniStat label="DG Units" value={`${data.dgUnits}u`} icon="engine" color="#EF4444" />
+            </View>
+
+            <Text style={styles.sectionTitle}>Management Menu</Text>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false} 
+              contentContainerStyle={styles.horizontalMenu}
+            >
+              {navIcons.map((item, index) => (
+                <TouchableOpacity 
+                  key={index} 
+                  style={styles.menuCard} 
+                  onPress={() => navigation.navigate(item.route)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.iconCircle, { backgroundColor: item.color + '15' }]}>
+                    <MaterialCommunityIcons name={item.icon} size={28} color={item.color} />
+                  </View>
+                  <Text style={styles.cardText} numberOfLines={1}>{item.name}</Text>
+                  {item.badge > 0 && (
+                    <View style={styles.badge}><Text style={styles.badgeText}>{item.badge}</Text></View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <Text style={styles.sectionTitle}>Collection Trend (₹)</Text>
+            <View style={styles.chartCard}>
+              <LineChart
+                data={{ labels: data.chartLabels, datasets: [{ data: data.chartData }] }}
+                width={width - 50} 
+                height={180}
+                chartConfig={chartConfig}
+                bezier
+                style={{ borderRadius: 16 }}
+              />
+            </View>
           </View>
-
-          <Text style={styles.sectionTitle}>Management Menu</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false} 
-            contentContainerStyle={styles.horizontalMenu}
-            decelerationRate="fast"
-          >
-            {navIcons.map((item, index) => (
-              <TouchableOpacity 
-                key={index} 
-                style={styles.menuCard} 
-                onPress={() => navigation.navigate(item.route)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.iconCircle, { backgroundColor: item.color + '15' }]}>
-                  <MaterialCommunityIcons name={item.icon} size={28} color={item.color} />
-                </View>
-                <Text style={styles.cardText} numberOfLines={1}>{item.name}</Text>
-                {item.badge > 0 && (
-                  <View style={styles.badge}><Text style={styles.badgeText}>{item.badge}</Text></View>
-                )}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          <Text style={styles.sectionTitle}>Collection Trend (₹)</Text>
-          <View style={styles.chartCard}>
-            <LineChart
-              data={{ labels: data.chartLabels, datasets: [{ data: data.chartData }] }}
-              width={width - 50} 
-              height={180}
-              chartConfig={chartConfig}
-              bezier
-              style={styles.chartStyle}
-              withVerticalLines={false} 
-              yAxisLabel="₹"
-              fromZero={true}
-            />
-          </View>
-        </View>
-        <View style={{ height: 100 }} />
-      </ScrollView>
+          <View style={{ height: 100 }} />
+        </ScrollView>
+      </View>
 
       <UserProfile visible={profileVisible} onClose={() => setProfileVisible(false)} />
     </SafeAreaView>
@@ -230,46 +221,63 @@ const MiniStat = ({ label, value, icon, color }) => (
 );
 
 const styles = StyleSheet.create({
+  safeContainer: { flex: 1, backgroundColor: '#333399' }, // 🟢 Fix: Same as header
   container: { flex: 1, backgroundColor: '#F8FAFC' },
-  loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loader: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFC' },
+  
   fixedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100 },
-  header: { backgroundColor: '#333399', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 60, borderBottomLeftRadius: 35, borderBottomRightRadius: 35, elevation: 10 },
+  header: { 
+    backgroundColor: '#333399', 
+    paddingHorizontal: 20, 
+    paddingTop: Platform.OS === 'android' ? 50 : 50, 
+    paddingBottom: 60, 
+    borderBottomLeftRadius: 35, 
+    borderBottomRightRadius: 35, 
+    elevation: 10 
+  },
+  
+  scrollContainer: { flex: 1, backgroundColor: '#F8FAFC' }, // 🟢 Fix: Ensure content background is white
   scrollSpacer: { height: 230 },
+
   headerTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   headerInfo: { flex: 1, marginLeft: 15 },
   greeting: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
   userName: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
   lossBadge: { backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
   lossText: { color: '#FFF', fontSize: 11, fontWeight: 'bold' },
-  profitCard: { backgroundColor: '#FFF', borderRadius: 25, padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', elevation: 10, marginBottom: -45 },
+  
+  profitCard: { 
+    backgroundColor: '#FFF', 
+    borderRadius: 25, 
+    padding: 20, 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    elevation: 10, 
+    marginBottom: -45,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 10
+  },
   profitLabel: { fontSize: 10, fontWeight: 'bold', color: '#94A3B8' },
   profitValue: { fontSize: 24, fontWeight: '900', color: '#1E293B' },
   profitSubRow: { flexDirection: 'row', marginTop: 3 },
   profitSub: { fontSize: 10, color: '#16A34A', fontWeight: 'bold' },
   profitIconBox: { padding: 12, borderRadius: 15 },
-  content: { paddingHorizontal: 20, marginTop: 1 },
+  
+  content: { paddingHorizontal: 20, marginTop: 20 },
   statsGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 25 },
   miniStatCard: { backgroundColor: '#FFF', width: '31%', padding: 15, borderRadius: 20, alignItems: 'center', elevation: 2 },
   miniStatValue: { fontSize: 16, fontWeight: 'bold', color: '#1E293B', marginTop: 5 },
   miniStatLabel: { fontSize: 10, color: '#94A3B8', fontWeight: 'bold' },
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#1E293B', marginVertical: 15, marginLeft: 5 },
-  
   chartCard: { 
     backgroundColor: '#FFF', 
+    padding: 10, 
     borderRadius: 24, 
-    paddingRight: 10,
-    paddingLeft: 10,
     elevation: 4,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
     alignItems: 'center',
     overflow: 'hidden'
-  },
-  chartStyle: {
-    marginVertical: 8,
-    borderRadius: 16,
-    paddingRight: 45
   },
   
   horizontalMenu: { paddingLeft: 5, paddingRight: 20, paddingVertical: 10 },
@@ -281,10 +289,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 15,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
     elevation: 5,
     borderWidth: 1,
     borderColor: '#F1F5F9'

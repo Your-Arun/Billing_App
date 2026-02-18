@@ -195,8 +195,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {
-    // 🟢 Manual Padding Logic: Android ke liye StatusBar height adjust karein
-    paddingTop: Platform.OS === 'android' ? 15 : 50, 
+    paddingTop: Platform.OS === 'android' ? 50 : 50, 
     paddingHorizontal: 20, 
     paddingBottom: 25, 
     backgroundColor: '#333399',

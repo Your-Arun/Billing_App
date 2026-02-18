@@ -139,8 +139,8 @@ const BillScreen = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" />
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content"  backgroundColor="#333399" translucent={false} />
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <TouchableOpacity onPress={() => navigation.goBack()}><MaterialCommunityIcons name="chevron-left" size={32} color="#FFF" /></TouchableOpacity>
@@ -167,50 +167,50 @@ const BillScreen = ({ navigation }) => {
                 <View style={styles.inputContainer}>
                   <View style={styles.row}>
                     <View style={styles.inputBlock}>
-                        <Text style={styles.label}>Units</Text>
-                        <TextInput 
-                            style={styles.input} 
-                            keyboardType="numeric" 
-                            value={form.units} 
-                            onChangeText={(t) => setForm({ ...form, units: t })} 
-                            placeholder="0.00" 
-                            placeholderTextColor="#9E9E9E" // 🟢 Fixed: Gray color for APK
-                        />
+                      <Text style={styles.label}>Units</Text>
+                      <TextInput
+                        style={styles.input}
+                        keyboardType="numeric"
+                        value={form.units}
+                        onChangeText={(t) => setForm({ ...form, units: t })}
+                        placeholder="0.00"
+                        placeholderTextColor="#9E9E9E" // 🟢 Fixed: Gray color for APK
+                      />
                     </View>
                     <View style={styles.inputBlock}>
-                        <Text style={styles.label}>Energy (₹)</Text>
-                        <TextInput 
-                            style={styles.input} 
-                            keyboardType="numeric" 
-                            value={form.energy} 
-                            onChangeText={(t) => setForm({ ...form, energy: t })} 
-                            placeholder="₹ 0.00" 
-                            placeholderTextColor="#9E9E9E" // 🟢 Fixed
-                        />
+                      <Text style={styles.label}>Energy (₹)</Text>
+                      <TextInput
+                        style={styles.input}
+                        keyboardType="numeric"
+                        value={form.energy}
+                        onChangeText={(t) => setForm({ ...form, energy: t })}
+                        placeholder="₹ 0.00"
+                        placeholderTextColor="#9E9E9E" // 🟢 Fixed
+                      />
                     </View>
                   </View>
                   <View style={styles.row}>
                     <View style={styles.inputBlock}>
-                        <Text style={styles.label}>Fixed (₹)</Text>
-                        <TextInput 
-                            style={styles.input} 
-                            keyboardType="numeric" 
-                            value={form.fixed} 
-                            onChangeText={(t) => setForm({ ...form, fixed: t })} 
-                            placeholder="₹ 0.00" 
-                            placeholderTextColor="#9E9E9E" // 🟢 Fixed
-                        />
+                      <Text style={styles.label}>Fixed (₹)</Text>
+                      <TextInput
+                        style={styles.input}
+                        keyboardType="numeric"
+                        value={form.fixed}
+                        onChangeText={(t) => setForm({ ...form, fixed: t })}
+                        placeholder="₹ 0.00"
+                        placeholderTextColor="#9E9E9E" // 🟢 Fixed
+                      />
                     </View>
                     <View style={styles.inputBlock}>
-                        <Text style={styles.label}>Total (₹)</Text>
-                        <TextInput 
-                            style={[styles.input, styles.boldInput]} 
-                            keyboardType="numeric" 
-                            value={form.total} 
-                            onChangeText={(t) => setForm({ ...form, total: t })} 
-                            placeholder="₹ 0.00" 
-                            placeholderTextColor="#9E9E9E" // 🟢 Fixed
-                        />
+                      <Text style={styles.label}>Total (₹)</Text>
+                      <TextInput
+                        style={[styles.input, styles.boldInput]}
+                        keyboardType="numeric"
+                        value={form.total}
+                        onChangeText={(t) => setForm({ ...form, total: t })}
+                        placeholder="₹ 0.00"
+                        placeholderTextColor="#9E9E9E" // 🟢 Fixed
+                      />
                     </View>
                   </View>
                 </View>
@@ -242,14 +242,21 @@ const BillScreen = ({ navigation }) => {
           contentContainerStyle={{ paddingBottom: 40 }}
         />
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { backgroundColor: '#333399', padding: 20, paddingBottom: 40, borderBottomLeftRadius: 30, borderBottomRightRadius: 30 },
-  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  header: {
+    paddingTop: Platform.OS === 'android' ? 50 : 50, 
+    paddingHorizontal: 25,
+    paddingBottom: 40,
+    backgroundColor: '#333399',
+    borderBottomLeftRadius: 35,
+    borderBottomRightRadius: 35,
+    elevation: 20
+  }, headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerTitle: { color: 'white', fontSize: 20, fontWeight: 'bold' },
   headerSub: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 5, textAlign: 'center' },
   mainContent: { padding: 20 },
@@ -260,11 +267,11 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 10, marginBottom: 10 },
   inputBlock: { flex: 1 },
   label: { fontSize: 11, fontWeight: 'bold', color: '#94A3B8', marginBottom: 4 },
-  input: { 
-    backgroundColor: '#F1F5F9', 
-    padding: 10, 
-    borderRadius: 10, 
-    fontWeight: 'bold', 
+  input: {
+    backgroundColor: '#F1F5F9',
+    padding: 10,
+    borderRadius: 10,
+    fontWeight: 'bold',
     color: '#000000', // 🟢 Fixed: Force Black color for typed text
     height: 45
   },
@@ -272,7 +279,7 @@ const styles = StyleSheet.create({
   submitBtn: { backgroundColor: '#333399', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 10 },
   submitText: { color: 'white', fontWeight: 'bold' },
   sectionHeading: { fontSize: 16, fontWeight: 'bold', marginTop: 25, color: '#1E293B' },
-  historyCard: { backgroundColor: 'white', marginHorizontal: 20, marginBottom: 10, borderRadius: 15, padding: 12, flexDirection: 'row', alignItems: 'center', elevation: 2 },
+  historyCard: { backgroundColor: 'white', marginHorizontal: 30, marginBottom: 20, borderRadius: 15, padding: 10, flexDirection: 'row', alignItems: 'center', elevation: 2 },
   monthBadge: { backgroundColor: '#333399', padding: 8, borderRadius: 12, width: 50, alignItems: 'center' },
   mText: { color: '#FFF', fontSize: 11, fontWeight: 'bold', textTransform: 'uppercase' },
   yText: { color: 'rgba(255,255,255,0.6)', fontSize: 8, fontWeight: 'bold' },

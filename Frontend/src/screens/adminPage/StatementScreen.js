@@ -1,9 +1,8 @@
 import React, { useState, useContext, useMemo, useEffect, useCallback } from 'react';
 import {
     View, Text, StyleSheet, FlatList, TouchableOpacity,
-    ActivityIndicator, Alert, StatusBar, TextInput, Linking, RefreshControl
+    ActivityIndicator, Alert, StatusBar, TextInput, Linking, RefreshControl, Platform
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -26,8 +25,7 @@ const StatementScreen = ({ route, navigation }) => {
 
     const adminId = user?._id || user?.id;
     const today = new Date().toLocaleDateString('en-IN');
-
-    // 📅 Date String safety handling
+    
     const currentFromDate = useMemo(() => startDate ? new Date(startDate).toLocaleDateString('en-IN') : "", [startDate]);
     const currentToDate = useMemo(() => endDate ? new Date(endDate).toLocaleDateString('en-IN') : "", [endDate]);
     
@@ -35,7 +33,6 @@ const StatementScreen = ({ route, navigation }) => {
         return endDate ? new Date(endDate).toLocaleString('en-US', { month: 'short', year: 'numeric' }) : "";
     }, [endDate]);
 
-    // 📄 EXACT HTML TEMPLATE (Updated with Fallbacks)
     const createHTML = (item) => {
         const fDate = item.periodFrom ? new Date(item.periodFrom).toLocaleDateString('en-IN') : currentFromDate;
         const tDate = item.periodTo ? new Date(item.periodTo).toLocaleDateString('en-IN') : currentToDate;
@@ -47,20 +44,17 @@ const StatementScreen = ({ route, navigation }) => {
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <style>
-          body { font-family: 'Helvetica'; padding: 40px; color: #333; }
+          body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #333; }
           .invoice-header { display: flex; justify-content: space-between; border-bottom: 2px solid #333399; padding-bottom: 20px; margin-bottom: 30px; }
           .company-name { color: #333399; font-size: 24px; font-weight: bold; text-transform: uppercase; margin: 0; }
           .info-table { width: 100%; margin-bottom: 30px; }
-          .info-val { font-size: 14px; font-weight: bold; }
           .reading-card { background: #f8f9ff; border: 1px solid #e0e7ff; border-radius: 10px; padding: 20px; display: flex; justify-content: space-between; margin-bottom: 30px; }
           .reading-item { text-align: center; flex: 1; }
-          .reading-item span { display: block; font-size: 10px; color: #666; margin-bottom: 5px; font-weight: bold; }
           .reading-item b { font-size: 18px; color: #333399; }
           .items-table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
-          .items-table th { background: #333399; color: white; padding: 12px; text-align: left; font-size: 12px; }
-          .items-table td { padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; }
+          .items-table th { background: #333399; color: white; padding: 12px; text-align: left; }
+          .items-table td { padding: 12px; border-bottom: 1px solid #eee; }
           .total-row { background: #f3f4f6; font-weight: bold; font-size: 16px; }
-          .footer { margin-top: 50px; text-align: center; font-size: 10px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
         </style>
       </head>
       <body>
@@ -70,68 +64,66 @@ const StatementScreen = ({ route, navigation }) => {
         </div>
         <table class="info-table">
           <tr>
-            <td><div>Bill To:</div><div class="info-val">${item.tenantName}</div><div>Meter: ${item.meterId}</div></td>
-            <td style="text-align: right;"><div>Billing Period</div><div class="info-val">${fDate} - ${tDate}</div></td>
+            <td>Bill To:<br/><b>${item.tenantName}</b><br/>Meter: ${item.meterId}</td>
+            <td style="text-align: right;">Billing Period:<br/><b>${fDate} - ${tDate}</b></td>
           </tr>
         </table>
         <div class="reading-card">
-          <div class="reading-item"><span>Opening</span><b>${Number(item.opening || 0).toFixed(2)}</b></div>
-          <div class="reading-item"><span>Closing</span><b>${Number(item.closing || 0).toFixed(2)}</b></div>
-          <div class="reading-item"><span>Units</span><b>${Number(item.units).toFixed(2)}</b></div>
+          <div class="reading-item"><span>Opening</span><br/><b>${Number(item.opening || 0).toFixed(2)}</b></div>
+          <div class="reading-item"><span>Closing</span><br/><b>${Number(item.closing || 0).toFixed(2)}</b></div>
+          <div class="reading-item"><span>Units</span><br/><b>${Number(item.units).toFixed(2)}</b></div>
         </div>
         <table class="items-table">
-          <thead><tr><th>Description</th><th style="text-align: center;">Rate Info</th><th style="text-align: right;">Amt (₹)</th></tr></thead>
+          <thead><tr><th>Description</th><th style="text-align: right;">Amount (₹)</th></tr></thead>
           <tbody>
-            <tr><td>Energy Consumption</td><td style="text-align: center;">₹${Number(item.ratePerUnit || 10.20).toFixed(2)}</td><td style="text-align: right;">${Number(energyAmt).toFixed(2)}</td></tr>
-            <tr><td>Fixed Charges</td><td style="text-align: center;">Standard</td><td style="text-align: right;">${Number(item.fixed || 0).toFixed(2)}</td></tr>
-            <tr><td>Loss (${item.transformerLoss || 0}%)</td><td style="text-align: center;">Shared</td><td style="text-align: right;">${Number(item.transLoss || 0).toFixed(2)}</td></tr>
-            <tr><td>Generator (DG)</td><td style="text-align: center;">${item.isDgDisabled ? 'OFF' : '₹1.00'}</td><td style="text-align: right;">${Number(item.dgCharge || 0).toFixed(2)}</td></tr>
-            <tr class="total-row"><td colspan="2" style="text-align: right;">Grand Total (Rounded)</td><td style="text-align: right; color: #333399;">₹ ${Math.round(total).toFixed(2)}</td></tr>
+            <tr><td>Energy Usage (₹${Number(item.ratePerUnit || 10.20).toFixed(2)}/u)</td><td style="text-align: right;">${Number(energyAmt).toFixed(2)}</td></tr>
+            <tr><td>Fixed Charges</td><td style="text-align: right;">${Number(item.fixed || 0).toFixed(2)}</td></tr>
+            <tr><td>Transformer Loss (${item.transformerLoss || 0}%)</td><td style="text-align: right;">${Number(item.transLoss || 0).toFixed(2)}</td></tr>
+            <tr><td>Generator (DG)</td><td style="text-align: right;">${Number(item.dgCharge || 0).toFixed(2)}</td></tr>
+            <tr class="total-row"><td>Grand Total (Rounded)</td><td style="text-align: right; color: #333399;">₹ ${Math.round(total).toFixed(2)}</td></tr>
           </tbody>
         </table>
       </body>
     </html>`;
     };
 
-    // 🔄 Fetch Logic
+    const loadCache = useCallback(async () => {
+        if (!adminId) return;
+        try {
+            const cachedData = await AsyncStorage.getItem(`statement_history_cache_${adminId}`);
+            if (cachedData) {
+                setHistory(JSON.parse(cachedData));
+                setLoadingHistory(false);
+            }
+        } catch (e) { console.log("Cache Load Error", e); }
+    }, [adminId]);
+
     const fetchHistory = useCallback(async () => {
         if (!adminId) return;
-        setLoadingHistory(true);
         try {
             const res = await axios.get(`${API_URL}/statement/history/${adminId}`);
             setHistory(res.data || []);
             await AsyncStorage.setItem(`statement_history_cache_${adminId}`, JSON.stringify(res.data));
-        } catch (e) { console.log("History error", e); }
+        } catch (e) { console.log("History fetch failed"); }
         finally { setLoadingHistory(false); }
-    }, [adminId]);
-
-    const loadCache = useCallback(async () => {
-        if (!adminId) return;
-        try {
-            const cached = await AsyncStorage.getItem(`statement_history_cache_${adminId}`);
-            if (cached) { setHistory(JSON.parse(cached)); setLoadingHistory(false); }
-        } catch (e) { console.log("Cache Error", e); }
     }, [adminId]);
 
     useEffect(() => { loadCache(); fetchHistory(); }, [loadCache, fetchHistory]);
 
-    // 🔍 Search Filters
     const filteredCurrent = useMemo(() => tenantBreakdown.filter(t => t.tenantName.toLowerCase().includes(searchText.toLowerCase())), [searchText, tenantBreakdown]);
     const filteredHistory = useMemo(() => history.filter(h => h.tenantName.toLowerCase().includes(searchText.toLowerCase())), [searchText, history]);
 
-    // 👁️ VIEW & PRINT (Works for both lists)
     const handleViewPrint = async (item) => {
         try {
-            const html = createHTML(item);
+            const html = item.htmlContent || createHTML(item);
             await Print.printAsync({ html });
         } catch (e) { Alert.alert("Error", "Could not preview PDF"); }
     };
 
-    // 💾 SEQUENTIAL BULK SAVE
     const handleSaveAll = async () => {
         if (tenantBreakdown.length === 0) return;
         Alert.alert("Save All", `Generate ${tenantBreakdown.length} invoices?`, [
-            { text: "Cancel", style: "cancel" },
+            { text: "Cancel" },
             { 
                 text: "Yes, Save All", 
                 onPress: async () => {
@@ -220,14 +212,33 @@ const StatementScreen = ({ route, navigation }) => {
         </View>
     );
 
+    if (loadingHistory && history.length === 0) {
+        return <View style={styles.loaderContainer}><ActivityIndicator size="large" color="#333399" /></View>;
+    }
+
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" />
+        <View style={styles.mainContainer}>
+            {/* 🔴 Fixed Status Bar for APK visibility */}
+            <StatusBar barStyle="light-content" backgroundColor="#333399" translucent={true} />
+
+            {/* 🟦 HEADER WITH MANUAL PADDING */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backCircle}><MaterialCommunityIcons name="chevron-left" size={30} color="#333" /></TouchableOpacity>
-                <View style={styles.searchBox}>
-                    <MaterialCommunityIcons name="magnify" size={22} color="#999" />
-                    <TextInput placeholder="Search tenant..." style={styles.searchInput} value={searchText} onChangeText={setSearchText} />
+                <View style={styles.headerTop}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backCircle}>
+                        <MaterialCommunityIcons name="chevron-left" size={30} color="#333" />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Statements</Text>
+                    <View style={{ width: 45 }} />
+                </View>
+                <View style={styles.searchContainer}>
+                    <MaterialCommunityIcons name="magnify" size={20} color="#999" />
+                    <TextInput 
+                        placeholder="Search tenant..." 
+                        placeholderTextColor="#9E9E9E"
+                        style={styles.searchInput} 
+                        value={searchText} 
+                        onChangeText={setSearchText} 
+                    />
                 </View>
             </View>
 
@@ -259,33 +270,47 @@ const StatementScreen = ({ route, navigation }) => {
                         </View>
                     </View>
                 )}
-                ListEmptyComponent={!loadingHistory && <Text style={styles.empty}>No history found.</Text>}
             />
-        </SafeAreaView>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F8F9FE' },
-    header: { flexDirection: 'row', alignItems: 'center', padding: 15, backgroundColor: '#FFF', elevation: 2 },
+    mainContainer: { flex: 1, backgroundColor: '#F8F9FE' },
+    loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    header: {
+        backgroundColor: '#333399',
+        // 🟢 Fix: Manual Padding for Android Status Bar height
+        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 10 : 50,
+        paddingHorizontal: 20, 
+        paddingBottom: 20,
+        borderBottomLeftRadius: 30, 
+        borderBottomRightRadius: 30,
+        elevation: 10
+    },
+    headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
     backCircle: { backgroundColor: '#F5F5F5', borderRadius: 25, width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-    searchBox: { flex: 1, flexDirection: 'row', backgroundColor: '#F1F3F6', borderRadius: 12, paddingHorizontal: 12, height: 45, alignItems: 'center', marginLeft: 15 },
-    searchInput: { flex: 1, marginLeft: 10, fontSize: 14 },
-    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingHorizontal: 5 },
+    headerTitle: { color: 'white', fontSize: 20, fontWeight: 'bold' },
+    
+    searchContainer: { flexDirection: 'row', backgroundColor: '#F1F3F6', borderRadius: 12, paddingHorizontal: 12, height: 45, alignItems: 'center' },
+    searchInput: { flex: 1, marginLeft: 10, fontSize: 14, color: '#000' },
+
+    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
     sectionTitle: { fontSize: 16, fontWeight: '800', color: '#4B5563' },
     saveAllBtn: { backgroundColor: '#333399', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 10 },
     saveAllText: { color: '#FFF', fontWeight: 'bold', fontSize: 11 },
+    
     card: { flexDirection: 'row', backgroundColor: '#FFF', padding: 16, borderRadius: 18, marginBottom: 10, alignItems: 'center', elevation: 2 },
     historyCard: { flexDirection: 'row', backgroundColor: '#FFF', padding: 16, borderRadius: 18, marginBottom: 10, alignItems: 'center', borderLeftWidth: 5, borderLeftColor: '#DC2626', elevation: 1 },
     tName: { fontSize: 15, fontWeight: 'bold', color: '#1A1C3D' },
     hName: { fontSize: 15, fontWeight: 'bold', color: '#1F2937' },
     tSub: { fontSize: 12, color: '#6B7280', marginTop: 4 },
-    dateTag: { backgroundColor: '#bbbecdff', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, marginLeft: 8, marginRight:100 },
+    nameRow: { flexDirection: 'row', alignItems: 'center' },
+    dateTag: { backgroundColor: '#F0F2FF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, marginLeft: 8 },
     dateTagText: { fontSize: 9, fontWeight: 'bold', color: '#333399' },
     actionRow: { flexDirection: 'row', gap: 5 },
-    iconBtn: { padding: 10, borderRadius: 12, backgroundColor: '#F0F2FF' },
+    iconBtn: { padding: 10, borderRadius: 12, backgroundColor: '#F0F2FF', marginLeft: 5 },
     pdfBtn: { padding: 8 },
-    empty: { textAlign: 'center', marginTop: 50, color: '#9CA3AF', fontWeight: 'bold' }
 });
 
 export default StatementScreen;

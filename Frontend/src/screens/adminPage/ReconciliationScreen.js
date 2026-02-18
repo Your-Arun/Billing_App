@@ -82,8 +82,8 @@ const ReconciliationScreen = ({ route, navigation }) => {
     }, [adminId, startDate, endDate, cacheKey]);
 
     useEffect(() => {
-        loadCache(); 
-        fetchAllData(); 
+        loadCache();
+        fetchAllData();
     }, [loadCache, fetchAllData]);
 
     // ⚡ 4. INSTANT CALCULATION (useMemo ensures no lag)
@@ -152,8 +152,8 @@ const ReconciliationScreen = ({ route, navigation }) => {
     if (loading && !rawApiData) {
         return (
             <View style={styles.loaderContainer}>
-                <ActivityIndicator size="large" color="#333399" />  
-                <Text style={{marginTop: 10, color: '#666'}}>Syncing Summary...</Text>
+                <ActivityIndicator size="large" color="#333399" />
+                <Text style={{ marginTop: 10, color: '#666' }}>Syncing Summary...</Text>
             </View>
         );
     }
@@ -161,8 +161,9 @@ const ReconciliationScreen = ({ route, navigation }) => {
     const { gridUnits, gridAmount, gridFixedPrice, solarUnits, totalTenantUnitsSum, commonLoss, lossPercent, totalTenantAmountSum, calculatedTenants, profit: calculatedProfit } = processedData || {};
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <StatusBar barStyle="dark-content" />
+        <SafeAreaView style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor="#333399" translucent={false} />
+
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}><MaterialCommunityIcons name="arrow-left" size={26} color="#FFF" /></TouchableOpacity>
                 <View style={{ marginLeft: 15 }}>
@@ -171,8 +172,8 @@ const ReconciliationScreen = ({ route, navigation }) => {
                 </View>
             </View>
 
-            <ScrollView 
-                contentContainerStyle={{ padding: 16, paddingBottom: 100 }} 
+            <ScrollView
+                contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
                 refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchAllData} tintColor="#333399" />}
             >
                 <View style={styles.mainCard}>
@@ -187,7 +188,7 @@ const ReconciliationScreen = ({ route, navigation }) => {
                         <View><Text style={styles.lossLabel}>System Loss (Common)</Text><Text style={styles.lossValue}>{commonLoss?.toFixed(1)} kWh</Text></View>
                         <Text style={[styles.lossPercent, { color: lossPercent > 12 ? '#DC2626' : '#059669' }]}>{lossPercent}%</Text>
                     </View>
-                    
+
                     <Row label="Collection Sum" value={`₹ ${Math.round(totalTenantAmountSum || 0)}`} icon="cash-multiple" color="#4F46E5" bold />
 
                     <View style={styles.profitBox}>

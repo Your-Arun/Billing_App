@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useContext, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  Modal, TextInput, FlatList, ActivityIndicator, Alert, RefreshControl
+  Modal, TextInput, FlatList, ActivityIndicator, Alert, RefreshControl,
+  Platform,
+  StatusBar
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import axios from 'axios';
@@ -221,6 +223,7 @@ const TenantsScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#333399" translucent={true} />
       {/* --- PREMIUM TOP HEADER --- */}
       <View style={styles.headerContainer}>
         <Text style={styles.headerTitle}>Property Manager</Text>
@@ -430,7 +433,10 @@ const PremiumInput = ({ label, value, onChange, icon, keyboardType = 'default' }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8F9FE' },
-  headerContainer: { backgroundColor: '#333399', paddingTop: 30, paddingBottom: 25, paddingHorizontal: 25, borderBottomLeftRadius: 35, borderBottomRightRadius: 35, elevation: 10 },
+  headerContainer: {
+    backgroundColor: '#333399', paddingTop: Platform.OS === 'android' ? 50 : 50,
+    paddingBottom: 25, paddingHorizontal: 25, borderBottomLeftRadius: 35, borderBottomRightRadius: 35, elevation: 10
+  },
   headerTitle: { color: 'white', fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
 
   // New Navigation Row
