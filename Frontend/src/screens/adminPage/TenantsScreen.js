@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
   currentReadingLabel: { fontSize: 9, fontWeight: 'bold', color: '#333399' },
   currentReadingValue: { fontSize: 24, fontWeight: 'bold', color: '#333399', marginTop: 5 },
   closeFullBtn: { marginTop: 25, padding: 18, borderRadius: 20, backgroundColor: '#F5F5F5', alignItems: 'center' },
-  formContainer: { flex: 1, backgroundColor: '#F8F9FD' },
+  formContainer: { flex: 1, backgroundColor: '#F8F9FD' , paddingTop:10},
   formHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 25, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 10 : 60, paddingBottom: 25, backgroundColor: 'white', borderBottomLeftRadius: 30, borderBottomRightRadius: 30, elevation: 3 },
   formOverline: { fontSize: 10, fontWeight: 'bold', color: '#BBB', letterSpacing: 2 },
   formTitle: { fontSize: 22, fontWeight: 'bold', color: '#333399' },

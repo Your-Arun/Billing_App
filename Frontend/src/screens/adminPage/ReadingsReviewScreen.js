@@ -211,7 +211,7 @@ const SummaryCard = ({ label, value, unit, icon, color }) => (
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F3F4F6' },
     loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#FFF', elevation: 2, paddingTop: Platform.OS === 'android' ? 50 : 50,  },
+    header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#FFF', elevation: 2, paddingTop: Platform.OS === 'android' ? 20 : 50,  },
     headerTitle: { flex:1, fontSize: 18, fontWeight: 'bold', color: '#111827', textAlign: 'center' },
     dateSelector: { flexDirection: 'row', backgroundColor: '#FFF', margin: 16, borderRadius: 15, padding: 12, elevation: 3 },
     dateBtn: { flex: 1, alignItems: 'center' },

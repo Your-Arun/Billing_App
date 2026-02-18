@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
   blueHeader: { 
     backgroundColor: '#333399', 
     paddingHorizontal: 25, 
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 50 : 60,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 20 : 60,
     paddingBottom: 20 
   },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
