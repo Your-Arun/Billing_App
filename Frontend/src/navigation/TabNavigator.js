@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import axios from 'axios';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Dashboard from '../screens/Dashboard';
 import ReadingsScreen from '../screens/adminPage/ReadingsScreen';
@@ -11,15 +12,16 @@ import TenantsScreen from '../screens/adminPage/TenantsScreen';
 
 import { UserContext } from '../services/UserContext';
 import API_URL from '../services/apiconfig';
-import { Platform } from 'react-native';
 
 const Tab = createBottomTabNavigator();
 
 const TabNavigator = () => {
   const { user } = useContext(UserContext);
   const [pendingCount, setPendingCount] = useState(null);
+  const insets = useSafeAreaInsets(); // 🔥 Universal safe area
 
   const adminId = user?._id || user?.id;
+
   const fetchPendingCount = async () => {
     if (!adminId) return;
     try {
@@ -40,50 +42,63 @@ const TabNavigator = () => {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        headerShown: false, 
+        headerShown: false,
         tabBarActiveTintColor: '#333399',
         tabBarInactiveTintColor: 'gray',
-        tabBarHideOnKeyboard: true, 
-        tabBarStyle: { 
-          paddingBottom: Platform.OS === 'ios' ? 25 : 10, 
-          paddingTop: 10,
-          height: Platform.OS === 'ios' ? 85 : 70, 
-          borderTopLeftRadius: 25,
-          borderTopRightRadius: 25,
+        tabBarHideOnKeyboard: true,
+
+        // ✅ UNIVERSAL SAFE TAB STYLE
+        tabBarStyle: {
+          paddingTop: 8,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 10,
+          height: 60 + (insets.bottom > 0 ? insets.bottom : 10),
           backgroundColor: '#fff',
-          elevation: 20,
-          position: 'absolute', 
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          elevation: 8,
           borderTopWidth: 0,
         },
+
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: 'bold',
-          marginBottom: 5,
+          fontWeight: '600',
+          marginBottom: 4,
         },
-        tabBarIcon: ({ color, size }) => {
+
+        tabBarIcon: ({ color }) => {
           let iconName;
+
           if (route.name === 'Home') iconName = 'home';
           else if (route.name === 'Readings') iconName = 'speedometer';
           else if (route.name === 'Approval') iconName = 'check-decagram';
           else if (route.name === 'Bill') iconName = 'lightning-bolt';
           else if (route.name === 'Tenants') iconName = 'account-group';
 
-          return <MaterialCommunityIcons name={iconName} size={28} color={color} />;
+          return (
+            <MaterialCommunityIcons
+              name={iconName}
+              size={26}
+              color={color}
+            />
+          );
         },
       })}
     >
       <Tab.Screen name="Home" component={Dashboard} />
       <Tab.Screen name="Readings" component={ReadingsScreen} />
-      
-      <Tab.Screen 
-        name="Approval" 
-        component={ApprovalScreen} 
+
+      <Tab.Screen
+        name="Approval"
+        component={ApprovalScreen}
         options={{
-          tabBarBadge: pendingCount, 
-          tabBarBadgeStyle: { backgroundColor: '#FF5252', color: 'white' }
+          tabBarBadge: pendingCount,
+          tabBarBadgeStyle: {
+            backgroundColor: '#FF5252',
+            color: '#fff',
+          },
         }}
       />
-      
+
       <Tab.Screen name="Bill" component={BillScreen} />
       <Tab.Screen name="Tenants" component={TenantsScreen} />
     </Tab.Navigator>

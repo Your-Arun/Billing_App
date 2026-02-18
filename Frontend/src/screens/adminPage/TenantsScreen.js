@@ -1,23 +1,21 @@
 import React, { useState, useEffect, useContext, useCallback } from 'react';
-import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView,
+import { 
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, 
   Modal, TextInput, FlatList, ActivityIndicator, Alert, RefreshControl,
-  Platform,
-  StatusBar
+  StatusBar, Platform 
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import axios from 'axios';
 import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
-import Toast from 'react-native-toast-message'; import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message'; 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const TenantsScreen = ({ navigation }) => {
   const { user } = useContext(UserContext);
-
-  // --- States ---
+  
   const [tenants, setTenants] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); 
   const [modalVisible, setTenantModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState(null);
@@ -28,99 +26,87 @@ const TenantsScreen = ({ navigation }) => {
   const [opening, setOpening] = useState(0);
 
   const [form, setForm] = useState({
-    name: '', meterId: '', multiplierCT: '1',
+    name: '', meterId: '',  multiplierCT: '1',
     ratePerUnit: '', transformerLoss: '0', fixedCharge: '0', connectedDG: ''
   });
 
-
   const companyId = user?.role === 'Admin' ? user?.id : user?.belongsToAdmin;
 
+  // 🔄 1. Load Cache
   const loadCache = useCallback(async () => {
     if (!companyId) return;
     try {
       const cachedData = await AsyncStorage.getItem(`tenants_cache_${companyId}`);
       if (cachedData) {
         setTenants(JSON.parse(cachedData));
-        setLoading(false); // डेटा मिल गया तो लोडर हटा दो
+        setLoading(false); 
       }
     } catch (e) {
       console.log("Cache Load Error", e);
     }
   }, [companyId]);
 
+  // 🌐 2. Fetch Data
   const fetchTenants = useCallback(async () => {
     if (!companyId) return;
-
-    if (tenants.length === 0) {
-      setLoading(true);
-    }
-
     try {
       const res = await axios.get(`${API_URL}/tenants/${companyId}`);
-      setTenants(res.data);
-      await AsyncStorage.setItem(`tenants_cache_${companyId}`, JSON.stringify(res.data));
+      const freshData = res.data || [];
+      setTenants(freshData);
+      await AsyncStorage.setItem(`tenants_cache_${companyId}`, JSON.stringify(freshData));
 
       if (selectedTenant) {
-        const freshData = res.data.find(t => t._id === selectedTenant._id);
-        if (freshData) setSelectedTenant(freshData);
+        const freshDataDetail = freshData.find(t => t._id === selectedTenant._id);
+        if (freshDataDetail) setSelectedTenant(freshDataDetail);
       }
-    } catch (e) {
-      if (tenants.length === 0) {
-        Toast.show({ type: 'error', text1: 'Connection Error', text2: 'Could not fetch list' });
-      }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+    } catch (e) { 
+        if (tenants.length === 0) Toast.show({ type: 'error', text1: 'Network Error' });
+    } finally { 
+      setLoading(false); 
+      setRefreshing(false); 
     }
   }, [companyId, selectedTenant, tenants.length]);
-
-  useEffect(() => {
-    loadCache();
-  }, [loadCache]);
 
   const fetchDGs = useCallback(async () => {
     if (!companyId) return;
     try {
       const res = await axios.get(`${API_URL}/dg/list/${companyId}`);
       setDgList(res.data || []);
-    } catch (e) {
-      console.log('DG fetch error:', e.message);
-    }
+    } catch (e) { console.log('DG fetch error:', e.message); }
   }, [companyId]);
 
   useEffect(() => {
-    if (!selectedTenant?._id) return;
-
-    axios
-      .get(`${API_URL}/readings/opening/${selectedTenant._id}`)
-      .then(res => setOpening(res.data.openingReading))
-      .catch(() => setOpening(0));
-
-  }, [selectedTenant?._id]);
+    loadCache();
+    fetchTenants();
+    fetchDGs();
+  }, [loadCache]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       fetchTenants();
-      fetchDGs();
     });
     return unsubscribe;
-  }, [navigation, fetchTenants, fetchDGs]);
+  }, [navigation, fetchTenants]);
 
+  useEffect(() => {
+    if (!selectedTenant?._id) return;
+    axios.get(`${API_URL}/readings/opening/${selectedTenant._id}`)
+      .then(res => setOpening(res.data.openingReading))
+      .catch(() => setOpening(0));
+  }, [selectedTenant?._id]);
 
-
-  const onRefresh = useCallback(() => {
+  const onRefresh = () => {
     setRefreshing(true);
     fetchTenants();
-  }, [fetchTenants]);
+  };
 
-  // --- Handlers ---
   const handleEditInitiate = (tenant) => {
     setForm({
       name: tenant.name, meterId: tenant.meterId,
-      multiplierCT: tenant.multiplierCT.toString(),
-      ratePerUnit: tenant.ratePerUnit.toString(),
-      transformerLoss: tenant.transformerLoss.toString(),
-      fixedCharge: tenant.fixedCharge.toString(),
+      multiplierCT: String(tenant.multiplierCT),
+      ratePerUnit: String(tenant.ratePerUnit),
+      transformerLoss: String(tenant.transformerLoss),
+      fixedCharge: String(tenant.fixedCharge),
       connectedDG: tenant.connectedDG || ''
     });
     setEditId(tenant._id);
@@ -135,14 +121,12 @@ const TenantsScreen = ({ navigation }) => {
     }
     try {
       const tenantData = {
-        name: form.name,
-        meterId: form.meterId,
+        ...form,
         adminId: companyId,
         ratePerUnit: Number(form.ratePerUnit),
         multiplierCT: Number(form.multiplierCT) || 1,
         transformerLoss: Number(form.transformerLoss) || 0,
         fixedCharge: Number(form.fixedCharge) || 0,
-        connectedDG: form.connectedDG || ''
       };
 
       if (isEditing) {
@@ -155,7 +139,7 @@ const TenantsScreen = ({ navigation }) => {
       closeFormModal();
       fetchTenants();
     } catch (e) {
-      Toast.show({ type: 'error', text1: 'Failed', text2: 'Check server connection' });
+      Toast.show({ type: 'error', text1: 'Failed' });
     }
   };
 
@@ -163,38 +147,23 @@ const TenantsScreen = ({ navigation }) => {
     setTenantModalVisible(false);
     setIsEditing(false);
     setEditId(null);
-    setForm({ name: '', meterId: '', multiplierCT: '1', ratePerUnit: '', transformerLoss: '0', fixedCharge: '0' });
+    setForm({ name: '', meterId: '', multiplierCT: '1', ratePerUnit: '', transformerLoss: '0', fixedCharge: '0', connectedDG: '' });
   };
 
   const handleDelete = (id, name) => {
     Alert.alert("Confirm Delete", `Remove ${name}?`, [
       { text: "Cancel" },
-      {
-        text: "Delete", style: "destructive", onPress: async () => {
+      { text: "Delete", style: "destructive", onPress: async () => {
           try {
-            const res = await axios.delete(`${API_URL}/tenants/${id}`);
-            if (res.data) {
-              setDetailModalVisible(false);
-              fetchTenants();
-              Toast.show({ type: 'success', text1: 'Deleted 🗑️', text2: name + ' removed' });
-            }
-          } catch (e) {
-            console.log("Delete Error Frontend:", e.response?.data || e.message);
-            Toast.show({ type: 'error', text1: 'Delete Failed', text2: 'Check server logs' });
-          }
+            await axios.delete(`${API_URL}/tenants/${id}`);
+            setDetailModalVisible(false);
+            fetchTenants();
+            Toast.show({ type: 'success', text1: 'Deleted 🗑️' });
+          } catch (e) { console.log(e); }
         }
       }
     ]);
   };
-
-  if (loading && tenants.length === 0 && !refreshing) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#333399" />
-        <Text style={{ marginTop: 10, color: '#666' }}>Loading Properties...</Text>
-      </View>
-    );
-  }
 
   const renderTenantItem = ({ item }) => (
     <TouchableOpacity style={styles.modernCard} onPress={() => { setSelectedTenant(item); setDetailModalVisible(true); }}>
@@ -221,32 +190,27 @@ const TenantsScreen = ({ navigation }) => {
     </TouchableOpacity>
   );
 
+  if (loading && tenants.length === 0 && !refreshing) {
+    return (
+      <View style={styles.center}><ActivityIndicator size="large" color="#333399" /></View>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
+      {/* 🔴 Fixed Status Bar for APK visibility */}
       <StatusBar barStyle="light-content" backgroundColor="#333399" translucent={true} />
-      {/* --- PREMIUM TOP HEADER --- */}
+
+      {/* 🟦 HEADER WITH MANUAL STATUSBAR PADDING */}
       <View style={styles.headerContainer}>
         <Text style={styles.headerTitle}>Property Manager</Text>
-
-        {/* 🟢 NEW NAVIGATION BUTTONS */}
         <View style={styles.navButtonRow}>
-          <TouchableOpacity
-            style={styles.navButton}
-            onPress={() => navigation.navigate('Solar')}
-          >
-            <View style={[styles.navIconBox, { backgroundColor: '#FFF4E5' }]}>
-              <MaterialCommunityIcons name="solar-power" size={22} color="#FF9800" />
-            </View>
+          <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate('Solar')}>
+            <View style={[styles.navIconBox, { backgroundColor: '#FFF4E5' }]}><MaterialCommunityIcons name="solar-power" size={22} color="#FF9800" /></View>
             <Text style={styles.navButtonText}>Solar Info</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.navButton}
-            onPress={() => navigation.navigate('DG')}
-          >
-            <View style={[styles.navIconBox, { backgroundColor: '#E8F5E9' }]}>
-              <MaterialCommunityIcons name="engine" size={22} color="#4CAF50" />
-            </View>
+          <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate('DG')}>
+            <View style={[styles.navIconBox, { backgroundColor: '#E8F5E9' }]}><MaterialCommunityIcons name="engine" size={22} color="#4CAF50" /></View>
             <Text style={styles.navButtonText}>DG Log</Text>
           </TouchableOpacity>
         </View>
@@ -259,30 +223,24 @@ const TenantsScreen = ({ navigation }) => {
           </TouchableOpacity>
         )}
 
-        {loading && !refreshing ? (
-          <ActivityIndicator size="large" color="#333399" style={{ marginTop: 100 }} />
-        ) : (
-          <FlatList
-            data={tenants}
-            keyExtractor={(item) => item._id}
-            renderItem={renderTenantItem}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-            contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
-            ListEmptyComponent={<Text style={styles.emptyText}>No properties found.</Text>}
-          />
-        )}
+        <FlatList
+          data={tenants}
+          keyExtractor={(item) => item._id}
+          renderItem={renderTenantItem}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#333399" />}
+          contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
+          ListEmptyComponent={<Text style={styles.emptyText}>No properties found.</Text>}
+        />
       </View>
 
-      {/* --- VIEW DETAIL MODAL --- */}
+      {/* Detail Modal (Profile) */}
       <Modal visible={detailModalVisible} animationType="slide" transparent={true}>
         <View style={styles.sheetOverlay}>
           <View style={styles.bottomSheet}>
             <View style={styles.sheetHandle} />
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>Tenant Profile</Text>
-              <TouchableOpacity onPress={() => setDetailModalVisible(false)}>
-                <MaterialCommunityIcons name="close-circle" size={28} color="#CCC" />
-              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setDetailModalVisible(false)}><MaterialCommunityIcons name="close-circle" size={28} color="#CCC" /></TouchableOpacity>
             </View>
 
             {selectedTenant && (
@@ -294,18 +252,13 @@ const TenantsScreen = ({ navigation }) => {
                 </View>
 
                 <View style={styles.dgStatusCard}>
-                  <MaterialCommunityIcons name="" size={20} color="#333399" />
                   <Text style={styles.dgStatusLabel}>CONNECTED TO : </Text>
                   <Text style={styles.dgStatusValue}>{selectedTenant.connectedDG || "No DG Connected"}</Text>
                 </View>
 
                 <View style={styles.actionGrid}>
-                  <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#4CAF50' }]} onPress={() => handleEditInitiate(selectedTenant)}>
-                    <MaterialCommunityIcons name="pencil" size={20} color="white" /><Text style={styles.actionBtnText}>Edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#EF5350' }]} onPress={() => handleDelete(selectedTenant._id, selectedTenant.name)}>
-                    <MaterialCommunityIcons name="trash-can" size={20} color="white" /><Text style={styles.actionBtnText}>Delete</Text>
-                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#4CAF50' }]} onPress={() => handleEditInitiate(selectedTenant)}><MaterialCommunityIcons name="pencil" size={20} color="white" /><Text style={styles.actionBtnText}>Edit</Text></TouchableOpacity>
+                  <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#EF5350' }]} onPress={() => handleDelete(selectedTenant._id, selectedTenant.name)}><MaterialCommunityIcons name="trash-can" size={20} color="white" /><Text style={styles.actionBtnText}>Delete</Text></TouchableOpacity>
                 </View>
 
                 <View style={styles.statsGrid}>
@@ -322,14 +275,14 @@ const TenantsScreen = ({ navigation }) => {
                     <Text style={styles.currentReadingValue}>{selectedTenant.currentClosing ? selectedTenant.currentClosing : "No Readings Yet"}</Text>
                   </View>
                 </View>
-                <TouchableOpacity style={styles.closeFullBtn} onPress={() => setDetailModalVisible(false)}><Text style={{ fontWeight: 'bold' }}>Back to List</Text></TouchableOpacity>
+                <TouchableOpacity style={styles.closeFullBtn} onPress={() => setDetailModalVisible(false)}><Text style={{ fontWeight: 'bold', color: '#666' }}>Back to List</Text></TouchableOpacity>
               </ScrollView>
             )}
           </View>
         </View>
       </Modal>
 
-      {/* --- FORM MODAL --- */}
+      {/* Form Modal (Add/Edit) */}
       <Modal visible={modalVisible} animationType="slide">
         <View style={styles.formContainer}>
           <View style={styles.formHeader}>
@@ -342,10 +295,7 @@ const TenantsScreen = ({ navigation }) => {
               <PremiumInput label="Meter Serial Number *" value={form.meterId} onChange={(t) => setForm({ ...form, meterId: t })} icon="barcode-scan" />
             </FormSection>
             <FormSection title="Specs" icon="flash-outline">
-              <View style={styles.flexRow}>
-
-                <View style={{ flex: 1 }}><PremiumInput label="Multiplier" value={form.multiplierCT} onChange={(t) => setForm({ ...form, multiplierCT: t })} keyboardType="numeric" /></View>
-              </View>
+              <PremiumInput label="Multiplier (CT)" value={form.multiplierCT} onChange={(t) => setForm({ ...form, multiplierCT: t })} keyboardType="numeric" />
               <PremiumInput label="Rate Per Unit (₹) *" value={form.ratePerUnit} onChange={(t) => setForm({ ...form, ratePerUnit: t })} keyboardType="numeric" icon="currency-inr" />
             </FormSection>
             <FormSection title="Adjustments" icon="tune-vertical">
@@ -355,56 +305,13 @@ const TenantsScreen = ({ navigation }) => {
               </View>
             </FormSection>
             <View style={styles.inputWrapper}>
-              <Text style={styles.inputLabel}>Connected DG</Text>
-
+              <Text style={styles.inputLabel}>Connected DG Unit</Text>
               <View style={styles.inputBox}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-
-                  {/* NONE OPTION */}
-                  <TouchableOpacity
-                    style={[
-                      styles.dgChip,
-                      form.connectedDG === 'None' && styles.dgChipActive
-                    ]}
-                    onPress={() => setForm({ ...form, connectedDG: 'None' })}
-                  >
-                    <Text
-                      style={[
-                        styles.dgChipText,
-                        form.connectedDG === 'None' && { color: '#fff' }
-                      ]}
-                    >
-                      None
-                    </Text>
-                  </TouchableOpacity>
-
-                  {/* DG LIST FROM API */}
-                  {dgList && dgList.length > 0 ? (
-                    dgList.map((dg) => (
-                      <TouchableOpacity
-                        key={dg}
-                        style={[
-                          styles.dgChip,
-                          form.connectedDG === dg && styles.dgChipActive
-                        ]}
-                        onPress={() => setForm({ ...form, connectedDG: dg })}
-                      >
-                        <Text
-                          style={[
-                            styles.dgChipText,
-                            form.connectedDG === dg && { color: '#fff' }
-                          ]}
-                        >
-                          {dg}
-                        </Text>
-                      </TouchableOpacity>
-                    ))
-                  ) : (
-                    <Text style={{ color: '#999', marginLeft: 10 }}>
-                      No DG Found
-                    </Text>
-                  )}
-
+                  <TouchableOpacity style={[styles.dgChip, form.connectedDG === 'None' && styles.dgChipActive]} onPress={() => setForm({ ...form, connectedDG: 'None' })}><Text style={[styles.dgChipText, form.connectedDG === 'None' && { color: '#fff' }]}>None</Text></TouchableOpacity>
+                  {dgList.map((dg) => (
+                    <TouchableOpacity key={dg} style={[styles.dgChip, form.connectedDG === dg && styles.dgChipActive]} onPress={() => setForm({ ...form, connectedDG: dg })}><Text style={[styles.dgChipText, form.connectedDG === dg && { color: '#fff' }]}>{dg}</Text></TouchableOpacity>
+                  ))}
                 </ScrollView>
               </View>
             </View>
@@ -413,38 +320,58 @@ const TenantsScreen = ({ navigation }) => {
           </ScrollView>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
-// --- Helpers ---
-const StatBox = ({ label, value, icon, color }) => (
-  <View style={styles.statBox}><MaterialCommunityIcons name={icon} size={20} color={color} /><Text style={styles.statBoxValue}>{value}</Text><Text style={styles.statBoxLabel}>{label}</Text></View>
+// ... Helpers remain same, updated input component to use placeholder colors
+const PremiumInput = ({ label, value, onChange, icon, keyboardType = 'default' }) => (
+  <View style={styles.inputWrapper}>
+    <Text style={styles.inputLabel}>{label}</Text>
+    <View style={styles.inputBox}>
+      {icon && <MaterialCommunityIcons name={icon} size={18} color="#AAA" style={{ marginRight: 10 }} />}
+      <TextInput 
+        style={styles.textInput} 
+        value={value} 
+        onChangeText={onChange} 
+        keyboardType={keyboardType} 
+        placeholderTextColor="#9E9E9E" // 🟢 Fix for visibility
+        color="#000" // 🟢 Fix for visibility
+      />
+    </View>
+  </View>
 );
-const DetailRowItem = ({ label, value, icon }) => (
-  <View style={styles.detailRow}><View style={styles.detailRowLeft}><MaterialCommunityIcons name={icon} size={20} color="#666" /><Text style={styles.detailRowLabel}>{label}</Text></View><Text style={styles.detailRowValue}>{value}</Text></View>
-);
+
 const FormSection = ({ title, icon, children }) => (
   <View style={styles.formCard}><View style={styles.sectionHeader}><MaterialCommunityIcons name={icon} size={18} color="#333399" /><Text style={styles.sectionTitle}>{title}</Text></View>{children}</View>
 );
-const PremiumInput = ({ label, value, onChange, icon, keyboardType = 'default' }) => (
-  <View style={styles.inputWrapper}><Text style={styles.inputLabel}>{label}</Text><View style={styles.inputBox}>{icon && <MaterialCommunityIcons name={icon} size={18} color="#AAA" style={{ marginRight: 10 }} />}<TextInput style={styles.textInput} value={value} onChangeText={onChange} keyboardType={keyboardType} /></View></View>
+
+const StatBox = ({ label, value, icon, color }) => (
+  <View style={styles.statBox}><MaterialCommunityIcons name={icon} size={20} color={color} /><Text style={styles.statBoxValue}>{value}</Text><Text style={styles.statBoxLabel}>{label}</Text></View>
+);
+
+const DetailRowItem = ({ label, value, icon }) => (
+  <View style={styles.detailRow}><View style={styles.detailRowLeft}><MaterialCommunityIcons name={icon} size={20} color="#666" /><Text style={styles.detailRowLabel}>{label}</Text></View><Text style={styles.detailRowValue}>{value}</Text></View>
 );
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8F9FE' },
-  headerContainer: {
-    backgroundColor: '#333399', paddingTop: Platform.OS === 'android' ? 50 : 50,
-    paddingBottom: 25, paddingHorizontal: 25, borderBottomLeftRadius: 35, borderBottomRightRadius: 35, elevation: 10
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  // 🟢 Fixed Header Styling
+  headerContainer: { 
+    backgroundColor: '#333399', 
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 15 : 60, 
+    paddingBottom: 25, 
+    paddingHorizontal: 25, 
+    borderBottomLeftRadius: 35, 
+    borderBottomRightRadius: 35, 
+    elevation: 10 
   },
   headerTitle: { color: 'white', fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
-
-  // New Navigation Row
   navButtonRow: { flexDirection: 'row', justifyContent: 'space-between' },
   navButton: { flex: 1, backgroundColor: 'white', flexDirection: 'row', padding: 14, borderRadius: 18, alignItems: 'center', marginHorizontal: 5, elevation: 4 },
   navIconBox: { padding: 8, borderRadius: 12, marginRight: 10 },
-  navButtonText: { fontSize: 13, fontWeight: 'bold', color: '#333399' },
-
+  navButtonText: { fontSize: 12, fontWeight: 'bold', color: '#333399' },
   modernCard: { backgroundColor: 'white', marginHorizontal: 20, marginTop: 16, borderRadius: 24, padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', elevation: 4 },
   cardLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   iconCircle: { backgroundColor: '#F0F2FF', padding: 12, borderRadius: 16 },
@@ -457,7 +384,7 @@ const styles = StyleSheet.create({
   readingPill: { backgroundColor: '#F8F9FD', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, marginRight: 10, alignItems: 'flex-end' },
   pillLabel: { fontSize: 8, fontWeight: 'bold', color: '#BBB' },
   pillValue: { fontSize: 14, fontWeight: 'bold', color: '#333' },
-  fab: { position: 'absolute', bottom: 80, right: 30, backgroundColor: '#333399', width: 65, height: 65, borderRadius: 32.5, justifyContent: 'center', alignItems: 'center', elevation: 8, zIndex: 100 },
+  fab: { position: 'absolute', bottom: 80, right: 30, backgroundColor: '#333399', width: 65, height: 65, borderRadius: 32.5, justifyContent: 'center', alignItems: 'center', elevation: 12, zIndex: 100 },
   sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   bottomSheet: { backgroundColor: 'white', height: '85%', borderTopLeftRadius: 40, borderTopRightRadius: 40, padding: 25 },
   sheetHandle: { width: 50, height: 5, backgroundColor: '#EEE', borderRadius: 10, alignSelf: 'center', marginBottom: 20 },
@@ -468,8 +395,8 @@ const styles = StyleSheet.create({
   heroName: { fontSize: 22, fontWeight: 'bold', color: '#333' },
   heroId: { fontSize: 13, color: '#999' },
   dgStatusCard: { backgroundColor: '#F0F2FF', flexDirection: 'row', alignItems: 'center', padding: 18, borderRadius: 20, marginBottom: 20, borderWidth: 1, borderColor: '#D0D7FF' },
-  dgStatusLabel: { fontSize: 9, fontWeight: 'bold', color: '#666', marginLeft: 8 },
-  dgStatusValue: { fontSize: 16, fontWeight: 'bold', color: '#333399', marginTop: 1, padding: 4 },
+  dgStatusLabel: { fontSize: 10, fontWeight: 'bold', color: '#666' },
+  dgStatusValue: { fontSize: 15, fontWeight: 'bold', color: '#333399', marginLeft: 5 },
   actionGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 25 },
   actionBtn: { flex: 1, flexDirection: 'row', padding: 15, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginHorizontal: 5, elevation: 2 },
   actionBtnText: { color: 'white', fontWeight: 'bold', marginLeft: 8, fontSize: 14 },
@@ -486,7 +413,7 @@ const styles = StyleSheet.create({
   currentReadingValue: { fontSize: 24, fontWeight: 'bold', color: '#333399', marginTop: 5 },
   closeFullBtn: { marginTop: 25, padding: 18, borderRadius: 20, backgroundColor: '#F5F5F5', alignItems: 'center' },
   formContainer: { flex: 1, backgroundColor: '#F8F9FD' },
-  formHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 25, paddingTop: 60, paddingBottom: 25, backgroundColor: 'white', borderBottomLeftRadius: 30, borderBottomRightRadius: 30, elevation: 3 },
+  formHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 25, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 10 : 60, paddingBottom: 25, backgroundColor: 'white', borderBottomLeftRadius: 30, borderBottomRightRadius: 30, elevation: 3 },
   formOverline: { fontSize: 10, fontWeight: 'bold', color: '#BBB', letterSpacing: 2 },
   formTitle: { fontSize: 22, fontWeight: 'bold', color: '#333399' },
   formClose: { backgroundColor: '#F0F2FF', padding: 10, borderRadius: 14 },
@@ -502,23 +429,9 @@ const styles = StyleSheet.create({
   submitBtn: { backgroundColor: '#333399', padding: 22, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginTop: 10, elevation: 5 },
   submitBtnText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
   emptyText: { textAlign: 'center', marginTop: 100, color: '#AAA', fontSize: 16 },
-  dgChip: {
-    backgroundColor: '#F0F2FF',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: '#D0D7FF'
-  },
-  dgChipActive: {
-    backgroundColor: '#333399'
-  },
-  dgChipText: {
-    color: '#333',
-    fontWeight: 'bold'
-  }
-
+  dgChip: { backgroundColor: '#F0F2FF', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, marginRight: 10, borderWidth: 1, borderColor: '#D0D7FF' },
+  dgChipActive: { backgroundColor: '#333399' },
+  dgChipText: { color: '#333', fontWeight: 'bold' }
 });
 
 export default TenantsScreen;

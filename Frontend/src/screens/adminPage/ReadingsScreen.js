@@ -8,7 +8,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
-import * as FileSystem from 'expo-file-system'; 
+import * as FileSystem from 'expo-file-system/legacy'; 
 import * as Sharing from 'expo-sharing'; 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 

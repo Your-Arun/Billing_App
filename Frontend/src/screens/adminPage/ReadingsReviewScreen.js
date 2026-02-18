@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, 
-    Modal, TextInput, Alert, FlatList, StatusBar, RefreshControl // 🟢 Fixed: 'refreshing' removed from here
+    Modal, TextInput, Alert, FlatList, StatusBar, RefreshControl, // 🟢 Fixed: 'refreshing' removed from here
+    Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -147,8 +148,7 @@ const ReadingsReviewScreen = ({ navigation }) => {
 
     return (
         <SafeAreaView style={styles.container}>
-                 <StatusBar barStyle="light-content" backgroundColor="#333399" translucent={false} />
-
+         <StatusBar barStyle="light-content" backgroundColor="#333399" translucent={false} />
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}><MaterialCommunityIcons name="chevron-left" size={32} color="#333399" /></TouchableOpacity>
                 <Text style={styles.headerTitle}>Review Readings</Text>
@@ -211,7 +211,7 @@ const SummaryCard = ({ label, value, unit, icon, color }) => (
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F3F4F6' },
     loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#FFF', elevation: 2 },
+    header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#FFF', elevation: 2, paddingTop: Platform.OS === 'android' ? 50 : 50,  },
     headerTitle: { flex:1, fontSize: 18, fontWeight: 'bold', color: '#111827', textAlign: 'center' },
     dateSelector: { flexDirection: 'row', backgroundColor: '#FFF', margin: 16, borderRadius: 15, padding: 12, elevation: 3 },
     dateBtn: { flex: 1, alignItems: 'center' },

@@ -117,7 +117,6 @@ const Dashboard = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.safeContainer} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor="#333399" translucent={false} />
-
       <View style={styles.fixedHeader}>
         <View style={styles.header}>
           <View style={styles.headerTop}>
@@ -221,7 +220,7 @@ const MiniStat = ({ label, value, icon, color }) => (
 );
 
 const styles = StyleSheet.create({
-  safeContainer: { flex: 1, backgroundColor: '#333399' }, // 🟢 Fix: Same as header
+  safeContainer: { flex: 1, backgroundColor: '#333399' }, 
   container: { flex: 1, backgroundColor: '#F8FAFC' },
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFC' },
   
@@ -236,7 +235,7 @@ const styles = StyleSheet.create({
     elevation: 10 
   },
   
-  scrollContainer: { flex: 1, backgroundColor: '#F8FAFC' }, // 🟢 Fix: Ensure content background is white
+  scrollContainer: { flex: 1, backgroundColor: '#F8FAFC' }, 
   scrollSpacer: { height: 230 },
 
   headerTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
@@ -265,7 +264,7 @@ const styles = StyleSheet.create({
   profitSub: { fontSize: 10, color: '#16A34A', fontWeight: 'bold' },
   profitIconBox: { padding: 12, borderRadius: 15 },
   
-  content: { paddingHorizontal: 20, marginTop: 20 },
+  content: { paddingHorizontal: 20, marginTop: 15 },
   statsGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 25 },
   miniStatCard: { backgroundColor: '#FFF', width: '31%', padding: 15, borderRadius: 20, alignItems: 'center', elevation: 2 },
   miniStatValue: { fontSize: 16, fontWeight: 'bold', color: '#1E293B', marginTop: 5 },
