@@ -162,7 +162,14 @@ const ReconciliationScreen = ({ route, navigation }) => {
     const { gridUnits, gridAmount, gridFixedPrice, solarUnits, totalTenantUnitsSum, commonLoss, lossPercent, totalTenantAmountSum, calculatedTenants, profit: calculatedProfit } = processedData || {};
 
     return (
-        <SafeAreaView style={styles.container}>
+
+        <View style={{ flex: 1, backgroundColor: '#333399' }}>
+        <StatusBar 
+            barStyle="light-content" 
+            backgroundColor="#333399" 
+            translucent={true} 
+        />
+        <SafeAreaView style={styles.container} edges={['top']}>
             <StatusBar barStyle="light-content" backgroundColor="#333399" translucent={false} />
 
             <View style={styles.header}>
@@ -259,6 +266,7 @@ const ReconciliationScreen = ({ route, navigation }) => {
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
+        </View>
     );
 };
 

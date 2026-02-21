@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import {
-    View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, 
+    View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
     Modal, TextInput, Alert, FlatList, StatusBar, RefreshControl, // 🟢 Fixed: 'refreshing' removed from here
     Platform
 } from 'react-native';
@@ -10,7 +10,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import { UserContext } from '../../services/UserContext';
 import API_URL from '../../services/apiconfig';
-import AsyncStorage from '@react-native-async-storage/async-storage'; 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Optimized Tenant Row
 const TenantRow = React.memo(({ t, onEdit }) => (
@@ -18,7 +18,7 @@ const TenantRow = React.memo(({ t, onEdit }) => (
         <View style={{ flex: 2 }}>
             <Text style={styles.tName} numberOfLines={1}>{t.tenantName}</Text>
             <Text style={styles.tMeter}>{t.meterId}</Text>
-            <Text style={[styles.tMeter, {color: '#666'}]}>{t.connectedDG || 'No DG'}</Text>
+            <Text style={[styles.tMeter, { color: '#666' }]}>{t.connectedDG || 'No DG'}</Text>
         </View>
         <View style={styles.cellCenter}>
             <Text style={styles.tLabel}>OPENING</Text>
@@ -69,7 +69,7 @@ const ReadingsReviewScreen = ({ navigation }) => {
                 setSolar(parsed.solar);
                 setDg(parsed.dg);
                 setTenants(parsed.tenants);
-                setLoading(false); 
+                setLoading(false);
             }
         } catch (e) { console.log("Cache Load Error", e); }
     }, [user.id]);
@@ -114,7 +114,7 @@ const ReadingsReviewScreen = ({ navigation }) => {
 
     const handleEdit = useCallback((t) => {
         setSelectedTenant(t);
-        setNewReading(t.closing ? t.closing.toString() : '0'); 
+        setNewReading(t.closing ? t.closing.toString() : '0');
         setEditModalVisible(true);
     }, []);
 
@@ -147,60 +147,66 @@ const ReadingsReviewScreen = ({ navigation }) => {
     }
 
     return (
-        <SafeAreaView style={styles.container}>
-         <StatusBar barStyle="light-content" backgroundColor="#333399" translucent={false} />
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()}><MaterialCommunityIcons name="chevron-left" size={32} color="#333399" /></TouchableOpacity>
-                <Text style={styles.headerTitle}>Review Readings</Text>
-                <View style={{width: 32}} />
-            </View>
-
-            <View style={styles.dateSelector}>
-                <TouchableOpacity onPress={() => setShowPicker('from')} style={styles.dateBtn}>
-                    <Text style={styles.dateLabel}>FROM</Text>
-                    <Text style={styles.dateVal}>{startDate.toLocaleDateString('en-IN')}</Text>
-                </TouchableOpacity>
-                <View style={styles.dateDivider} />
-                <TouchableOpacity onPress={() => setShowPicker('to')} style={styles.dateBtn}>
-                    <Text style={styles.dateLabel}>TO</Text>
-                    <Text style={styles.dateVal}>{endDate.toLocaleDateString('en-IN')}</Text>
-                </TouchableOpacity>
-            </View>
-
-            {showPicker && (
-                <DateTimePicker
-                    value={showPicker === 'from' ? startDate : endDate}
-                    mode="date"
-                    onChange={(e, d) => { setShowPicker(null); if (d) { showPicker === 'from' ? setStartDate(d) : setEndDate(d); } }}
-                />
-            )}
-
-            <FlatList
-                data={tenants}
-                keyExtractor={(item, index) => item.tenantId || index.toString()}
-                renderItem={({ item }) => <TenantRow t={item} onEdit={handleEdit} />}
-                ListHeaderComponent={ListHeader}
-                contentContainerStyle={{ paddingBottom: 120 }}
-                initialNumToRender={10}
-                removeClippedSubviews={true} 
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#333399" />} 
+        <View style={{ flex: 1, backgroundColor: '#333399' }}>
+            <StatusBar
+                barStyle="light-content"
+                backgroundColor="#333399"
+                translucent={false} // इसे false ही रखें अगर आप Header को अलग रखना चाहते हैं
             />
+            <SafeAreaView style={styles.container}>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => navigation.goBack()}><MaterialCommunityIcons name="chevron-left" size={32} color="#333399" /></TouchableOpacity>
+                    <Text style={styles.headerTitle}>Review Readings</Text>
+                    <View style={{ width: 32 }} />
+                </View>
 
-            {/* Edit Modal (Logic same as yours) */}
+                <View style={styles.dateSelector}>
+                    <TouchableOpacity onPress={() => setShowPicker('from')} style={styles.dateBtn}>
+                        <Text style={styles.dateLabel}>FROM</Text>
+                        <Text style={styles.dateVal}>{startDate.toLocaleDateString('en-IN')}</Text>
+                    </TouchableOpacity>
+                    <View style={styles.dateDivider} />
+                    <TouchableOpacity onPress={() => setShowPicker('to')} style={styles.dateBtn}>
+                        <Text style={styles.dateLabel}>TO</Text>
+                        <Text style={styles.dateVal}>{endDate.toLocaleDateString('en-IN')}</Text>
+                    </TouchableOpacity>
+                </View>
 
-            <View style={styles.footer}>
-                <TouchableOpacity style={styles.submitBtn} onPress={() => navigation.navigate('Reconciliation', { startDate: startDate.toISOString(), endDate: endDate.toISOString() })}>
-                    <Text style={styles.submitText}>PROCEED TO RECONCILE</Text>
-                    <MaterialCommunityIcons name="arrow-right" size={20} color="#FFF" />
-                </TouchableOpacity>
-            </View>
-        </SafeAreaView>
+                {showPicker && (
+                    <DateTimePicker
+                        value={showPicker === 'from' ? startDate : endDate}
+                        mode="date"
+                        onChange={(e, d) => { setShowPicker(null); if (d) { showPicker === 'from' ? setStartDate(d) : setEndDate(d); } }}
+                    />
+                )}
+
+                <FlatList
+                    data={tenants}
+                    keyExtractor={(item, index) => item.tenantId || index.toString()}
+                    renderItem={({ item }) => <TenantRow t={item} onEdit={handleEdit} />}
+                    ListHeaderComponent={ListHeader}
+                    contentContainerStyle={{ paddingBottom: 120 }}
+                    initialNumToRender={10}
+                    removeClippedSubviews={true}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#333399" />}
+                />
+
+                {/* Edit Modal (Logic same as yours) */}
+
+                <View style={styles.footer}>
+                    <TouchableOpacity style={styles.submitBtn} onPress={() => navigation.navigate('Reconciliation', { startDate: startDate.toISOString(), endDate: endDate.toISOString() })}>
+                        <Text style={styles.submitText}>PROCEED TO RECONCILE</Text>
+                        <MaterialCommunityIcons name="arrow-right" size={20} color="#FFF" />
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        </View>
     );
 };
 
 const SummaryCard = ({ label, value, unit, icon, color }) => (
     <View style={styles.sCard}>
-        <View style={[styles.iconBox, {backgroundColor: color + '15'}]}>
+        <View style={[styles.iconBox, { backgroundColor: color + '15' }]}>
             <MaterialCommunityIcons name={icon} size={20} color={color} />
         </View>
         <Text style={styles.sLabel}>{label}</Text>
@@ -211,8 +217,18 @@ const SummaryCard = ({ label, value, unit, icon, color }) => (
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F3F4F6' },
     loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#FFF', elevation: 2, paddingTop: Platform.OS === 'android' ? 20 : 50,  },
-    headerTitle: { flex:1, fontSize: 18, fontWeight: 'bold', color: '#111827', textAlign: 'center' },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: '#FFF',
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+    }, headerTitle: { flex: 1, fontSize: 18, fontWeight: 'bold', color: '#111827', textAlign: 'center' },
     dateSelector: { flexDirection: 'row', backgroundColor: '#FFF', margin: 16, borderRadius: 15, padding: 12, elevation: 3 },
     dateBtn: { flex: 1, alignItems: 'center' },
     dateLabel: { fontSize: 10, color: '#999', fontWeight: 'bold', marginBottom: 2 },
