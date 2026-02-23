@@ -147,60 +147,54 @@ const ReadingsReviewScreen = ({ navigation }) => {
     }
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#333399' }}>
-            <StatusBar
-                barStyle="light-content"
-                backgroundColor="#333399"
-                translucent={false} // इसे false ही रखें अगर आप Header को अलग रखना चाहते हैं
-            />
-            <SafeAreaView style={styles.container}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()}><MaterialCommunityIcons name="chevron-left" size={32} color="#333399" /></TouchableOpacity>
-                    <Text style={styles.headerTitle}>Review Readings</Text>
-                    <View style={{ width: 32 }} />
-                </View>
+        <SafeAreaView style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor="#333399" translucent={false} />
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => navigation.goBack()}><MaterialCommunityIcons name="chevron-left" size={32} color="white" /></TouchableOpacity>
+                <Text style={styles.headerTitle}>Review Readings</Text>
+                <View style={{ width: 32 }} />
+            </View>
 
-                <View style={styles.dateSelector}>
-                    <TouchableOpacity onPress={() => setShowPicker('from')} style={styles.dateBtn}>
-                        <Text style={styles.dateLabel}>FROM</Text>
-                        <Text style={styles.dateVal}>{startDate.toLocaleDateString('en-IN')}</Text>
-                    </TouchableOpacity>
-                    <View style={styles.dateDivider} />
-                    <TouchableOpacity onPress={() => setShowPicker('to')} style={styles.dateBtn}>
-                        <Text style={styles.dateLabel}>TO</Text>
-                        <Text style={styles.dateVal}>{endDate.toLocaleDateString('en-IN')}</Text>
-                    </TouchableOpacity>
-                </View>
+            <View style={styles.dateSelector}>
+                <TouchableOpacity onPress={() => setShowPicker('from')} style={styles.dateBtn}>
+                    <Text style={styles.dateLabel}>FROM</Text>
+                    <Text style={styles.dateVal}>{startDate.toLocaleDateString('en-IN')}</Text>
+                </TouchableOpacity>
+                <View style={styles.dateDivider} />
+                <TouchableOpacity onPress={() => setShowPicker('to')} style={styles.dateBtn}>
+                    <Text style={styles.dateLabel}>TO</Text>
+                    <Text style={styles.dateVal}>{endDate.toLocaleDateString('en-IN')}</Text>
+                </TouchableOpacity>
+            </View>
 
-                {showPicker && (
-                    <DateTimePicker
-                        value={showPicker === 'from' ? startDate : endDate}
-                        mode="date"
-                        onChange={(e, d) => { setShowPicker(null); if (d) { showPicker === 'from' ? setStartDate(d) : setEndDate(d); } }}
-                    />
-                )}
-
-                <FlatList
-                    data={tenants}
-                    keyExtractor={(item, index) => item.tenantId || index.toString()}
-                    renderItem={({ item }) => <TenantRow t={item} onEdit={handleEdit} />}
-                    ListHeaderComponent={ListHeader}
-                    contentContainerStyle={{ paddingBottom: 120 }}
-                    initialNumToRender={10}
-                    removeClippedSubviews={true}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#333399" />}
+            {showPicker && (
+                <DateTimePicker
+                    value={showPicker === 'from' ? startDate : endDate}
+                    mode="date"
+                    onChange={(e, d) => { setShowPicker(null); if (d) { showPicker === 'from' ? setStartDate(d) : setEndDate(d); } }}
                 />
+            )}
 
-                {/* Edit Modal (Logic same as yours) */}
+            <FlatList
+                data={tenants}
+                keyExtractor={(item, index) => item.tenantId || index.toString()}
+                renderItem={({ item }) => <TenantRow t={item} onEdit={handleEdit} />}
+                ListHeaderComponent={ListHeader}
+                contentContainerStyle={{ paddingBottom: 120 }}
+                initialNumToRender={10}
+                removeClippedSubviews={true}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#333399" />}
+            />
 
-                <View style={styles.footer}>
-                    <TouchableOpacity style={styles.submitBtn} onPress={() => navigation.navigate('Reconciliation', { startDate: startDate.toISOString(), endDate: endDate.toISOString() })}>
-                        <Text style={styles.submitText}>PROCEED TO RECONCILE</Text>
-                        <MaterialCommunityIcons name="arrow-right" size={20} color="#FFF" />
-                    </TouchableOpacity>
-                </View>
-            </SafeAreaView>
-        </View>
+            {/* Edit Modal (Logic same as yours) */}
+
+            <View style={styles.footer}>
+                <TouchableOpacity style={styles.submitBtn} onPress={() => navigation.navigate('Reconciliation', { startDate: startDate.toISOString(), endDate: endDate.toISOString() })}>
+                    <Text style={styles.submitText}>PROCEED TO RECONCILE</Text>
+                    <MaterialCommunityIcons name="arrow-right" size={20} color="#FFF" />
+                </TouchableOpacity>
+            </View>
+        </SafeAreaView>
     );
 };
 
@@ -222,13 +216,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 16,
         paddingVertical: 12,
-        backgroundColor: '#FFF',
+        backgroundColor: '#333399', 
         elevation: 4,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
+        paddingTop: Platform.OS === 'android' ? 50 : 50, 
         shadowOpacity: 0.1,
         shadowRadius: 3,
-    }, headerTitle: { flex: 1, fontSize: 18, fontWeight: 'bold', color: '#111827', textAlign: 'center' },
+    }, headerTitle: { flex: 1, fontSize: 18, fontWeight: 'bold', color: 'white', textAlign: 'center' },
     dateSelector: { flexDirection: 'row', backgroundColor: '#FFF', margin: 16, borderRadius: 15, padding: 12, elevation: 3 },
     dateBtn: { flex: 1, alignItems: 'center' },
     dateLabel: { fontSize: 10, color: '#999', fontWeight: 'bold', marginBottom: 2 },
