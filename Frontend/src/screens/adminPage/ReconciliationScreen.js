@@ -286,7 +286,7 @@ const PriceItem = ({ label, val, color = '#4B5563' }) => (
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F3F4F6' },
-    header: { backgroundColor: '#333399', padding: 20, flexDirection: 'row', alignItems: 'center', borderBottomLeftRadius: 20, borderBottomRightRadius: 20 , paddingTop: Platform.OS === 'android' ? 50 : 50, },
+    header: { backgroundColor: '#333399', padding: 20, flexDirection: 'row', alignItems: 'center', borderBottomLeftRadius: 20, borderBottomRightRadius: 20 , paddingTop: Platform.OS === 'android' ? 20 : 50, },
     headerTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
     headerSub: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
     loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },

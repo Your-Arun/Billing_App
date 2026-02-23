@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
         elevation: 4,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        paddingTop: Platform.OS === 'android' ? 50 : 50, 
+        paddingTop: Platform.OS === 'android' ? 20 : 50, 
         shadowOpacity: 0.1,
         shadowRadius: 3,
     }, headerTitle: { flex: 1, fontSize: 18, fontWeight: 'bold', color: 'white', textAlign: 'center' },
