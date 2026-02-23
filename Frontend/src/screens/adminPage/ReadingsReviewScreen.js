@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
-    Modal, TextInput, Alert, FlatList, StatusBar, RefreshControl, // 🟢 Fixed: 'refreshing' removed from here
+    Modal, TextInput, Alert, FlatList, StatusBar, RefreshControl,
     Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,7 +13,7 @@ import API_URL from '../../services/apiconfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Optimized Tenant Row
-const TenantRow = React.memo(({ t, onEdit }) => (
+const TenantRow = React.memo(({ t }) => (
     <View style={styles.tableRow}>
         <View style={{ flex: 2 }}>
             <Text style={styles.tName} numberOfLines={1}>{t.tenantName}</Text>
@@ -32,9 +32,6 @@ const TenantRow = React.memo(({ t, onEdit }) => (
             <Text style={styles.tLabel}>USED</Text>
             <Text style={styles.spike}>{t.spike}</Text>
         </View>
-        {/* <TouchableOpacity onPress={() => onEdit(t)} style={styles.editBtn}>
-            <MaterialCommunityIcons name="pencil-box-outline" size={24} color="#4F46E5" />
-        </TouchableOpacity> */}
     </View>
 ));
 
@@ -52,27 +49,7 @@ const ReadingsReviewScreen = ({ navigation }) => {
     const [endDate, setEndDate] = useState(new Date());
     const [showPicker, setShowPicker] = useState(null);
 
-    const [isEditModalVisible, setEditModalVisible] = useState(false);
-    const [selectedTenant, setSelectedTenant] = useState(null);
-    const [newReading, setNewReading] = useState('');
-    const [updating, setUpdating] = useState(false);
-
     const formatDateForAPI = (date) => date.toISOString().split('T')[0];
-
-    const loadCache = useCallback(async () => {
-        if (!user?.id) return;
-        try {
-            const cached = await AsyncStorage.getItem(`review_cache_${user.id}`);
-            if (cached) {
-                const parsed = JSON.parse(cached);
-                setBillData(parsed.billData);
-                setSolar(parsed.solar);
-                setDg(parsed.dg);
-                setTenants(parsed.tenants);
-                setLoading(false);
-            }
-        } catch (e) { console.log("Cache Load Error", e); }
-    }, [user.id]);
 
     const fetchData = useCallback(async () => {
         if (!user?.id) return;
@@ -99,37 +76,16 @@ const ReadingsReviewScreen = ({ navigation }) => {
             setSolar(freshData.solar);
             setDg(freshData.dg);
             setTenants(freshData.tenants);
-            await AsyncStorage.setItem(`review_cache_${user.id}`, JSON.stringify(freshData));
         } catch (err) { console.log('Fetch Error:', err.message); }
         finally { setLoading(false); setRefreshing(false); }
     }, [user.id, startDate, endDate]);
 
-    useEffect(() => { loadCache(); }, [loadCache]);
     useEffect(() => { fetchData(); }, [fetchData]);
 
     const onRefresh = useCallback(() => {
         setRefreshing(true);
         fetchData();
     }, [fetchData]);
-
-    const handleEdit = useCallback((t) => {
-        setSelectedTenant(t);
-        setNewReading(t.closing ? t.closing.toString() : '0');
-        setEditModalVisible(true);
-    }, []);
-
-    const handleSaveUpdate = async () => {
-        if (!newReading || isNaN(newReading)) return Alert.alert("Error", "Enter valid number");
-        setUpdating(true);
-        try {
-            await axios.put(`${API_URL}/readings/update-reading/${selectedTenant.readingId}`, {
-                newReading: Number(newReading)
-            });
-            setEditModalVisible(false);
-            fetchData();
-        } catch (err) { Alert.alert("Failed", "Update failed"); }
-        finally { setUpdating(false); }
-    };
 
     const ListHeader = useMemo(() => (
         <View>
@@ -147,53 +103,68 @@ const ReadingsReviewScreen = ({ navigation }) => {
     }
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()}><MaterialCommunityIcons name="chevron-left" size={32} color="white" /></TouchableOpacity>
-                <Text style={styles.headerTitle}>Review Readings</Text>
-                <View style={{ width: 32 }} />
-            </View>
-
-            <View style={styles.dateSelector}>
-                <TouchableOpacity onPress={() => setShowPicker('from')} style={styles.dateBtn}>
-                    <Text style={styles.dateLabel}>FROM</Text>
-                    <Text style={styles.dateVal}>{startDate.toLocaleDateString('en-IN')}</Text>
-                </TouchableOpacity>
-                <View style={styles.dateDivider} />
-                <TouchableOpacity onPress={() => setShowPicker('to')} style={styles.dateBtn}>
-                    <Text style={styles.dateLabel}>TO</Text>
-                    <Text style={styles.dateVal}>{endDate.toLocaleDateString('en-IN')}</Text>
-                </TouchableOpacity>
-            </View>
-
-            {showPicker && (
-                <DateTimePicker
-                    value={showPicker === 'from' ? startDate : endDate}
-                    mode="date"
-                    onChange={(e, d) => { setShowPicker(null); if (d) { showPicker === 'from' ? setStartDate(d) : setEndDate(d); } }}
-                />
-            )}
-
-            <FlatList
-                data={tenants}
-                keyExtractor={(item, index) => item.tenantId || index.toString()}
-                renderItem={({ item }) => <TenantRow t={item} onEdit={handleEdit} />}
-                ListHeaderComponent={ListHeader}
-                contentContainerStyle={{ paddingBottom: 120 }}
-                initialNumToRender={10}
-                removeClippedSubviews={true}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#333399" />}
+        // 1. Root View Background for seamless StatusBar (Blue)
+        <View style={{ flex: 1, backgroundColor: '#333399' }}>
+            {/* 2. Added Missing StatusBar Component */}
+            <StatusBar 
+                barStyle="light-content" 
+                backgroundColor="#333399" 
+                translucent={false} 
             />
+            
+            <SafeAreaView style={styles.container} edges={['top']}>
+                {/* 3. Header with blue background and no manual paddingTop */}
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => navigation.goBack()}>
+                        <MaterialCommunityIcons name="chevron-left" size={32} color="white" />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Review Readings</Text>
+                    <View style={{ width: 32 }} />
+                </View>
 
-            {/* Edit Modal (Logic same as yours) */}
+                {/* Content Area (Grey background) */}
+                <View style={{ flex: 1, backgroundColor: '#F3F4F6' }}>
+                    <View style={styles.dateSelector}>
+                        <TouchableOpacity onPress={() => setShowPicker('from')} style={styles.dateBtn}>
+                            <Text style={styles.dateLabel}>FROM</Text>
+                            <Text style={styles.dateVal}>{startDate.toLocaleDateString('en-IN')}</Text>
+                        </TouchableOpacity>
+                        <View style={styles.dateDivider} />
+                        <TouchableOpacity onPress={() => setShowPicker('to')} style={styles.dateBtn}>
+                            <Text style={styles.dateLabel}>TO</Text>
+                            <Text style={styles.dateVal}>{endDate.toLocaleDateString('en-IN')}</Text>
+                        </TouchableOpacity>
+                    </View>
 
-            <View style={styles.footer}>
-                <TouchableOpacity style={styles.submitBtn} onPress={() => navigation.navigate('Reconciliation', { startDate: startDate.toISOString(), endDate: endDate.toISOString() })}>
-                    <Text style={styles.submitText}>PROCEED TO RECONCILE</Text>
-                    <MaterialCommunityIcons name="arrow-right" size={20} color="#FFF" />
-                </TouchableOpacity>
-            </View>
-        </SafeAreaView>
+                    {showPicker && (
+                        <DateTimePicker
+                            value={showPicker === 'from' ? startDate : endDate}
+                            mode="date"
+                            onChange={(e, d) => { setShowPicker(null); if (d) { showPicker === 'from' ? setStartDate(d) : setEndDate(d); } }}
+                        />
+                    )}
+
+                    <FlatList
+                        data={tenants}
+                        keyExtractor={(item, index) => item.tenantId || index.toString()}
+                        renderItem={({ item }) => <TenantRow t={item} />}
+                        ListHeaderComponent={ListHeader}
+                        contentContainerStyle={{ paddingBottom: 120 }}
+                        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#333399" />}
+                    />
+                </View>
+
+                <View style={styles.footer}>
+                    <TouchableOpacity 
+                        style={styles.submitBtn} 
+                        onPress={() => navigation.navigate('Reconciliation', { startDate: startDate.toISOString(), endDate: endDate.toISOString() })}
+                    >
+                        <Text style={styles.submitText}>PROCEED TO RECONCILE</Text>
+                        <MaterialCommunityIcons name="arrow-right" size={20} color="#FFF" />
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        </View>
     );
 };
 
@@ -208,21 +179,22 @@ const SummaryCard = ({ label, value, unit, icon, color }) => (
 );
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F3F4F6' },
-    loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    container: { flex: 1, backgroundColor: '#333399' }, // SafeArea matches header
+    loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F4F6' },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingVertical: 14,
         backgroundColor: '#333399', 
         elevation: 4,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        paddingTop: Platform.OS === 'android' ? 20 : 50, 
         shadowOpacity: 0.1,
         shadowRadius: 3,
-    }, headerTitle: { flex: 1, fontSize: 18, fontWeight: 'bold', color: 'white', textAlign: 'center' },
+        // ❌ paddingTop: 50 हटा दिया गया (SafeAreaView handles it)
+    }, 
+    headerTitle: { flex: 1, fontSize: 18, fontWeight: 'bold', color: 'white', textAlign: 'center' },
     dateSelector: { flexDirection: 'row', backgroundColor: '#FFF', margin: 16, borderRadius: 15, padding: 12, elevation: 3 },
     dateBtn: { flex: 1, alignItems: 'center' },
     dateLabel: { fontSize: 10, color: '#999', fontWeight: 'bold', marginBottom: 2 },
@@ -241,7 +213,6 @@ const styles = StyleSheet.create({
     tLabel: { fontSize: 8, color: '#999', fontWeight: 'bold' },
     tValue: { fontWeight: 'bold', color: '#333', fontSize: 12 },
     spike: { fontWeight: 'bold', color: '#DC2626', fontSize: 15 },
-    editBtn: { marginLeft: 10 },
     footer: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, backgroundColor: '#FFF', borderTopWidth: 1, borderColor: '#EEE' },
     submitBtn: { backgroundColor: '#333399', height: 55, borderRadius: 15, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', elevation: 4 },
     submitText: { color: '#FFF', fontWeight: 'bold', marginRight: 10 }
